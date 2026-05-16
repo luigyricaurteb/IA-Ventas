@@ -75,7 +75,8 @@ export async function startCompany(slug: string): Promise<void> {
     logger,
     browser: Browsers.macOS("Desktop"),
     markOnlineOnConnect: false,
-    syncFullHistory: false,
+    syncFullHistory: true,   // carga historial completo de conversaciones
+    getMessage: async () => ({ conversation: "" }), // necesario para descifrar mensajes del historial
   });
 
   const handle: BotHandle = {
@@ -131,13 +132,125 @@ export async function startCompany(slug: string): Promise<void> {
     }
   });
 
+  // ── Historial al conectar (conversaciones previas) ──────────────────────
+  sock.ev.on("messaging-history.set", ({ messages, chats, contacts, isLatest }) => {
+    console.log(`[bot:${slug}] messaging-history.set — ${chats.length} chats, ${messages.length} msgs, isLatest=${isLatest}`);
+    try {
+      importHistory(db, slug, chats, contacts, messages);
+    } catch (e) {
+      console.error(`[bot:${slug}] Error importando historial:`, e);
+    }
+  });
+
+  // ── Mensajes en tiempo real ─────────────────────────────────────────────
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    console.log(`[bot:${slug}][debug] messages.upsert — type:${type} cantidad:${messages.length}`);
+    if (type === "append") {
+      // Mensajes históricos adicionales — guardar en DB sin responder
+      importHistoricalMessages(db, messages);
+      return;
+    }
     if (type !== "notify") return;
     for (const msg of messages) {
       await handleIncomingMessage(sock, msg, slug);
     }
   });
+}
+
+// ── Importar historial de conversaciones desde Baileys ───────────────────────
+function importHistory(
+  db: import("better-sqlite3").Database,
+  slug: string,
+  chats: { id: string; name?: string | null; conversationTimestamp?: number | Long | null }[],
+  contacts: { id: string; name?: string | null; notify?: string | null }[],
+  messages: import("@whiskeysockets/baileys").proto.IWebMessageInfo[]
+) {
+  // Mapa de contactos para obtener nombres
+  const contactNames = new Map<string, string>();
+  for (const c of contacts) {
+    if (c.name || c.notify) contactNames.set(c.id, c.name || c.notify || "");
+  }
+
+  // Primero crear conversaciones para todos los chats individuales
+  let convsCreated = 0;
+  for (const chat of chats) {
+    if (!chat.id.endsWith("@s.whatsapp.net")) continue; // ignorar grupos
+    const phone = chat.id.split("@")[0];
+    const name  = chat.name || contactNames.get(chat.id) || null;
+    const ts    = chat.conversationTimestamp
+      ? Number(typeof chat.conversationTimestamp === "object" && "low" in chat.conversationTimestamp
+          ? (chat.conversationTimestamp as { low: number }).low
+          : chat.conversationTimestamp)
+      : null;
+    try {
+      db.prepare(
+        "INSERT INTO conversations (phone, name, last_message_at) VALUES (?,?,?) ON CONFLICT(phone) DO UPDATE SET name=COALESCE(excluded.name, name), last_message_at=COALESCE(excluded.last_message_at, last_message_at)"
+      ).run(phone, name, ts);
+      convsCreated++;
+    } catch {}
+  }
+
+  // Luego insertar mensajes del historial
+  let msgsImported = 0;
+  for (const msg of messages) {
+    try {
+      const jid = msg.key.remoteJid ?? "";
+      if (!jid.endsWith("@s.whatsapp.net")) continue;
+      const phone = jid.split("@")[0];
+
+      const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
+      if (!conv) continue;
+
+      const text =
+        msg.message?.conversation ??
+        msg.message?.extendedTextMessage?.text ??
+        null;
+      if (!text) continue;
+
+      const role = msg.key.fromMe ? "assistant" : "user";
+      const ts   = msg.messageTimestamp ? Number(
+        typeof msg.messageTimestamp === "object" && "low" in msg.messageTimestamp
+          ? (msg.messageTimestamp as { low: number }).low
+          : msg.messageTimestamp
+      ) : Math.floor(Date.now() / 1000);
+
+      // Evitar duplicados por timestamp + rol + conversación
+      const exists = db.prepare(
+        "SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1"
+      ).get(conv.id, role, ts);
+      if (exists) continue;
+
+      db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)")
+        .run(conv.id, role, text, ts);
+      msgsImported++;
+    } catch {}
+  }
+
+  console.log(`[bot:${slug}] Historial importado: ${convsCreated} conversaciones, ${msgsImported} mensajes`);
+}
+
+function importHistoricalMessages(
+  db: import("better-sqlite3").Database,
+  messages: import("@whiskeysockets/baileys").proto.IWebMessageInfo[]
+) {
+  for (const msg of messages) {
+    try {
+      const jid = msg.key.remoteJid ?? "";
+      if (!jid.endsWith("@s.whatsapp.net")) continue;
+      const phone = jid.split("@")[0];
+      const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
+      if (!conv) continue;
+      const text = msg.message?.conversation ?? msg.message?.extendedTextMessage?.text ?? null;
+      if (!text) continue;
+      const role = msg.key.fromMe ? "assistant" : "user";
+      const ts   = msg.messageTimestamp ? Number(
+        typeof msg.messageTimestamp === "object" && "low" in msg.messageTimestamp
+          ? (msg.messageTimestamp as { low: number }).low
+          : msg.messageTimestamp
+      ) : Math.floor(Date.now() / 1000);
+      const exists = db.prepare("SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1").get(conv.id, role, ts);
+      if (!exists) db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)").run(conv.id, role, text, ts);
+    } catch {}
+  }
 }
 
 function scheduleReconnect(slug: string, code?: number) {

@@ -35,15 +35,16 @@ export interface CurrentUser {
 }
 
 export default function ConnectionGate() {
-  const [connected, setConnected]     = useState(false);
-  const [phone, setPhone]             = useState<string | null>(null);
+  const [connected, setConnected]         = useState(false);
+  const [phone, setPhone]                 = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedId, setSelectedId]   = useState<number | null>(null);
+  const [selectedId, setSelectedId]       = useState<number | null>(null);
   const [initialChecked, setInitialChecked] = useState(false);
-  const [activeModule, setActiveModule] = useState<Module>("chat");
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [scanning, setScanning]       = useState(false);
-  const [scanResult, setScanResult]   = useState<string | null>(null);
+  const [activeModule, setActiveModule]   = useState<Module>("chat");
+  const [currentUser, setCurrentUser]     = useState<CurrentUser | null>(null);
+  const [scanning, setScanning]           = useState(false);
+  const [scanResult, setScanResult]       = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen]     = useState(false); // móvil drawer
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
@@ -117,44 +118,100 @@ export default function ConnectionGate() {
   const isMaster      = currentUser?.isMaster ?? false;
   const allowedMods   = getAllowedModules(perms, isMaster);
 
+  // En móvil, cuando hay una conversación seleccionada mostramos el panel, no la lista
+  const showChatPanel  = selectedConv !== null;
+  const showChatList   = !showChatPanel || selectedId === null;
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar active={activeModule} onChange={setActiveModule} allowedModules={allowedMods} />
+    // h-dvh = dynamic viewport height (funciona en móvil con barras del navegador)
+    <div className="flex h-screen md:h-screen overflow-hidden bg-gray-100">
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <DashboardHeader phone={phone} onDisconnect={handleDisconnect} currentUser={currentUser} onLogout={handleLogout} />
+      {/* ── Sidebar (desktop fijo + móvil drawer) ──────────────────────── */}
+      <Sidebar
+        active={activeModule}
+        onChange={m => { setActiveModule(m); setSidebarOpen(false); }}
+        allowedModules={allowedMods}
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        onMobileOpen={() => setSidebarOpen(true)}
+      />
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Módulo exclusivo master: gestión de plataforma */}
+      {/* ── Contenido principal ─────────────────────────────────────────── */}
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+
+        {/* Header — en móvil tiene botón hamburguesa */}
+        <DashboardHeader
+          phone={phone}
+          onDisconnect={handleDisconnect}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onMenuOpen={() => setSidebarOpen(true)}
+        />
+
+        {/* Área de contenido — padding-bottom en móvil para bottom nav */}
+        <div className="flex flex-1 overflow-hidden min-h-0 pb-14 md:pb-0">
+
           {activeModule === "master" && isMaster && <MasterDashboard onLogout={handleLogout} />}
 
           {activeModule === "chat" && canAccess(perms, "chat", isMaster) && (
             connected ? (
-              <>
-                <div className="w-72 shrink-0 border-r border-gray-200 bg-white flex flex-col">
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversaciones</h2>
-                    <button onClick={handleScan} disabled={scanning} title="Escanear con IA" className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
+              <div className="flex flex-1 overflow-hidden min-w-0">
+
+                {/* Lista de conversaciones — oculta en móvil si hay conv. seleccionada */}
+                <div className={`
+                  ${showChatPanel ? "hidden md:flex" : "flex"}
+                  w-full md:w-72 shrink-0 border-r border-gray-200 bg-white flex-col
+                `}>
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
+                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Conversaciones
+                      {conversations.length > 0 && (
+                        <span className="ml-1.5 bg-gray-200 text-gray-600 rounded-full px-1.5 py-0.5 text-[10px]">
+                          {conversations.length}
+                        </span>
+                      )}
+                    </h2>
+                    <button onClick={handleScan} disabled={scanning} className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
                       {scanning ? "⏳" : "🔍 Escanear"}
                     </button>
                   </div>
                   {scanResult && <div className="px-3 py-1.5 bg-emerald-50 border-b text-xs text-emerald-700">{scanResult}</div>}
-                  <ConversationList conversations={conversations} selectedId={selectedId} onSelect={setSelectedId} />
+                  <ConversationList conversations={conversations} selectedId={selectedId} onSelect={id => setSelectedId(id)} />
                 </div>
-                <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
+
+                {/* Panel de conversación — full screen en móvil */}
+                <div className={`
+                  ${showChatPanel ? "flex" : "hidden md:flex"}
+                  flex-1 overflow-hidden bg-gray-50 flex-col min-w-0
+                `}>
+                  {/* Botón "volver" en móvil */}
+                  {showChatPanel && (
+                    <div className="md:hidden px-3 py-2 bg-white border-b border-gray-100 flex items-center gap-2">
+                      <button onClick={() => setSelectedId(null)} className="text-sm text-emerald-600 font-medium flex items-center gap-1">
+                        ← Conversaciones
+                      </button>
+                    </div>
+                  )}
                   <JulietaAlertsPanel />
                   {selectedConv
                     ? <ConversationPanel conversation={selectedConv} onModeChange={handleModeChange} onDelete={handleDelete} />
-                    : <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">Selecciona una conversación</div>
+                    : <div className="flex flex-1 items-center justify-center text-gray-400 text-sm p-6 text-center">
+                        <div>
+                          <div className="text-4xl mb-3">💬</div>
+                          <p className="font-medium">Selecciona una conversación</p>
+                          <p className="text-xs mt-1 text-gray-300">Aparecerá el historial completo</p>
+                        </div>
+                      </div>
                   }
                 </div>
-              </>
+              </div>
             ) : (
               <div className="flex-1 overflow-auto">
                 <QRScreen onConnected={handleConnected} />
               </div>
             )
           )}
+
           {activeModule === "crm"        && canAccess(perms,"crm",isMaster)        && <KanbanBoard />}
           {activeModule === "calendar"   && canAccess(perms,"calendar",isMaster)   && <CalendarModule />}
           {activeModule === "analytics"  && canAccess(perms,"analytics",isMaster)  && <AnalyticsModule />}

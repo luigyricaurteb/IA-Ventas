@@ -9,9 +9,10 @@ interface DashboardHeaderProps {
   onDisconnect: () => void;
   currentUser?: { name: string; role?: string; isMaster?: boolean } | null;
   onLogout?: () => void;
+  onMenuOpen?: () => void;
 }
 
-export default function DashboardHeader({ phone, onDisconnect, currentUser, onLogout }: DashboardHeaderProps) {
+export default function DashboardHeader({ phone, onDisconnect, currentUser, onLogout, onMenuOpen }: DashboardHeaderProps) {
   const [slaBreaches, setSlaBreaches] = useState(0);
   const [showSla, setShowSla]         = useState(false);
   const [slaList, setSlaList]         = useState<SlaBreachItem[]>([]);
@@ -48,11 +49,17 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
   }
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 shrink-0 relative">
+    <header className="flex items-center justify-between px-3 md:px-6 py-3 bg-white border-b border-gray-200 shrink-0 relative">
       <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-        <span className="font-semibold text-gray-800">Agente DMC</span>
-        {phone && <span className="text-sm text-gray-400 ml-2">+{phone}</span>}
+        {/* Hamburguesa en móvil */}
+        <button onClick={onMenuOpen} className="md:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 mr-1">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="w-2 h-2 rounded-full bg-emerald-500 hidden md:block" />
+        <span className="font-semibold text-gray-800 text-sm md:text-base">Agente DMC</span>
+        {phone && <span className="text-xs md:text-sm text-gray-400">+{phone}</span>}
       </div>
       <div className="flex items-center gap-4">
         {/* Alerta de vencimiento de suscripción */}
