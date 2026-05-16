@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getCompanyById, updateCompany } from "@/lib/master/db-master";
+import masterDb from "@/lib/master/db-master";
 import { getUserFromToken } from "@/lib/auth";
+import { clearCompanyDbCache } from "@/lib/master/db-company";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -15,8 +17,33 @@ function requireMaster(req: NextRequest) {
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!requireMaster(req)) return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
   const { id } = await params;
-  const body = await req.json();
-  updateCompany(Number(id), body);
+  const body = await req.json() as Record<string, unknown>;
+  // Filtrar solo campos válidos
+  const allowed = ["name","email","phone","plan_id","status","logo_filename"];
+  const update: Record<string, unknown> = {};
+  for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
+  if (Object.keys(update).length) updateCompany(Number(id), update);
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  if (!requireMaster(req)) return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  const { id } = await params;
+  const company = getCompanyById(Number(id));
+  if (!company) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  if (company.slug === "platform") return NextResponse.json({ error: "No se puede eliminar la empresa plataforma" }, { status: 400 });
+
+  // Limpiar cache de conexión DB
+  clearCompanyDbCache(company.slug);
+
+  // Eliminar archivos de la empresa
+  try { if (company.db_path && fs.existsSync(company.db_path)) fs.unlinkSync(company.db_path); } catch {}
+  try { if (company.auth_path && fs.existsSync(company.auth_path)) fs.rmSync(company.auth_path, { recursive: true, force: true }); } catch {}
+
+  // Eliminar de la DB maestra (cascada: subscriptions, etc.)
+  masterDb.prepare("DELETE FROM subscriptions WHERE company_id=?").run(Number(id));
+  masterDb.prepare("DELETE FROM companies WHERE id=?").run(Number(id));
+
   return NextResponse.json({ ok: true });
 }
 
