@@ -41,9 +41,15 @@ export default function ConnectionGate() {
   const [scanResult, setScanResult] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verificar sesión
-    fetch("/api/auth/me").then((r) => r.json()).then((d) => {
-      if (d.user) setCurrentUser(d.user);
+    // Verificar sesión — si no es válida, redirigir al login
+    fetch("/api/auth/me").then((r) => {
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return null;
+      }
+      return r.json();
+    }).then((d) => {
+      if (d?.user) setCurrentUser(d.user);
     }).catch(() => {});
 
     // Verificar conexión WhatsApp
