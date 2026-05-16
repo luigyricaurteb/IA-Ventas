@@ -75,8 +75,8 @@ export async function startCompany(slug: string): Promise<void> {
     logger,
     browser: Browsers.macOS("Desktop"),
     markOnlineOnConnect: false,
-    syncFullHistory: true,   // carga historial completo de conversaciones
-    getMessage: async () => ({ conversation: "" }), // necesario para descifrar mensajes del historial
+    syncFullHistory: false,  // false = QR aparece rápido; historial llega vía messaging-history.set
+    getMessage: async () => ({ conversation: "" }),
   });
 
   const handle: BotHandle = {
