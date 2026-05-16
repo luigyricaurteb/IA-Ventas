@@ -1,9 +1,11 @@
 #!/bin/sh
-# Arranca el bot en background y Next.js en foreground
-# Railway monitorea el proceso principal (Next.js) en el PORT asignado
+# Bot en background, Next.js en foreground
+# Railway hace health check en el PORT que asigna (default 3000)
+
+echo "[start.sh] Iniciando bot en background..."
 npm run start:bot &
 BOT_PID=$!
-echo "[start.sh] Bot iniciado con PID $BOT_PID"
+echo "[start.sh] Bot PID: $BOT_PID"
 
-# Next.js en foreground — Railway hace health check aquí
-exec npm run start
+echo "[start.sh] Iniciando Next.js en puerto ${PORT:-3000}..."
+exec node_modules/.bin/next start -p ${PORT:-3000} -H 0.0.0.0
