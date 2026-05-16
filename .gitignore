@@ -1,0 +1,40 @@
+# Dependencias
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Datos runtime (NO versionar — se crean en el servidor)
+data/
+auth/
+
+# Variables de entorno (NUNCA subir)
+.env.local
+.env
+
+# Uploads de usuarios (se crean en el servidor con volumen persistente)
+public/uploads/products/*
+public/uploads/logos/*
+public/uploads/proofs/*
+public/uploads/pdfs/*
+public/uploads/supplier-docs/*
+!public/uploads/products/.gitkeep
+!public/uploads/logos/.gitkeep
+!public/uploads/proofs/.gitkeep
+!public/uploads/pdfs/.gitkeep
+!public/uploads/supplier-docs/.gitkeep
+
+# Claude Code interno
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
