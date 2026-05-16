@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
-import { getUserByUsername, getUserById, type User } from "./db";
+import db, { getUserByUsername, getUserById, type User } from "./db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "agente-dmc-secret-2026-changeme";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const JWT_SECRET      = process.env.JWT_SECRET      || "agente-dmc-secret-2026-changeme";
+const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD  || "admin123";
+const ADMIN_SALT      = process.env.ADMIN_SALT      || "agente-dmc-fixed-salt-2026";
 
 // ── JWT sin librerías externas ────────────────────────────────────────────
 
@@ -27,10 +28,7 @@ export function verifyJWT(token: string): Record<string, unknown> | null {
   }
 }
 
-// ── Contraseña determinista para admin ────────────────────────────────────
-// Usa ADMIN_SALT fija para que el hash sea siempre el mismo entre reinicios
-
-const ADMIN_SALT = process.env.ADMIN_SALT || "agente-dmc-fixed-salt-2026";
+// ── Password helpers ──────────────────────────────────────────────────────
 
 export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
   const s    = salt ?? crypto.randomBytes(16).toString("hex");
@@ -43,11 +41,10 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
   return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hash, "hex"));
 }
 
-// Asegura que el admin existe siempre con password desde env var
+// ── Admin siempre disponible con ADMIN_PASSWORD del env ──────────────────
+
 export function ensureAdminUser(): void {
   const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
-  const db = require("./db").default;
-  // Actualizar hash del admin (por si cambió ADMIN_PASSWORD)
   const existing = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
   if (existing) {
     db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE username = 'admin'").run(hash, salt);
@@ -56,12 +53,16 @@ export function ensureAdminUser(): void {
   }
 }
 
-// ── Login y sesión via JWT ────────────────────────────────────────────────
+// Crear admin la primera vez que se importa este módulo
+try { ensureAdminUser(); } catch {}
 
-export async function loginUser(username: string, password: string): Promise<{
-  token: string;
-  user: Omit<User, "password_hash" | "salt">;
-} | null> {
+// ── Login via JWT ─────────────────────────────────────────────────────────
+
+export async function loginUser(
+  username: string,
+  password: string
+): Promise<{ token: string; user: Omit<User, "password_hash" | "salt"> } | null> {
+  ensureAdminUser(); // garantiza que admin existe antes de cada login
   const user = getUserByUsername(username);
   if (!user) return null;
   if (!verifyPassword(password, user.password_hash, user.salt)) return null;
@@ -69,7 +70,7 @@ export async function loginUser(username: string, password: string): Promise<{
   const token = createJWT({
     sub:  String(user.id),
     role: user.role,
-    exp:  Math.floor(Date.now() / 1000) + 7 * 86400, // 7 días
+    exp:  Math.floor(Date.now() / 1000) + 7 * 86400,
   });
 
   const { password_hash: _, salt: __, ...safe } = user;
@@ -80,14 +81,12 @@ export function getUserFromToken(token: string): Omit<User, "password_hash" | "s
   const payload = verifyJWT(token);
   if (!payload || typeof payload.sub !== "string") return null;
   const user = getUserById(Number(payload.sub));
-  if (!user) return null;
+  if (!user || !user.active) return null;
   const { password_hash: _, salt: __, ...safe } = user;
   return safe;
 }
 
-export function logout(_token: string): void {
-  // Con JWT no hay sesión en DB que borrar
-}
+export function logout(_token: string): void { /* JWT es stateless */ }
 
 // ── Permisos por rol ──────────────────────────────────────────────────────
 
