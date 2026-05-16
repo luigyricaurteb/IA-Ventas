@@ -8,10 +8,10 @@
   "scripts": {
     "dev": "next dev -p 8080",
     "build": "next build",
-    "start": "next start -p ${PORT:-3000}",
+    "start": "next start",
     "lint": "next lint",
     "start:bot": "tsx scripts/start-bot.ts",
-    "start:all": "concurrently --kill-others --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\""
+    "start:all": "concurrently --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\""
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
