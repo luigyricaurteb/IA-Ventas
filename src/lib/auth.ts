@@ -1,15 +1,19 @@
 import crypto from "node:crypto";
-import db, { getUserByUsername, getUserById, type User } from "./db";
+import { getMasterUser, checkRateLimit, recordLoginAttempt } from "./master/db-master";
+import { getCompanyDb } from "./master/db-company";
+import { getCompanyBySlug } from "./master/db-master";
 
-const JWT_SECRET      = process.env.JWT_SECRET      || "agente-dmc-secret-2026-changeme";
-const ADMIN_PASSWORD  = process.env.ADMIN_PASSWORD  || "admin123";
-const ADMIN_SALT      = process.env.ADMIN_SALT      || "agente-dmc-fixed-salt-2026";
+const JWT_SECRET     = process.env.JWT_SECRET     || "agente-dmc-secret-2026-changeme";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || "admin123";
+const ADMIN_SALT     = process.env.ADMIN_SALT      || "agente-dmc-fixed-salt-2026";
+const MASTER_PASS    = process.env.MASTER_PASSWORD || "master123";
+const MASTER_SALT_V  = process.env.MASTER_SALT     || "master-fixed-salt-2026";
 
-// ── JWT sin librerías externas ────────────────────────────────────────────
+// ── JWT ───────────────────────────────────────────────────────────────────
 
 export function createJWT(payload: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const body   = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000) })).toString("base64url");
+  const body   = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now()/1000) })).toString("base64url");
   const sig    = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
   return `${header}.${body}.${sig}`;
 }
@@ -21,14 +25,12 @@ export function verifyJWT(token: string): Record<string, unknown> | null {
     const expected = crypto.createHmac("sha256", JWT_SECRET).update(`${header}.${body}`).digest("base64url");
     if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
     const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as Record<string, unknown>;
-    if (typeof payload.exp === "number" && payload.exp < Date.now() / 1000) return null;
+    if (typeof payload.exp === "number" && payload.exp < Date.now()/1000) return null;
     return payload;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// ── Password helpers ──────────────────────────────────────────────────────
+// ── Contraseñas ───────────────────────────────────────────────────────────
 
 export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
   const s    = salt ?? crypto.randomBytes(16).toString("hex");
@@ -41,69 +43,141 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
   return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(hash, "hex"));
 }
 
-// ── Admin siempre disponible con ADMIN_PASSWORD del env ──────────────────
+// ── Sanitización de inputs (SQL injection / XSS prevention) ──────────────
 
-export function ensureAdminUser(): void {
-  const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
-  const existing = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
-  if (existing) {
-    db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE username = 'admin'").run(hash, salt);
-  } else {
-    db.prepare("INSERT INTO users (username, name, password_hash, salt, role) VALUES ('admin', 'Administrador', ?, ?, 'admin')").run(hash, salt);
-  }
+export function sanitizeInput(value: string): string {
+  return value
+    .replace(/[<>]/g, "") // No XSS
+    .replace(/['"`;]/g, "") // No SQL injection básica (prepared statements ya protegen)
+    .trim()
+    .slice(0, 500); // Límite de longitud
 }
 
-// Crear admin la primera vez que se importa este módulo
-try { ensureAdminUser(); } catch {}
+// ── Login MASTER ──────────────────────────────────────────────────────────
 
-// ── Login via JWT ─────────────────────────────────────────────────────────
+export async function loginMaster(username: string, password: string, ip: string): Promise<{
+  token: string;
+  user: { id: number; username: string; name: string; role: "master" };
+} | null> {
+  // Rate limiting: máx 5 intentos / 15 min por IP
+  if (!checkRateLimit(ip, 5, 900)) return null;
 
-export async function loginUser(
-  username: string,
-  password: string
-): Promise<{ token: string; user: Omit<User, "password_hash" | "salt"> } | null> {
-  ensureAdminUser(); // garantiza que admin existe antes de cada login
-  const user = getUserByUsername(username);
-  if (!user) return null;
-  if (!verifyPassword(password, user.password_hash, user.salt)) return null;
+  const user = getMasterUser(sanitizeInput(username));
+  if (!user) { recordLoginAttempt(ip); return null; }
+  if (!verifyPassword(password, user.password_hash, user.salt)) { recordLoginAttempt(ip); return null; }
 
   const token = createJWT({
     sub:  String(user.id),
-    role: user.role,
-    exp:  Math.floor(Date.now() / 1000) + 7 * 86400,
+    role: "master",
+    exp:  Math.floor(Date.now()/1000) + 8*3600, // 8 horas para master
+  });
+  return { token, user: { id: user.id, username: user.username, name: user.name, role: "master" } };
+}
+
+// ── Login empresa ─────────────────────────────────────────────────────────
+
+export async function loginCompanyUser(companySlug: string, username: string, password: string, ip: string): Promise<{
+  token: string;
+  user: { id: number; username: string; name: string; permissions: Record<string, boolean>; is_admin: boolean };
+} | null> {
+  if (!checkRateLimit(`${ip}:${companySlug}`, 5, 900)) return null;
+
+  const company = getCompanyBySlug(sanitizeInput(companySlug));
+  if (!company || company.status === "suspended") { recordLoginAttempt(ip); return null; }
+
+  const db = getCompanyDb(companySlug);
+
+  // Garantizar que el admin de la empresa existe
+  ensureCompanyAdmin(db);
+
+  const user = db.prepare("SELECT * FROM users WHERE username=? AND active=1").get(sanitizeInput(username)) as {
+    id: number; username: string; name: string; password_hash: string; salt: string;
+    permissions: string; is_admin: number; active: number;
+  } | null;
+
+  if (!user) { recordLoginAttempt(ip); return null; }
+  if (!verifyPassword(password, user.password_hash, user.salt)) { recordLoginAttempt(ip); return null; }
+
+  const permissions = JSON.parse(user.permissions || "{}") as Record<string, boolean>;
+
+  // Filtrar permisos por el plan de la empresa
+  const planPermissions = getPlanModules(company.plan_id);
+  const effectivePermissions: Record<string, boolean> = {};
+  for (const [mod, allowed] of Object.entries(permissions)) {
+    effectivePermissions[mod] = allowed && (planPermissions[mod] !== false);
+  }
+  // Admin de empresa tiene todos los módulos del plan
+  if (user.is_admin) {
+    for (const [mod, allowed] of Object.entries(planPermissions)) {
+      if (allowed) effectivePermissions[mod] = true;
+    }
+  }
+
+  const token = createJWT({
+    sub:         String(user.id),
+    company:     companySlug,
+    permissions: effectivePermissions,
+    is_admin:    Boolean(user.is_admin),
+    exp:         Math.floor(Date.now()/1000) + 7*86400,
   });
 
-  const { password_hash: _, salt: __, ...safe } = user;
-  return { token, user: safe };
+  return { token, user: { id: user.id, username: user.username, name: user.name, permissions: effectivePermissions, is_admin: Boolean(user.is_admin) } };
 }
 
-export function getUserFromToken(token: string): Omit<User, "password_hash" | "salt"> | null {
+function getPlanModules(planId: number | null): Record<string, boolean> {
+  if (!planId) return {};
+  try {
+    const { getPlanById } = require("./master/db-master");
+    const plan = getPlanById(planId);
+    if (!plan) return {};
+    return JSON.parse(plan.modules || "{}") as Record<string, boolean>;
+  } catch { return {}; }
+}
+
+function ensureCompanyAdmin(db: import("better-sqlite3").Database): void {
+  const count = (db.prepare("SELECT COUNT(*) as c FROM users WHERE is_admin=1").get() as { c: number }).c;
+  if (count === 0) {
+    const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
+    db.prepare("INSERT OR IGNORE INTO users (username, name, password_hash, salt, permissions, is_admin) VALUES ('admin', 'Administrador', ?, ?, ?, 1)")
+      .run(hash, salt, JSON.stringify({ chat:true,crm:true,calendar:true,products:true,campaigns:true,documents:true,analytics:true,suppliers:true,accounting:true,settings:true }));
+  } else {
+    // Actualizar hash si cambió ADMIN_PASSWORD
+    const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
+    db.prepare("UPDATE users SET password_hash=?, salt=? WHERE username='admin'").run(hash, salt);
+  }
+}
+
+// ── Verificar token y obtener usuario ─────────────────────────────────────
+
+export interface AuthUser {
+  sub: string;
+  role?: "master";
+  company?: string;
+  permissions?: Record<string, boolean>;
+  is_admin?: boolean;
+}
+
+export function getUserFromToken(token: string): AuthUser | null {
   const payload = verifyJWT(token);
   if (!payload || typeof payload.sub !== "string") return null;
-  const user = getUserById(Number(payload.sub));
-  if (!user || !user.active) return null;
-  const { password_hash: _, salt: __, ...safe } = user;
-  return safe;
+  return payload as unknown as AuthUser;
 }
 
-export function logout(_token: string): void { /* JWT es stateless */ }
+export function logout(_token: string): void { /* JWT stateless */ }
 
-// ── Permisos por rol ──────────────────────────────────────────────────────
+// ── Módulos disponibles ───────────────────────────────────────────────────
 
-export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics";
+export type Module = "chat"|"crm"|"calendar"|"accounting"|"suppliers"|"products"|"campaigns"|"documents"|"settings"|"analytics";
+export const ALL_MODULES: Module[] = ["chat","crm","calendar","accounting","suppliers","products","campaigns","documents","settings","analytics"];
 
-const ROLE_PERMISSIONS: Record<string, Module[]> = {
-  admin:         ["chat","crm","calendar","accounting","suppliers","products","campaigns","documents","settings","analytics"],
-  ventas:        ["chat","crm","calendar","products","analytics"],
-  contabilidad:  ["accounting","suppliers","calendar","analytics"],
-  operaciones:   ["chat","calendar","crm"],
-  marketing:     ["campaigns","crm","analytics"],
-};
-
-export function getAllowedModules(role: string): Module[] {
-  return ROLE_PERMISSIONS[role] ?? [];
+export function getAllowedModules(permissions: Record<string, boolean> | undefined, isMaster = false): Module[] {
+  if (isMaster) return [...ALL_MODULES, "master" as Module];
+  if (!permissions) return [];
+  return ALL_MODULES.filter(m => permissions[m] === true);
 }
 
-export function canAccess(role: string, module: Module): boolean {
-  return getAllowedModules(role).includes(module);
+export function canAccess(permissions: Record<string, boolean> | undefined, module: string, isMaster = false): boolean {
+  if (isMaster) return true;
+  if (!permissions) return false;
+  return permissions[module] === true;
 }

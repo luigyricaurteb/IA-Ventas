@@ -7,7 +7,7 @@ interface Ctx { params: Promise<{ id: string }> }
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const token = req.cookies.get("session_token")?.value ?? "";
   const me = getUserFromToken(token);
-  if (!me || me.role !== "admin") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  if (!me || me?.role !== "master") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
 
   const { id } = await params;
   const body = await req.json();
@@ -26,9 +26,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   const token = req.cookies.get("session_token")?.value ?? "";
   const me = getUserFromToken(token);
-  if (!me || me.role !== "admin") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  if (!me || me?.role !== "master") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
   const { id } = await params;
-  if (Number(id) === me.id) return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
+  if (id === me.sub) return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
   deleteUser(Number(id));
   return NextResponse.json({ ok: true });
 }

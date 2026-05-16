@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const token = req.cookies.get("session_token")?.value ?? "";
   const me = getUserFromToken(token);
-  if (!me || me.role !== "admin") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  if (!me || me?.role !== "master") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
   return NextResponse.json({ users: listUsers() });
 }
 
 export async function POST(req: NextRequest) {
   const token = req.cookies.get("session_token")?.value ?? "";
   const me = getUserFromToken(token);
-  if (!me || me.role !== "admin") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  if (!me || me?.role !== "master") return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
 
   const body = await req.json();
   if (!body.username || !body.password || !body.name) {

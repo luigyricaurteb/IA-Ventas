@@ -3,7 +3,7 @@
 interface DashboardHeaderProps {
   phone: string | null;
   onDisconnect: () => void;
-  currentUser?: { name: string; role: string } | null;
+  currentUser?: { name: string; role?: string } | null;
   onLogout?: () => void;
 }
 

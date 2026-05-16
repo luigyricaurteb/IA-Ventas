@@ -10,7 +10,7 @@ interface SystemUser { id: number; username: string; name: string; role: string;
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
 interface AiLearning { id: number; topic: string; content: string; created_at: number }
 
-export default function SettingsModule({ currentUser }: { currentUser?: { role: string } | null }) {
+export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean } | null }) {
   const [tab, setTab] = useState<Tab>("company");
   const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "" });
   const [users, setUsers] = useState<SystemUser[]>([]);
@@ -28,7 +28,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role: 
     fetch("/api/settings/banks").then((r) => r.json()).then((d) => setBanks(d.banks));
     fetch("/api/settings/smtp").then((r) => r.json()).then((d) => setSmtp(d.config));
     fetch("/api/settings/learnings").then((r) => r.json()).then((d) => setLearnings(d.learnings));
-    if (currentUser?.role === "admin") {
+    if (currentUser?.is_admin || currentUser?.role === "master") {
       fetch("/api/users").then((r) => r.json()).then((d) => setUsers(d.users ?? []));
     }
   }, [currentUser]);
@@ -96,7 +96,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role: 
     { id: "learning", label: `Aprendizaje (${aiName})` },
     { id: "users",    label: "Usuarios y roles", adminOnly: true },
   ];
-  const TABS = ALL_TABS.filter((t) => !t.adminOnly || currentUser?.role === "admin") as { id: Tab; label: string }[];
+  const TABS = ALL_TABS.filter((t) => !t.adminOnly || currentUser?.is_admin || currentUser?.role === "master") as { id: Tab; label: string }[];
 
   return (
     <div className="flex-1 overflow-auto p-6 max-w-3xl">

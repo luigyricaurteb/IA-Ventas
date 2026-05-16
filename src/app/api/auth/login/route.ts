@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginUser, ensureAdminUser } from "@/lib/auth";
+import { loginMaster, loginCompanyUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,16 +8,24 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  // Garantiza que admin siempre existe con la contraseña del env var
-  ensureAdminUser();
-  const { username, password } = await req.json();
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "unknown";
+  const body = await req.json();
+  const { username, password, company: companySlug, isMaster } = body;
+
   if (!username || !password) {
     return NextResponse.json({ error: "Usuario y contraseña requeridos" }, { status: 400 });
   }
 
-  const result = await loginUser(username, password);
+  let result: { token: string; user: unknown } | null = null;
+
+  if (isMaster || !companySlug) {
+    result = await loginMaster(username, password, ip);
+  } else {
+    result = await loginCompanyUser(companySlug, username, password, ip);
+  }
+
   if (!result) {
-    return NextResponse.json({ error: "Credenciales incorrectas" }, { status: 401 });
+    return NextResponse.json({ error: "Credenciales incorrectas o cuenta suspendida" }, { status: 401 });
   }
 
   const res = NextResponse.json({ user: result.user });
