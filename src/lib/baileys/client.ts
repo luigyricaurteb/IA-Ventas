@@ -67,9 +67,13 @@ export async function start(): Promise<void> {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log("[bot] QR recibido — escanea desde localhost:3000 o el terminal:");
-      QRCodeTerminal.generate(qr, { small: true });
-      setConnectionState({ status: "qr", qr_string: qr, phone: null });
+      // Solo actualizar si el QR realmente cambió (evita parpadeo en el dashboard)
+      const current = getConnectionState();
+      if (current.qr_string !== qr) {
+        console.log("[bot] QR recibido — escanea desde el dashboard:");
+        QRCodeTerminal.generate(qr, { small: true });
+        setConnectionState({ status: "qr", qr_string: qr, phone: null });
+      }
     }
 
     if (connection === "connecting") {
@@ -115,8 +119,9 @@ export async function start(): Promise<void> {
 
 function scheduleReconnect(code?: number) {
   if (reconnectTimer) return;
-  const delay = code === 440 ? 15000 : 5000;
-  console.log(`[bot] Reconectando en ${delay / 1000}s...`);
+  // Delays más largos en producción para no generar QRs constantemente
+  const delay = code === 440 ? 30000 : code === 408 ? 20000 : 10000;
+  console.log(`[bot] Reconectando en ${delay / 1000}s (código ${code})...`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     if (handle) {
