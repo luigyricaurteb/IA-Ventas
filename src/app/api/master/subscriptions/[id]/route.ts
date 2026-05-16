@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { approveSubscription } from "@/lib/master/db-master";
 import { getUserFromToken } from "@/lib/auth";

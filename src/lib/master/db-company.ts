@@ -11,8 +11,20 @@ import { getCompanyBySlug } from "./db-master";
 // Cache de instancias abiertas para no abrir el mismo archivo múltiples veces
 const dbCache = new Map<string, Database.Database>();
 
+const IS_BUILD = process.env.NEXT_PHASE === "phase-production-build";
+
 export function getCompanyDb(slug: string): Database.Database {
   if (dbCache.has(slug)) return dbCache.get(slug)!;
+
+  // Durante el build de Next.js, devolver una DB en memoria para no bloquear archivos
+  if (IS_BUILD) {
+    const db = new Database(":memory:");
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+    initCompanySchema(db);
+    dbCache.set(slug, db);
+    return db;
+  }
 
   const company = getCompanyBySlug(slug);
   if (!company) throw new Error(`Empresa '${slug}' no encontrada`);

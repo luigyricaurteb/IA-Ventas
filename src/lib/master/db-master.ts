@@ -6,9 +6,13 @@ import crypto from "node:crypto";
 const STORAGE = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
 const MASTER_DB_PATH = path.join(STORAGE, "master.db");
 
-if (!fs.existsSync(STORAGE)) fs.mkdirSync(STORAGE, { recursive: true });
+// Durante el build de Next.js no hay volúmenes disponibles ni bot corriendo.
+// Usamos :memory: para que los módulos se importen sin abrir archivos en disco.
+const IS_BUILD = process.env.NEXT_PHASE === "phase-production-build";
 
-const masterDb = new Database(MASTER_DB_PATH);
+if (!IS_BUILD && !fs.existsSync(STORAGE)) fs.mkdirSync(STORAGE, { recursive: true });
+
+const masterDb = new Database(IS_BUILD ? ":memory:" : MASTER_DB_PATH);
 masterDb.pragma("busy_timeout = 30000");
 masterDb.pragma("journal_mode = WAL");
 masterDb.pragma("foreign_keys = ON");

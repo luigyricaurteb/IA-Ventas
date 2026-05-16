@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 import fs from "node:fs";
