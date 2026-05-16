@@ -375,6 +375,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
 `);
 
+db.pragma("busy_timeout = 30000");
+
 // ── Tipos ─────────────────────────────────────────────────────────────────
 
 export interface Conversation {
