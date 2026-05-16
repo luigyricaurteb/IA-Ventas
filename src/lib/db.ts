@@ -934,14 +934,8 @@ export function deleteSession(token: string): void {
   db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
 }
 
-// Crear usuario admin por defecto — INSERT OR IGNORE para que no falle si ya existe
-{
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.pbkdf2Sync("admin123", salt, 100000, 64, "sha512").toString("hex");
-  db.prepare(
-    "INSERT OR IGNORE INTO users (username, name, password_hash, salt, role) VALUES ('admin', 'Administrador', ?, ?, 'admin')"
-  ).run(hash, salt);
-}
+// Admin se crea/actualiza desde auth.ts con ADMIN_PASSWORD y ADMIN_SALT del env
+// (proceso diferido para evitar circular dependency al importar auth.ts aquí)
 
 // ── Migración segura: nuevas tablas en BD existente ──────────────────────
 for (const sql of [

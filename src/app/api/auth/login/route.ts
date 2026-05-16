@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginUser } from "@/lib/auth";
+import { loginUser, ensureAdminUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +8,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // Garantiza que admin siempre existe con la contraseña del env var
+  ensureAdminUser();
   const { username, password } = await req.json();
   if (!username || !password) {
     return NextResponse.json({ error: "Usuario y contraseña requeridos" }, { status: 400 });
