@@ -1,7 +1,0 @@
-[build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "echo 'RAILWAY START' && node --version && ls .next/ && npm run start"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
