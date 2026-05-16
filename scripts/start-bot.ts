@@ -12,7 +12,7 @@ import {
 } from "../src/lib/db";
 
 const RESTART_FLAG = path.resolve(process.cwd(), "data", ".restart");
-const AUTH_DIR = path.resolve(process.cwd(), "auth");
+const AUTH_DIR = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
 
 async function main() {
   console.log("[bot] Iniciando agente WhatsApp...");

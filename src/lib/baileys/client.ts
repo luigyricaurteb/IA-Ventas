@@ -12,7 +12,7 @@ import path from "node:path";
 import { getConnectionState, setConnectionState } from "../db";
 import { handleIncomingMessage } from "./handler";
 
-const AUTH_DIR = path.resolve(process.cwd(), "auth");
+const AUTH_DIR = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
 
 const logger = pino({ level: "silent" });
 

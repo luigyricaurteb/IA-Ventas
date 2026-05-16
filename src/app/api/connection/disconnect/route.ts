@@ -7,7 +7,7 @@ import { setConnectionState } from "@/lib/db";
 export async function POST() {
   setConnectionState({ status: "disconnected", qr_string: null, phone: null });
 
-  const authDir = path.resolve(process.cwd(), "auth");
+  const authDir = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
   try {
     fs.rmSync(authDir, { recursive: true, force: true });
   } catch {}

@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "messages.db");
 
 if (!fs.existsSync(DATA_DIR)) {
