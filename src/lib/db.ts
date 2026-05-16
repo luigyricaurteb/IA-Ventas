@@ -12,10 +12,15 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const db = new Database(DB_PATH);
 
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
+// Enable WAL mode for better concurrent read/write performance.
+// busy_timeout tells SQLite to retry for up to 10 s before throwing
+// SQLITE_BUSY, which prevents lock errors when multiple processes
+// (e.g. Next.js build workers) access the database simultaneously.
+db.pragma("journal_mode = WAL");
+db.pragma("busy_timeout = 10000");
+db.pragma("foreign_keys = ON");
 
+db.exec(`
   -- ── Conversaciones WhatsApp ──────────────────────────────────────────
   CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
