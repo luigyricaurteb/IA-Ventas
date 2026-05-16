@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { setConnectionState } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   setConnectionState({ status: "disconnected", qr_string: null, phone: null });
 
