@@ -9,10 +9,22 @@ import { sendWithAntiBlock } from "../bot/anti-block";
 const PROOFS_DIR = path.resolve(process.cwd(), "public", "uploads", "proofs");
 
 const ALLOWED_MIMETYPES: Record<string, string> = {
+  // Imágenes
   "image/jpeg": "jpg",
   "image/jpg":  "jpg",
   "image/png":  "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  // Documentos
   "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  // Video / audio (algunos clientes envían pantallazos de confirmación en video)
+  "video/mp4":  "mp4",
+  "video/3gpp": "3gp",
 };
 
 const PAYMENT_STATES = ["QUOTE_SENT", "AWAITING_PAYMENT", "COLLECTING_PEOPLE"];
@@ -48,7 +60,7 @@ export async function handleIncomingMessage(
 
     if (!ext) {
       await sendWithAntiBlock(sock, remoteJid,
-        "Solo aceptamos comprobantes en formato JPG, PNG o PDF. Por favor envíalo en uno de esos formatos.",
+        "Solo aceptamos comprobantes en estos formatos: JPG, PNG, WEBP, HEIC, PDF, Word o Excel. Por favor reenvíalo en uno de esos formatos.",
         phone
       );
       return;

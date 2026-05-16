@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "start:bot": "tsx scripts/start-bot.ts",
-    "start:all": "concurrently --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\""
+    "start:all": "concurrently --names BOT,WEB --prefix-colors yellow,cyan \"npm run start:bot\" \"npm run start\"",
+    "seed:julieta": "tsx scripts/seed-julieta-skill.ts"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",
