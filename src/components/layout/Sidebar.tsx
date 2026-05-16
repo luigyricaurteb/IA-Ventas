@@ -70,7 +70,7 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
 
   // ── Sidebar desktop ───────────────────────────────────────────────────────
   const desktopSidebar = (
-    <aside className="hidden md:flex w-56 shrink-0 bg-gray-900 flex-col h-full">
+    <aside className="hidden md:flex md:flex-col w-56 shrink-0 bg-gray-900 h-full">
       {/* Logo */}
       <div className="px-4 py-4 border-b border-gray-800 shrink-0">
         <span className="text-white font-bold text-sm tracking-wide">Agente DMC</span>

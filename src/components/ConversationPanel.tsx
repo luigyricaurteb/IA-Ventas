@@ -74,8 +74,10 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   const [noteDraft, setNoteDraft] = useState("");
   const [summary, setSummary]   = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [csatSent, setCsatSent]     = useState(false);
-  const [resetting, setResetting]   = useState(false);
+  const [csatSent, setCsatSent]       = useState(false);
+  const [resetting, setResetting]     = useState(false);
+  const [learning, setLearning]       = useState(false);
+  const [learnResult, setLearnResult] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const convId = conversation.id;
 
@@ -196,6 +198,24 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   async function handleDelete() {
     await fetch(`/api/conversations/${convId}`, { method: "DELETE" });
     onDelete(convId); setShowDeleteConfirm(false);
+  }
+
+  async function handleLearn() {
+    setLearning(true); setLearnResult(null);
+    try {
+      const res = await fetch(`/api/conversations/${convId}/learn`, { method: "POST" });
+      const d = await res.json() as { count?: number; saved?: { topic: string }[]; error?: string };
+      if (res.ok) {
+        setLearnResult(`✓ ${d.count} aprendizaje${d.count !== 1 ? "s" : ""} extraído${d.count !== 1 ? "s" : ""} y guardado${d.count !== 1 ? "s" : ""} para Julieta`);
+      } else {
+        setLearnResult(`Error: ${d.error}`);
+      }
+      setTimeout(() => setLearnResult(null), 6000);
+    } catch {
+      setLearnResult("Error de conexión");
+    } finally {
+      setLearning(false);
+    }
   }
 
   async function handleReset() {
@@ -323,12 +343,24 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
               className="text-xs text-yellow-700 bg-yellow-50 hover:bg-yellow-100 px-2 py-1 rounded-lg">
               📌 Nota
             </button>
+            <button onClick={handleLearn} disabled={learning}
+              className="text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg disabled:opacity-50"
+              title="Extrae conocimientos de esta conversación y se los enseña a Julieta">
+              {learning ? "⏳" : "🧠 Enseñar a Julieta"}
+            </button>
             <button onClick={handleReset} disabled={resetting}
               className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg disabled:opacity-50"
-              title="Reinicia el flujo del bot para esta conversación. No borra los mensajes.">
+              title="Reinicia el flujo del bot. No borra los mensajes.">
               {resetting ? "⏳" : "🔄 Nueva conv."}
             </button>
           </div>
+
+          {/* Resultado de aprendizaje */}
+          {learnResult && (
+            <div className={`mx-4 mb-1 rounded-xl px-3 py-2 text-xs shrink-0 ${learnResult.startsWith("Error") ? "bg-red-50 text-red-700 border border-red-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200"}`}>
+              {learnResult}
+            </div>
+          )}
 
           {/* Resumen IA */}
           {summary && (

@@ -123,8 +123,7 @@ export default function ConnectionGate() {
   const showChatList   = !showChatPanel || selectedId === null;
 
   return (
-    // h-dvh = dynamic viewport height (funciona en móvil con barras del navegador)
-    <div className="flex h-screen md:h-screen overflow-hidden bg-gray-100">
+    <div className="flex h-screen overflow-hidden bg-white">
 
       {/* ── Sidebar (desktop fijo + móvil drawer) ──────────────────────── */}
       <Sidebar

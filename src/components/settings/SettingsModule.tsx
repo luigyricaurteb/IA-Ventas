@@ -22,6 +22,7 @@ interface CompanyConfig { name: string | null; phone: string | null; email: stri
 interface SystemUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
 interface AiLearning { id: number; topic: string; content: string; created_at: number }
+interface EditingLearning { id: number; topic: string; content: string }
 interface DriveSource { id: number; name: string; drive_url: string; file_type: string; topic: string; last_synced_at: number | null; sync_status: string; sync_error: string | null }
 interface MsgTemplate { id: number; name: string; content: string; category: string | null }
 
@@ -50,7 +51,8 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [smtp, setSmtp] = useState<SmtpConfig>({ host: "", port: 587, secure: 0, user: "", from_name: "", from_email: "" });
   const [learnings, setLearnings] = useState<AiLearning[]>([]);
-  const [newLearning, setNewLearning] = useState({ topic: "", content: "" });
+  const [newLearning, setNewLearning]       = useState({ topic: "", content: "" });
+  const [editingLearning, setEditingLearning] = useState<EditingLearning | null>(null);
   const [newBank, setNewBank] = useState({ bank_name: "", account_type: "ahorros", account_number: "", account_holder: "" });
   const [driveSources, setDriveSources] = useState<DriveSource[]>([]);
   const [newDrive, setNewDrive] = useState({ name: "", drive_url: "", topic: "" });
@@ -112,8 +114,20 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   }
 
   async function deleteLearning(id: number) {
+    if (!confirm("¿Eliminar este conocimiento?")) return;
     await fetch(`/api/settings/learnings/${id}`, { method: "DELETE" });
     setLearnings(learnings.filter((l) => l.id !== id));
+  }
+
+  async function saveEditLearning() {
+    if (!editingLearning) return;
+    await fetch(`/api/settings/learnings/${editingLearning.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: editingLearning.topic, content: editingLearning.content }),
+    });
+    setLearnings(learnings.map(l => l.id === editingLearning.id ? { ...l, ...editingLearning } : l));
+    setEditingLearning(null);
   }
 
   const aiName = company.ai_name || "Julieta";
@@ -395,12 +409,44 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             )}
             <div className="space-y-2">
               {learnings.filter(l => !l.topic.startsWith("[Drive]")).map((l) => (
-                <div key={l.id} className="bg-white border rounded-xl p-4 flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">{l.topic}</span>
-                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap line-clamp-3">{l.content}</p>
-                  </div>
-                  <button onClick={() => deleteLearning(l.id)} className="text-red-400 hover:text-red-600 text-sm shrink-0">Eliminar</button>
+                <div key={l.id} className="bg-white border rounded-xl p-4">
+                  {editingLearning?.id === l.id ? (
+                    // Edición inline
+                    <div className="space-y-2">
+                      <input
+                        value={editingLearning.topic}
+                        onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-1.5 text-sm font-medium"
+                        placeholder="Tema"
+                      />
+                      <textarea
+                        value={editingLearning.content}
+                        onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
+                        rows={4}
+                        className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+                        placeholder="Contenido"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={saveEditLearning} className="bg-purple-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-purple-700">Guardar</button>
+                        <button onClick={() => setEditingLearning(null)} className="border px-4 py-1.5 rounded-lg text-sm text-gray-600">Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Vista normal
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">{l.topic}</span>
+                        <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap line-clamp-4">{l.content}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })}
+                          className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded"
+                        >✏️</button>
+                        <button onClick={() => deleteLearning(l.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">🗑</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
