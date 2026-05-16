@@ -7,103 +7,114 @@ interface QRScreenProps {
 }
 
 export default function QRScreen({ onConnected }: QRScreenProps) {
-  const [qrPng, setQrPng]         = useState<string | null>(null);
-  const [status, setStatus]       = useState<string>("disconnected");
-  const [waitSecs, setWaitSecs]   = useState(0);
+  const [qrPng, setQrPng]       = useState<string | null>(null);
+  const [botStatus, setBotStatus] = useState<string>("disconnected");
+  const [waitSecs, setWaitSecs]  = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const lastUpdatedAt = useRef<number>(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectedRef  = useRef(false);
 
-  async function fetchStatus() {
+  async function fetchStatus(silent = false) {
     try {
       const res  = await fetch("/api/connection/status");
-      const data = await res.json() as { status: string; phone?: string; qrPng?: string; updatedAt?: number };
+      const data = await res.json() as {
+        status: string; phone?: string; qrPng?: string; updatedAt?: number;
+      };
 
-      setStatus(data.status);
+      if (connectedRef.current) return;
+
+      setBotStatus(data.status);
 
       if (data.status === "connected" && data.phone) {
+        connectedRef.current = true;
         onConnected(data.phone);
         return;
       }
 
-      // Solo actualizar QR si el updatedAt cambió (evita parpadeo)
+      // QR cambió → actualizar sin parpadeo
       if (data.qrPng && data.updatedAt && data.updatedAt !== lastUpdatedAt.current) {
         lastUpdatedAt.current = data.updatedAt;
+        if (!silent) setRefreshing(true);
         setQrPng(data.qrPng);
+        setTimeout(() => setRefreshing(false), 300);
       }
     } catch {}
   }
 
   useEffect(() => {
-    fetchStatus(); // llamada inicial inmediata
-
-    // Polling: cada 2s hasta conectar o hasta tener QR, luego cada 5s
-    timerRef.current = setInterval(fetchStatus, 2500);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    fetchStatus();
+    // Poll cada 2s: recoge el QR nuevo automáticamente cada vez que WhatsApp lo rota
+    const iv = setInterval(() => fetchStatus(true), 2000);
+    return () => clearInterval(iv);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Contador de espera para mostrar al usuario cuánto lleva
+  // Contador de espera
   useEffect(() => {
     const t = setInterval(() => setWaitSecs(s => s + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const statusMsg: Record<string, string> = {
-    disconnected: "Iniciando bot de WhatsApp...",
-    connecting:   "Conectando con WhatsApp...",
-    qr:           "QR listo — escanea ahora",
-  };
-
   return (
     <div className="flex-1 flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
-        <div className="mb-6">
+        {/* Header */}
+        <div className="mb-5">
           <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-2xl">📱</span>
           </div>
           <h1 className="text-xl font-bold text-gray-800">Conectar WhatsApp</h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-gray-500 mt-1">
             Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo
           </p>
         </div>
 
-        {/* Estado actual */}
-        <div className={`flex items-center justify-center gap-2 text-sm mb-4 ${qrPng ? "text-emerald-600" : "text-gray-500"}`}>
-          <span className={`w-2 h-2 rounded-full ${qrPng ? "bg-emerald-500" : "bg-amber-400 animate-pulse"}`} />
-          <span>{statusMsg[status] ?? "Iniciando..."}</span>
-          {!qrPng && waitSecs > 5 && <span className="text-gray-300">({waitSecs}s)</span>}
+        {/* Estado */}
+        <div className={`flex items-center justify-center gap-2 text-xs mb-4 font-medium ${
+          qrPng ? "text-emerald-600" : "text-amber-500"
+        }`}>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${
+            qrPng ? "bg-emerald-500" : "bg-amber-400 animate-pulse"
+          }`} />
+          {qrPng
+            ? (refreshing ? "Actualizando QR..." : "QR activo — escanea ahora")
+            : botStatus === "connecting" ? "Conectando con WhatsApp..."
+            : "Iniciando bot..."}
         </div>
 
         {/* QR o spinner */}
         {qrPng ? (
-          <>
+          <div className="relative inline-block">
             <img
               src={qrPng}
               alt="QR de WhatsApp"
-              className="w-60 h-60 mx-auto rounded-xl border-4 border-emerald-50 mb-3"
+              className={`w-64 h-64 rounded-xl border-4 border-emerald-50 mx-auto transition-opacity duration-300 ${
+                refreshing ? "opacity-60" : "opacity-100"
+              }`}
             />
-            <p className="text-xs text-gray-400">El QR expira en ~20 segundos. Se actualiza automáticamente.</p>
-            <button
-              onClick={fetchStatus}
-              className="mt-3 text-xs text-blue-400 hover:text-blue-600 underline"
-            >
-              Forzar actualización del QR
-            </button>
-          </>
+            {/* Overlay de recarga sutil */}
+            {refreshing && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/40">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="py-10">
-            <div className="w-12 h-12 border-3 border-gray-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" style={{ borderWidth: 3 }} />
-            {waitSecs < 15 && <p className="text-sm text-gray-400">Esperando al bot...</p>}
-            {waitSecs >= 15 && waitSecs < 45 && (
+            <div className="w-12 h-12 rounded-full animate-spin mx-auto mb-4"
+              style={{ border: "3px solid #e5e7eb", borderTopColor: "#10b981" }} />
+            {waitSecs < 20 && <p className="text-sm text-gray-400">Generando código QR...</p>}
+            {waitSecs >= 20 && waitSecs < 50 && (
               <p className="text-sm text-gray-400">
-                Esto puede tardar hasta 30 segundos en el primer inicio.
+                El bot está iniciando en el servidor.<br />
+                <span className="text-xs text-gray-300">Puede tardar hasta 30 segundos.</span>
               </p>
             )}
-            {waitSecs >= 45 && (
+            {waitSecs >= 50 && (
               <div className="space-y-3">
-                <p className="text-sm text-amber-600 font-medium">El bot está tardando más de lo normal.</p>
+                <p className="text-sm text-amber-600 font-medium">Tomando más tiempo de lo normal</p>
                 <p className="text-xs text-gray-400">
-                  El servicio puede estar iniciando en Railway. Espera un momento más o recarga la página.
+                  El servidor podría estar reiniciando. Espera un momento más.
                 </p>
                 <button
                   onClick={() => window.location.reload()}
@@ -114,6 +125,13 @@ export default function QRScreen({ onConnected }: QRScreenProps) {
               </div>
             )}
           </div>
+        )}
+
+        {/* Info pie */}
+        {qrPng && (
+          <p className="text-xs text-gray-400 mt-3">
+            El código se actualiza automáticamente. No necesitas hacer nada, solo escanearlo.
+          </p>
         )}
       </div>
     </div>
