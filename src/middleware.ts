@@ -8,8 +8,9 @@ export function middleware(request: NextRequest) {
   const isLoginPage   = pathname === "/login";
   const isAuthApi     = pathname.startsWith("/api/auth");
   const isPublicAsset = pathname.startsWith("/uploads") || pathname.startsWith("/_next") || pathname === "/favicon.ico";
+  const isPublicApi   = pathname.startsWith("/api/public");
 
-  if (isPublicAsset || isAuthApi) return NextResponse.next();
+  if (isPublicAsset || isAuthApi || isPublicApi) return NextResponse.next();
 
   if (!token && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
