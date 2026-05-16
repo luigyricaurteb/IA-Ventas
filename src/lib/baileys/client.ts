@@ -75,7 +75,10 @@ export async function startCompany(slug: string): Promise<void> {
     logger,
     browser: Browsers.macOS("Desktop"),
     markOnlineOnConnect: false,
-    syncFullHistory: false,  // false = QR aparece rápido; historial llega vía messaging-history.set
+    // true = carga TODAS las conversaciones históricas (hasta 90 días).
+    // El QR sigue apareciendo, solo que WhatsApp tarda un poco más en enviar
+    // el histórico completo. Es necesario para mostrar las 60+ conversaciones.
+    syncFullHistory: true,
     getMessage: async () => ({ conversation: "" }),
   });
 
@@ -156,11 +159,20 @@ export async function startCompany(slug: string): Promise<void> {
   });
 }
 
+type LongLike = { low: number; high: number; unsigned: boolean };
+function toLong(v: unknown): number | null {
+  if (!v) return null;
+  if (typeof v === "number") return v;
+  if (typeof v === "bigint") return Number(v);
+  if (typeof v === "object" && "low" in (v as object)) return (v as LongLike).low;
+  return null;
+}
+
 // ── Importar historial de conversaciones desde Baileys ───────────────────────
 function importHistory(
   db: import("better-sqlite3").Database,
   slug: string,
-  chats: { id: string; name?: string | null; conversationTimestamp?: number | Long | null }[],
+  chats: { id: string; name?: string | null; conversationTimestamp?: unknown }[],
   contacts: { id: string; name?: string | null; notify?: string | null }[],
   messages: import("@whiskeysockets/baileys").proto.IWebMessageInfo[]
 ) {
@@ -176,11 +188,7 @@ function importHistory(
     if (!chat.id.endsWith("@s.whatsapp.net")) continue; // ignorar grupos
     const phone = chat.id.split("@")[0];
     const name  = chat.name || contactNames.get(chat.id) || null;
-    const ts    = chat.conversationTimestamp
-      ? Number(typeof chat.conversationTimestamp === "object" && "low" in chat.conversationTimestamp
-          ? (chat.conversationTimestamp as { low: number }).low
-          : chat.conversationTimestamp)
-      : null;
+    const ts    = toLong(chat.conversationTimestamp);
     try {
       db.prepare(
         "INSERT INTO conversations (phone, name, last_message_at) VALUES (?,?,?) ON CONFLICT(phone) DO UPDATE SET name=COALESCE(excluded.name, name), last_message_at=COALESCE(excluded.last_message_at, last_message_at)"
@@ -207,13 +215,9 @@ function importHistory(
       if (!text) continue;
 
       const role = msg.key.fromMe ? "assistant" : "user";
-      const ts   = msg.messageTimestamp ? Number(
-        typeof msg.messageTimestamp === "object" && "low" in msg.messageTimestamp
-          ? (msg.messageTimestamp as { low: number }).low
-          : msg.messageTimestamp
-      ) : Math.floor(Date.now() / 1000);
+      const ts = toLong(msg.messageTimestamp) ?? Math.floor(Date.now() / 1000);
 
-      // Evitar duplicados por timestamp + rol + conversación
+      // Evitar duplicados por (conversation_id, role, created_at)
       const exists = db.prepare(
         "SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1"
       ).get(conv.id, role, ts);
@@ -225,7 +229,7 @@ function importHistory(
     } catch {}
   }
 
-  console.log(`[bot:${slug}] Historial importado: ${convsCreated} conversaciones, ${msgsImported} mensajes`);
+  console.log(`[bot:${slug}] ✅ Historial importado: ${convsCreated} conversaciones, ${msgsImported} mensajes`);
 }
 
 function importHistoricalMessages(
@@ -242,11 +246,7 @@ function importHistoricalMessages(
       const text = msg.message?.conversation ?? msg.message?.extendedTextMessage?.text ?? null;
       if (!text) continue;
       const role = msg.key.fromMe ? "assistant" : "user";
-      const ts   = msg.messageTimestamp ? Number(
-        typeof msg.messageTimestamp === "object" && "low" in msg.messageTimestamp
-          ? (msg.messageTimestamp as { low: number }).low
-          : msg.messageTimestamp
-      ) : Math.floor(Date.now() / 1000);
+      const ts = toLong(msg.messageTimestamp) ?? Math.floor(Date.now() / 1000);
       const exists = db.prepare("SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1").get(conv.id, role, ts);
       if (!exists) db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)").run(conv.id, role, text, ts);
     } catch {}

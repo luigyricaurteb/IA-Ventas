@@ -25,7 +25,7 @@ import { sendWithAntiBlock, sendMultipleWithAntiBlock, isOptOutMessage } from ".
 type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
   | "ACTIVE" | "COLLECTING_PEOPLE"
-  | "QUOTE_SENT" | "AWAITING_PAYMENT" | "DONE";
+  | "QUOTE_SENT" | "AWAITING_PAYMENT" | "CONFIRMING_PAYMENT" | "DONE";
 
 const YES_KW = ["si","sí","acepto","ok","yes","claro","dale","de acuerdo","correcto","adelante","afirmativo","exacto"];
 const NO_KW  = ["no","rechazo","no acepto","nope","negativo"];
@@ -304,6 +304,69 @@ export async function processBotMessage(
     await send(db, sock, jid, phone, conversationId,
       `Estamos verificando tu pago y te confirmaremos la reserva muy pronto. ¿Tienes alguna otra pregunta? 😊`
     );
+    return;
+  }
+
+  // ── CONFIRMING_PAYMENT — cliente debe confirmar el monto leído ───────
+  if (currentState === "CONFIRMING_PAYMENT") {
+    const proofId  = (stateData.proof_id as number) ?? null;
+    const aiMonto  = (stateData.ai_monto as number) ?? 0;
+    const total    = (stateData.total as number) ?? 0;
+
+    if (isYes(text)) {
+      // Cliente confirma el monto
+      setState(db, conversationId, "AWAITING_PAYMENT");
+
+      const minAbono = total * 0.5;
+      const dealRow  = getOrCreateDeal(db, conversationId) ? db.prepare("SELECT id FROM crm_deals WHERE conversation_id=? ORDER BY id DESC LIMIT 1").get(conversationId) as { id: number } | null : null;
+
+      let respuesta: string;
+      if (total > 0 && aiMonto > 0 && aiMonto < minAbono) {
+        // Monto confirmado pero insuficiente (< 50%)
+        respuesta = `⚠️ Gracias por confirmar. Sin embargo, el valor de *$${aiMonto.toLocaleString("es-CO")} COP* es menor al mínimo requerido para reservar.\n\n• Total del servicio: *$${total.toLocaleString("es-CO")} COP*\n• Mínimo para abonar (50%): *$${minAbono.toLocaleString("es-CO")} COP*\n\nPor favor realiza una transferencia por el monto mínimo y envíanos el nuevo comprobante. 🙏`;
+        if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId); // -1 = rechazado
+      } else {
+        // Monto aceptable — notificar al equipo
+        if (dealRow?.id) db.prepare("UPDATE crm_deals SET stage='NEGOCIACION' WHERE id=?").run(dealRow.id);
+        const saldo = aiMonto > 0 && total > 0 ? Math.max(0, total - aiMonto) : 0;
+
+        if (saldo > 0) {
+          respuesta = `✅ ¡Confirmado! Registramos tu abono de *$${aiMonto.toLocaleString("es-CO")} COP*.\n\nSaldo pendiente: *$${saldo.toLocaleString("es-CO")} COP*\n\nUn asesor verificará el pago y te avisará pronto. Si tienes el saldo listo, puedes enviar otro comprobante. 🙏`;
+        } else {
+          respuesta = `✅ ¡Confirmado! Registramos tu pago de *$${aiMonto > 0 ? `$${aiMonto.toLocaleString("es-CO")} COP` : "tu comprobante"}*.\n\nUn asesor lo verificará y confirmará tu reserva pronto. ¡Gracias! 🙏`;
+        }
+      }
+
+      await send(db, sock, jid, phone, conversationId, respuesta);
+
+    } else if (isNo(text)) {
+      // Cliente dice que el monto es incorrecto
+      if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId); // marcar como rechazado
+      setState(db, conversationId, "ACTIVE");
+      await send(db, sock, jid, phone, conversationId,
+        `Entendido. Por favor envíanos el comprobante correcto o indícanos el monto exacto que transferiste para registrarlo manualmente. 📎`
+      );
+
+    } else {
+      // El cliente escribió un número directamente (el monto real)
+      const numMatch = text.replace(/[.,\s]/g, "").match(/\d+/);
+      if (numMatch && Number(numMatch[0]) > 0) {
+        const manualMonto = Number(numMatch[0]);
+        if (proofId) {
+          db.prepare("UPDATE payment_proofs SET ai_amount=? WHERE id=?").run(manualMonto, proofId);
+          // Actualizar state data con el monto manual
+          const newData = { ...stateData, ai_monto: manualMonto };
+          setState(db, conversationId, "CONFIRMING_PAYMENT", newData);
+          await send(db, sock, jid, phone, conversationId,
+            `Anotado. ¿Confirmamos un pago de *$${manualMonto.toLocaleString("es-CO")} COP*? Responde *SI* para confirmar o *NO* para cancelar.`
+          );
+        }
+      } else {
+        await send(db, sock, jid, phone, conversationId,
+          `Por favor responde *SI* si el monto detectado es correcto, *NO* si es incorrecto, o escribe el monto exacto que transferiste.`
+        );
+      }
+    }
     return;
   }
 
