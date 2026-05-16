@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteConversation, getConversationById } from "@/lib/db";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
 interface Ctx {
   params: Promise<{ conversationId: string }>;
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const { conversationId } = await params;
   const id = Number(conversationId);
 
@@ -13,11 +17,13 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  const conv = getConversationById(id);
+  const conv = db.prepare("SELECT id FROM conversations WHERE id = ?").get(id);
   if (!conv) {
     return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
   }
 
-  deleteConversation(id);
+  db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(id);
+  db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
+
   return NextResponse.json({ ok: true });
 }

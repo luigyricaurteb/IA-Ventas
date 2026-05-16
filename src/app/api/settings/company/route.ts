@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCompanyConfig, updateCompanyConfig } from "@/lib/db";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 import fs from "node:fs";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  return NextResponse.json({ config: getCompanyConfig() });
+export async function GET(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
+  const config = db.prepare("SELECT * FROM company_config WHERE id = 1").get();
+  return NextResponse.json({ config });
 }
 
 export async function POST(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data")) {
     const formData = await req.formData();
@@ -30,10 +39,24 @@ export async function POST(req: NextRequest) {
       updates.logo_filename = filename;
     }
 
-    if (Object.keys(updates).length > 0) updateCompanyConfig(updates);
+    if (Object.keys(updates).length > 0) {
+      const fields = Object.keys(updates);
+      const sets = fields.map((f) => `${f} = ?`).join(", ");
+      db.prepare(`UPDATE company_config SET ${sets}, updated_at = unixepoch() WHERE id = 1`).run(
+        ...fields.map((f) => updates[f]),
+      );
+    }
   } else {
     const body = await req.json();
-    updateCompanyConfig(body);
+    const fields = Object.keys(body);
+    if (fields.length > 0) {
+      const sets = fields.map((f) => `${f} = ?`).join(", ");
+      db.prepare(`UPDATE company_config SET ${sets}, updated_at = unixepoch() WHERE id = 1`).run(
+        ...fields.map((f) => body[f]),
+      );
+    }
   }
-  return NextResponse.json({ config: getCompanyConfig() });
+
+  const config = db.prepare("SELECT * FROM company_config WHERE id = 1").get();
+  return NextResponse.json({ config });
 }

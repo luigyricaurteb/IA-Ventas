@@ -9,36 +9,43 @@ import type { WASocket } from "@whiskeysockets/baileys";
 import pino from "pino";
 import QRCodeTerminal from "qrcode-terminal";
 import path from "node:path";
-import { getConnectionState, setConnectionState } from "../db";
+import { getCompanyDb } from "../master/db-company";
 import { handleIncomingMessage } from "./handler";
 
-const AUTH_DIR = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
-
+const AUTH_BASE = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
 const logger = pino({ level: "silent" });
 
 export interface BotHandle {
+  slug: string;
   sock: WASocket;
   shutdown: () => Promise<void>;
 }
 
-let handle: BotHandle | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+// Pool of active company bots: slug → handle
+const handles = new Map<string, BotHandle>();
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function getHandle(): BotHandle | null {
-  return handle;
+export function getHandle(slug = "platform"): BotHandle | null {
+  return handles.get(slug) ?? null;
 }
 
-export async function start(): Promise<void> {
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+export function getAllHandles(): Map<string, BotHandle> {
+  return handles;
+}
+
+export async function startCompany(slug: string): Promise<void> {
+  if (handles.has(slug)) return; // ya corriendo
+
+  const db = getCompanyDb(slug);
+  const authDir = path.join(AUTH_BASE, `company_${slug}`);
+
+  const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
   let version: [number, number, number] | undefined;
   try {
     const fetched = await fetchLatestBaileysVersion();
     version = fetched.version;
-    console.log(`[bot] Versión WhatsApp Web: ${version.join(".")}`);
-  } catch (err) {
-    console.warn("[bot] No se pudo obtener última versión de Baileys:", err);
-  }
+  } catch {}
 
   const sock = makeWASocket({
     version,
@@ -49,17 +56,16 @@ export async function start(): Promise<void> {
     syncFullHistory: false,
   });
 
-  handle = {
+  const handle: BotHandle = {
+    slug,
     sock,
     shutdown: async () => {
-      try {
-        await sock.logout();
-      } catch {}
-      try {
-        sock.end(undefined);
-      } catch {}
+      handles.delete(slug);
+      try { await sock.logout(); } catch {}
+      try { sock.end(undefined); } catch {}
     },
   };
+  handles.set(slug, handle);
 
   sock.ev.on("creds.update", saveCreds);
 
@@ -67,69 +73,63 @@ export async function start(): Promise<void> {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      // Solo actualizar si el QR realmente cambió (evita parpadeo en el dashboard)
-      const current = getConnectionState();
-      if (current.qr_string !== qr) {
-        console.log("[bot] QR recibido — escanea desde el dashboard:");
+      const current = db.prepare("SELECT qr_string FROM connection_state WHERE id=1").get() as { qr_string: string | null } | null;
+      if (current?.qr_string !== qr) {
+        console.log(`[bot:${slug}] QR recibido — escanea desde el dashboard:`);
         QRCodeTerminal.generate(qr, { small: true });
-        setConnectionState({ status: "qr", qr_string: qr, phone: null });
+        db.prepare("UPDATE connection_state SET status='qr', qr_string=?, phone=NULL, updated_at=unixepoch() WHERE id=1").run(qr);
       }
     }
 
     if (connection === "connecting") {
-      const current = getConnectionState();
-      if (current.status === "disconnected") {
-        setConnectionState({ status: "connecting" });
+      const s = db.prepare("SELECT status FROM connection_state WHERE id=1").get() as { status: string } | null;
+      if (s?.status === "disconnected") {
+        db.prepare("UPDATE connection_state SET status='connecting', updated_at=unixepoch() WHERE id=1").run();
       }
     }
 
     if (connection === "open") {
       const rawId = sock.user?.id ?? "";
       const phone = rawId.split(":")[0];
-      setConnectionState({ status: "connected", qr_string: null, phone });
-      console.log(`[bot] Conectado como ${phone}`);
+      db.prepare("UPDATE connection_state SET status='connected', qr_string=NULL, phone=?, updated_at=unixepoch() WHERE id=1").run(phone);
+      console.log(`[bot:${slug}] Conectado como ${phone}`);
     }
 
     if (connection === "close") {
-      const code = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output
-        ?.statusCode;
-
-      console.log(`[bot] Conexión cerrada. Código: ${code}`);
+      handles.delete(slug);
+      const code = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode;
+      console.log(`[bot:${slug}] Conexión cerrada. Código: ${code}`);
 
       if (code === DisconnectReason.loggedOut) {
-        console.log("[bot] Sesión cerrada (logout). Esperando nuevo QR.");
-        setConnectionState({ status: "disconnected", qr_string: null, phone: null });
+        db.prepare("UPDATE connection_state SET status='disconnected', qr_string=NULL, phone=NULL, updated_at=unixepoch() WHERE id=1").run();
+        console.log(`[bot:${slug}] Sesión cerrada (logout). Esperando nuevo QR.`);
         return;
       }
-
-      // Code 515 = pairing exitoso, reconectar normalmente
-      // Code 440 = connectionReplaced, esperar más tiempo
-      scheduleReconnect(code);
+      scheduleReconnect(slug, code);
     }
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    console.log(`[bot][debug] messages.upsert — type:${type} cantidad:${messages.length}`);
+    console.log(`[bot:${slug}][debug] messages.upsert — type:${type} cantidad:${messages.length}`);
     if (type !== "notify") return;
     for (const msg of messages) {
-      await handleIncomingMessage(sock, msg);
+      await handleIncomingMessage(sock, msg, slug);
     }
   });
 }
 
-function scheduleReconnect(code?: number) {
-  if (reconnectTimer) return;
-  // Delays más largos en producción para no generar QRs constantemente
+function scheduleReconnect(slug: string, code?: number) {
+  if (reconnectTimers.has(slug)) return;
   const delay = code === 440 ? 30000 : code === 408 ? 20000 : 10000;
-  console.log(`[bot] Reconectando en ${delay / 1000}s (código ${code})...`);
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    if (handle) {
-      try {
-        handle.sock.end(undefined);
-      } catch {}
-      handle = null;
-    }
-    start().catch((err) => console.error("[bot] Error al reconectar:", err));
+  console.log(`[bot:${slug}] Reconectando en ${delay / 1000}s (código ${code})...`);
+  const timer = setTimeout(() => {
+    reconnectTimers.delete(slug);
+    startCompany(slug).catch(err => console.error(`[bot:${slug}] Error al reconectar:`, err));
   }, delay);
+  reconnectTimers.set(slug, timer);
+}
+
+// Compatibilidad: arrancar empresa "platform" (empresa del master)
+export async function start(): Promise<void> {
+  await startCompany("platform");
 }

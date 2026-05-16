@@ -1,11 +1,17 @@
 export const dynamic = "force-dynamic";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
-import { setConnectionState } from "@/lib/db";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
-export async function POST() {
-  setConnectionState({ status: "disconnected", qr_string: null, phone: null });
+export async function POST(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
+  db.prepare(
+    "UPDATE connection_state SET status = 'disconnected', qr_string = NULL, phone = NULL, updated_at = unixepoch() WHERE id = 1"
+  ).run();
 
   const authDir = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
   try {

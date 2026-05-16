@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   // Embudo de conversión
   const stages = ["NUEVO","CALIFICADO","PROPUESTA","NEGOCIACION","GANADO","PERDIDO"];
-  const funnelRaw = db.prepare(`
-    SELECT stage, COUNT(*) as count FROM crm_deals GROUP BY stage
-  `).all() as { stage: string; count: number }[];
+  const funnelRaw = db.prepare(
+    "SELECT stage, COUNT(*) as count FROM crm_deals GROUP BY stage"
+  ).all() as { stage: string; count: number }[];
   const funnelMap = Object.fromEntries(funnelRaw.map((r) => [r.stage, r.count]));
   const funnel = stages.map((s) => ({ stage: s, count: funnelMap[s] ?? 0 }));
   const totalDeals = funnel.reduce((a, b) => a + b.count, 0);
@@ -41,7 +45,10 @@ export async function GET() {
   `).get() as { avg_days: number | null })?.avg_days ?? 0;
 
   // Mensajes totales y conversaciones activas
-  const totalConversations = (db.prepare("SELECT COUNT(*) as c FROM conversations").get() as { c: number }).c;
+  const totalConversations = (db.prepare(
+    "SELECT COUNT(*) as c FROM conversations"
+  ).get() as { c: number }).c;
+
   const activeToday = (db.prepare(`
     SELECT COUNT(*) as c FROM conversations WHERE last_message_at > unixepoch() - 86400
   `).get() as { c: number }).c;

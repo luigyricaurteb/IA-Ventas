@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
-import db, { insertReservation } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 
 // Escanea deals GANADOS que no tienen reserva y las crea automáticamente
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const orphans = db.prepare(`
     SELECT d.id, d.contact_id, d.product_id, d.people_count, d.total_value,
            c.full_name, c.travel_date, c.email,
@@ -31,17 +35,25 @@ export async function POST() {
       if (!isNaN(parsed)) serviceDate = Math.floor(parsed / 1000);
     }
 
-    const res = insertReservation({
-      deal_id:      deal.id,
-      contact_id:   deal.contact_id,
-      client_name:  deal.full_name ?? deal.phone ?? "Cliente",
-      service_name: deal.product_name ?? "Servicio DMC",
-      service_date: serviceDate,
-      people_count: deal.people_count ?? 1,
-      total_value:  deal.total_value,
-      status:       "confirmed",
-      notes:        deal.travel_date ? `Fecha solicitada: ${deal.travel_date}` : null,
-    });
+    const code = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    const res = db.prepare(`
+      INSERT INTO reservations
+        (deal_id, contact_id, reservation_code, client_name, service_name,
+         service_date, people_count, total_value, status, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+      RETURNING id
+    `).get(
+      deal.id,
+      deal.contact_id,
+      code,
+      deal.full_name ?? deal.phone ?? "Cliente",
+      deal.product_name ?? "Servicio DMC",
+      serviceDate,
+      deal.people_count ?? 1,
+      deal.total_value,
+      deal.travel_date ? `Fecha solicitada: ${deal.travel_date}` : null,
+    ) as { id: number };
+
     created.push(res.id);
   }
 

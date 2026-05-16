@@ -1,6 +1,5 @@
 import OpenAI from "openai";
-import { getCompanyConfig, listAiLearnings } from "./db";
-import type { Message, Product } from "./db";
+import { getCompanyDb } from "./master/db-company";
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
@@ -13,12 +12,16 @@ const client = new OpenAI({
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 
-function buildBaseSystemPrompt(): string {
-  const config = getCompanyConfig();
-  const aiName = config.ai_name ?? "Julieta";
-  const company = config.name ?? "nuestra empresa";
-  const generalInstructions = config.ai_general_instructions ?? "";
-  const learnings = listAiLearnings();
+type HistoryMsg = { role: string; content: string };
+
+function buildBaseSystemPrompt(slug: string): string {
+  const db = getCompanyDb(slug);
+  const config = db.prepare("SELECT * FROM company_config WHERE id=1").get() as { ai_name: string | null; name: string | null; ai_general_instructions: string | null } | null;
+  const aiName = config?.ai_name ?? "Julieta";
+  const company = config?.name ?? "nuestra empresa";
+  const generalInstructions = config?.ai_general_instructions ?? "";
+
+  const learnings = db.prepare("SELECT topic, content FROM ai_learnings ORDER BY created_at DESC LIMIT 30").all() as { topic: string; content: string }[];
 
   let prompt = `Eres ${aiName}, la asistente virtual de *${company}*.\n`;
 
@@ -39,9 +42,9 @@ function buildBaseSystemPrompt(): string {
   return prompt;
 }
 
-export async function generateReply(history: Message[]): Promise<string> {
-  const systemPrompt = buildBaseSystemPrompt();
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.map((m) => ({
+export async function generateReply(history: HistoryMsg[], slug = "platform"): Promise<string> {
+  const systemPrompt = buildBaseSystemPrompt(slug);
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.map(m => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.content,
   }));
@@ -50,8 +53,7 @@ export async function generateReply(history: Message[]): Promise<string> {
     const response = await client.chat.completions.create({
       model: MODEL,
       messages: [{ role: "system", content: systemPrompt }, ...messages],
-      max_tokens: 300,
-      temperature: 0.7,
+      max_tokens: 300, temperature: 0.7,
     });
     return response.choices[0]?.message?.content?.trim() ?? "Lo siento, no pude procesar tu mensaje.";
   } catch (err: unknown) {
@@ -62,40 +64,40 @@ export async function generateReply(history: Message[]): Promise<string> {
 }
 
 interface StructuredContext {
-  products?: Product[];
+  products?: { id: number; name: string; price_per_person: number; description: string | null; ai_instructions?: string | null }[];
   companyName?: string;
   collectedData?: Record<string, unknown>;
 }
 
-// Frases que indican que Julieta no sabe cómo responder
 const UNCERTAINTY_PHRASES = [
-  "no tengo información", "no cuento con", "no dispongo",
-  "no estoy seguro", "no sé", "no puedo responder",
-  "déjame derivarte", "derivarte con un asesor",
-  "no tengo esa información", "no conozco",
+  "no tengo información","no cuento con","no dispongo",
+  "no estoy seguro","no sé","no puedo responder",
+  "déjame derivarte","derivarte con un asesor",
+  "no tengo esa información","no conozco",
 ];
 
 export function isUncertainResponse(text: string): boolean {
-  const lower = text.toLowerCase();
-  return UNCERTAINTY_PHRASES.some((p) => lower.includes(p));
+  return UNCERTAINTY_PHRASES.some(p => text.toLowerCase().includes(p));
 }
 
 export async function generateStructuredReply(
-  history: Message[],
+  history: HistoryMsg[],
   botState: string,
-  ctx: StructuredContext
+  ctx: StructuredContext,
+  slug = "platform"
 ): Promise<string> {
   const { products = [], collectedData = {} } = ctx;
-  const config = getCompanyConfig();
-  const aiName = config.ai_name ?? "Julieta";
-  const companyName = config.name ?? ctx.companyName ?? "nuestra empresa";
+  const db = getCompanyDb(slug);
+  const config = db.prepare("SELECT ai_name, name FROM company_config WHERE id=1").get() as { ai_name: string | null; name: string | null } | null;
+  const aiName = config?.ai_name ?? "Julieta";
+  const companyName = config?.name ?? ctx.companyName ?? "nuestra empresa";
 
-  let systemPrompt = buildBaseSystemPrompt();
+  let systemPrompt = buildBaseSystemPrompt(slug);
   systemPrompt += `\nEstado actual de la conversación: ${botState}.`;
   systemPrompt += `\nEmpresa: ${companyName}.`;
 
   if (products.length > 0) {
-    const productDetails = products.map((p) =>
+    const productDetails = products.map(p =>
       `- ${p.name} ($${p.price_per_person.toLocaleString("es-CO")}/persona): ${p.description ?? ""}${p.ai_instructions ? `\n  → ${p.ai_instructions}` : ""}`
     ).join("\n");
     systemPrompt += `\n\nCatálogo disponible:\n${productDetails}`;
@@ -106,8 +108,9 @@ export async function generateStructuredReply(
   }
 
   systemPrompt += `\n\nIMPORTANTE: Responde en máximo 3 líneas. Si el usuario muestra interés en comprar, guíalo suavemente hacia elegir un producto del catálogo.`;
+  void aiName;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.slice(-10).map((m) => ({
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.slice(-10).map(m => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.content,
   }));
@@ -116,8 +119,7 @@ export async function generateStructuredReply(
     const response = await client.chat.completions.create({
       model: MODEL,
       messages: [{ role: "system", content: systemPrompt }, ...messages],
-      max_tokens: 250,
-      temperature: 0.7,
+      max_tokens: 250, temperature: 0.7,
     });
     return response.choices[0]?.message?.content?.trim() ?? "¿En qué más puedo ayudarte?";
   } catch (err: unknown) {

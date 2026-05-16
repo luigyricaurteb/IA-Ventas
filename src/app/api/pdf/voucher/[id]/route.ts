@@ -1,36 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 import fs from "node:fs";
 import path from "node:path";
-import db, { getCompanyConfig, ensureReservationCode } from "@/lib/db";
 
 interface Ctx { params: Promise<{ id: string }> }
 
-export async function GET(_req: NextRequest, { params }: Ctx) {
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const { id } = await params;
   const resId = Number(id);
 
-  const reservation = db.prepare<[number], {
+  const reservation = db.prepare(
+    "SELECT * FROM reservations WHERE id = ?"
+  ).get(resId) as {
     id: number; reservation_code: string | null; client_name: string | null;
     service_name: string | null; service_date: number; people_count: number;
     total_value: number | null; notes: string | null; status: string;
-  }>("SELECT * FROM reservations WHERE id = ?").get(resId);
+  } | null;
 
   if (!reservation) return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
 
-  const code    = ensureReservationCode(resId);
-  const company = getCompanyConfig();
+  // Ensure reservation code
+  let code = reservation.reservation_code;
+  if (!code) {
+    code = `RES-${resId}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    db.prepare("UPDATE reservations SET reservation_code = ? WHERE id = ?").run(code, resId);
+  }
+
+  const company = db.prepare("SELECT * FROM company_config WHERE id = 1").get() as {
+    name: string | null; phone: string | null; email: string | null;
+    nequi_phone: string | null; daviplata_phone: string | null; logo_filename: string | null;
+  } | null ?? { name: null, phone: null, email: null, nequi_phone: null, daviplata_phone: null, logo_filename: null };
 
   // Datos del contacto
-  const contact = db.prepare<[number], { full_name: string | null; email: string | null; phone: string | null } | null>(
+  const contact = db.prepare(
     "SELECT c.full_name, c.email, conv.phone FROM reservations r LEFT JOIN contacts c ON r.contact_id = c.id LEFT JOIN conversations conv ON c.conversation_id = conv.id WHERE r.id = ?"
-  ).get(resId);
+  ).get(resId) as { full_name: string | null; email: string | null; phone: string | null } | null;
 
   // Generar QR de pago
   const paymentText = [
     `RESERVA: ${code}`,
-    company.nequi_phone   ? `Nequi: ${company.nequi_phone}`       : "",
+    company.nequi_phone    ? `Nequi: ${company.nequi_phone}`       : "",
     company.daviplata_phone ? `Daviplata: ${company.daviplata_phone}` : "",
     reservation.total_value ? `Monto: $${reservation.total_value.toLocaleString("es-CO")} COP` : "",
     `Referencia: ${code}`,
@@ -71,7 +86,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     doc.fillColor("#111827").fontSize(18).font("Helvetica-Bold")
        .text("VOUCHER DE RESERVA", 50, 130, { align: "center", width: W });
     doc.fillColor(accentColor).fontSize(13).font("Helvetica-Bold")
-       .text(code, 50, 152, { align: "center", width: W });
+       .text(code!, 50, 152, { align: "center", width: W });
 
     // ── QR de pago (esquina superior derecha) ────────────────────────
     doc.image(qrBuffer, 450, 130, { width: 90 });

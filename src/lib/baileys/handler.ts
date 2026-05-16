@@ -2,21 +2,16 @@ import type { WASocket, proto } from "@whiskeysockets/baileys";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  getOrCreateConversation, insertMessage, getRecentHistory, getConversationById,
-  getBotState, insertPaymentProof, getOrCreateDeal, updateDealStage,
-  getCompanyConfig,
-} from "../db";
+import { getCompanyDb } from "../master/db-company";
 import { processBotMessage } from "../bot/state-machine";
 import { sendWithAntiBlock } from "../bot/anti-block";
-import { sendEmail } from "../email";
 
 const PROOFS_DIR = path.resolve(process.cwd(), "public", "uploads", "proofs");
 
 const ALLOWED_MIMETYPES: Record<string, string> = {
   "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
+  "image/jpg":  "jpg",
+  "image/png":  "png",
   "application/pdf": "pdf",
 };
 
@@ -24,7 +19,8 @@ const PAYMENT_STATES = ["QUOTE_SENT", "AWAITING_PAYMENT", "COLLECTING_PEOPLE"];
 
 export async function handleIncomingMessage(
   sock: WASocket,
-  msg: proto.IWebMessageInfo
+  msg: proto.IWebMessageInfo,
+  slug = "platform"
 ): Promise<void> {
   if (msg.key.fromMe) return;
 
@@ -32,11 +28,16 @@ export async function handleIncomingMessage(
   if (remoteJid.endsWith("@g.us")) return;
   if (!remoteJid.endsWith("@s.whatsapp.net") && !remoteJid.endsWith("@lid")) return;
 
+  const db       = getCompanyDb(slug);
   const phone    = remoteJid.split("@")[0];
   const pushName = msg.pushName ?? undefined;
-  const convo    = getOrCreateConversation(phone, pushName);
 
-  // ── Detección de imagen o PDF (comprobante de pago) ──────────────────
+  // Crear / actualizar conversación
+  const convo = db.prepare(
+    "INSERT INTO conversations (phone, name) VALUES (?,?) ON CONFLICT(phone) DO UPDATE SET name=COALESCE(excluded.name, name), last_message_at=unixepoch() RETURNING *"
+  ).get(phone, pushName ?? null) as { id: number; phone: string; mode: string };
+
+  // ── Comprobante de pago (imagen o PDF) ────────────────────────────────
   const imageMsg    = msg.message?.imageMessage;
   const documentMsg = msg.message?.documentMessage;
   const mediaMsg    = imageMsg ?? documentMsg ?? null;
@@ -46,67 +47,59 @@ export async function handleIncomingMessage(
     const ext      = ALLOWED_MIMETYPES[mimetype];
 
     if (!ext) {
-      // Tipo no permitido
       await sendWithAntiBlock(sock, remoteJid,
-        `Solo aceptamos comprobantes en formato JPG, PNG o PDF. Por favor envíalo en uno de esos formatos.`,
+        "Solo aceptamos comprobantes en formato JPG, PNG o PDF. Por favor envíalo en uno de esos formatos.",
         phone
       );
       return;
     }
 
-    const botState = getBotState(convo.id);
+    const botState = db.prepare("SELECT state FROM bot_conversation_state WHERE conversation_id=?").get(convo.id) as { state: string } | null;
     const currentState = botState?.state ?? "";
 
-    if (!PAYMENT_STATES.includes(currentState) && currentState !== "BROWSING") {
-      // No estamos esperando pago, ignorar silenciosamente
-      return;
-    }
+    if (!PAYMENT_STATES.includes(currentState) && currentState !== "BROWSING") return;
 
-    // Descargar y guardar el archivo
     try {
       if (!fs.existsSync(PROOFS_DIR)) fs.mkdirSync(PROOFS_DIR, { recursive: true });
 
       const buffer = await downloadMediaMessage(msg, "buffer", {}) as Buffer;
-      const filename = `proof_${convo.id}_${Date.now()}.${ext}`;
+      const filename = `proof_${slug}_${convo.id}_${Date.now()}.${ext}`;
       fs.writeFileSync(path.join(PROOFS_DIR, filename), buffer);
 
-      const deal = getOrCreateDeal(convo.id);
-      insertPaymentProof(convo.id, deal.id, filename, mimetype);
-      updateDealStage(deal.id, "NEGOCIACION");
-      insertMessage(convo.id, "user", `[Comprobante de pago adjunto: ${filename}]`);
+      // Obtener o crear deal
+      const contact = db.prepare("SELECT id FROM contacts WHERE conversation_id=?").get(convo.id) as { id: number } | null;
+      const deal = db.prepare(
+        "INSERT INTO crm_deals (conversation_id, contact_id, stage) VALUES (?,?,?) ON CONFLICT DO NOTHING RETURNING *"
+      ).get(convo.id, contact?.id ?? null, "NEGOCIACION") as { id: number } | null;
+      const dealId = deal?.id ?? (db.prepare("SELECT id FROM crm_deals WHERE conversation_id=?").get(convo.id) as { id: number } | null)?.id ?? null;
 
-      // Respuesta al cliente
-      await sendWithAntiBlock(sock, remoteJid,
-        `✅ ¡Recibimos tu comprobante de pago! Lo estamos verificando y te confirmaremos tu reserva en breve. Gracias por tu paciencia. 🙏`,
-        phone
-      );
-      insertMessage(convo.id, "assistant", `✅ ¡Recibimos tu comprobante de pago! Lo estamos verificando y te confirmaremos tu reserva en breve. Gracias por tu paciencia. 🙏`);
+      db.prepare("INSERT INTO payment_proofs (conversation_id, deal_id, filename, mimetype) VALUES (?,?,?,?)").run(convo.id, dealId, filename, mimetype);
+      if (dealId) db.prepare("UPDATE crm_deals SET stage='NEGOCIACION' WHERE id=?").run(dealId);
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(convo.id, "user", `[Comprobante: ${filename}]`);
 
-      // Email de alerta al admin
-      const company = getCompanyConfig();
-      if (company.email) {
-        const fresh = getConversationById(convo.id);
-        const clientName = pushName ?? phone;
+      const replyMsg = "✅ ¡Recibimos tu comprobante de pago! Lo estamos verificando y te confirmaremos tu reserva en breve. Gracias por tu paciencia. 🙏";
+      await sendWithAntiBlock(sock, remoteJid, replyMsg, phone);
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(convo.id, "assistant", replyMsg);
+
+      // Email de alerta si hay SMTP configurado
+      const company = db.prepare("SELECT email FROM company_config WHERE id=1").get() as { email: string | null } | null;
+      const smtp = db.prepare("SELECT * FROM smtp_config WHERE id=1").get() as { host: string | null; port: number; secure: number; user: string | null; password: string | null; from_name: string | null; from_email: string | null } | null;
+      if (company?.email && smtp?.host && smtp?.user) {
         try {
-          await sendEmail(
-            company.email,
-            `⚠️ Comprobante de pago recibido — ${clientName}`,
-            `<h2>Nuevo comprobante de pago recibido</h2>
-             <p><strong>Cliente:</strong> ${clientName}</p>
-             <p><strong>Teléfono:</strong> ${phone}</p>
-             <p><strong>Formato:</strong> ${ext.toUpperCase()}</p>
-             <p><strong>Hora:</strong> ${new Date().toLocaleString("es-CO")}</p>
-             <hr/>
-             <p>Ingresa al dashboard para revisar el comprobante y confirmar la reserva.</p>`
-          );
-        } catch (emailErr) {
-          console.warn("[handler] No se pudo enviar email de alerta:", emailErr);
-        }
+          const nodemailer = await import("nodemailer");
+          const transporter = nodemailer.createTransport({ host: smtp.host, port: smtp.port, secure: smtp.secure === 1, auth: { user: smtp.user, pass: smtp.password ?? "" } });
+          await transporter.sendMail({
+            from: `"${smtp.from_name ?? "Agente"}" <${smtp.from_email ?? smtp.user}>`,
+            to: company.email,
+            subject: `⚠️ Comprobante recibido — ${pushName ?? phone}`,
+            html: `<h2>Nuevo comprobante</h2><p><b>Cliente:</b> ${pushName ?? phone}</p><p><b>Teléfono:</b> ${phone}</p><p><b>Formato:</b> ${ext.toUpperCase()}</p>`,
+          });
+        } catch {}
       }
 
-      console.log(`[bot] 📎 Comprobante recibido de ${phone} (${ext.toUpperCase()})`);
+      console.log(`[bot:${slug}] 📎 Comprobante recibido de ${phone}`);
     } catch (err) {
-      console.error("[handler] Error procesando comprobante:", err);
+      console.error(`[handler:${slug}] Error procesando comprobante:`, err);
     }
     return;
   }
@@ -119,16 +112,21 @@ export async function handleIncomingMessage(
 
   if (!text) return;
 
-  console.log(`[bot] ← Mensaje de ${phone}: "${text.slice(0, 60)}"`);
-  insertMessage(convo.id, "user", text);
+  console.log(`[bot:${slug}] ← ${phone}: "${text.slice(0, 60)}"`);
+  db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(convo.id, "user", text);
+  db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(convo.id);
 
-  const fresh = getConversationById(convo.id);
+  // Solo procesar si está en modo AI
+  const fresh = db.prepare("SELECT mode FROM conversations WHERE id=?").get(convo.id) as { mode: string } | null;
   if (!fresh || fresh.mode !== "AI") return;
 
-  const history = getRecentHistory(convo.id, 20);
+  const history = db.prepare(
+    "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at DESC LIMIT 20"
+  ).all(convo.id) as { role: string; content: string }[];
+
   try {
-    await processBotMessage(sock, convo.id, phone, remoteJid, text, history);
+    await processBotMessage(sock, convo.id, phone, remoteJid, text, history.reverse(), slug);
   } catch (err) {
-    console.error(`[bot] Error procesando mensaje de ${phone}:`, err);
+    console.error(`[bot:${slug}] Error procesando mensaje de ${phone}:`, err);
   }
 }

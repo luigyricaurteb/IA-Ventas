@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  listReservationsByMonth, listReservationsPaginated,
-  insertReservation, getReservationCountByDay,
-} from "@/lib/db";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const { searchParams } = new URL(req.url);
   const view   = searchParams.get("view") ?? "month";
   const year   = Number(searchParams.get("year")  ?? new Date().getFullYear());
@@ -15,34 +16,74 @@ export async function GET(req: NextRequest) {
   const page   = Number(searchParams.get("page") ?? 0);
 
   if (view === "month") {
-    const reservations = listReservationsByMonth(year, month);
-    const countByDay   = getReservationCountByDay(year, month);
+    // Start and end of month as unix timestamps
+    const start = Math.floor(new Date(year, month - 1, 1).getTime() / 1000);
+    const end   = Math.floor(new Date(year, month, 1).getTime() / 1000);
+
+    const reservations = db.prepare(
+      "SELECT * FROM reservations WHERE service_date >= ? AND service_date < ? ORDER BY service_date ASC"
+    ).all(start, end);
+
+    // Count by day
+    const rawCounts = db.prepare(`
+      SELECT strftime('%d', datetime(service_date, 'unixepoch')) as day, COUNT(*) as count
+      FROM reservations WHERE service_date >= ? AND service_date < ?
+      GROUP BY day
+    `).all(start, end) as { day: string; count: number }[];
+    const countByDay = Object.fromEntries(rawCounts.map((r) => [Number(r.day), r.count]));
+
     return NextResponse.json({ reservations, countByDay });
   }
 
   if (view === "list") {
-    const { rows, total } = listReservationsPaginated(status, page, 50);
-    return NextResponse.json({ rows, total, page });
+    const limit = 50;
+    const offset = page * limit;
+    const whereClause = status ? "WHERE status = ?" : "";
+    const args = status ? [status, limit, offset] : [limit, offset];
+
+    const rows = db.prepare(
+      `SELECT * FROM reservations ${whereClause} ORDER BY service_date DESC LIMIT ? OFFSET ?`
+    ).all(...args);
+
+    const totalRow = db.prepare(
+      `SELECT COUNT(*) as c FROM reservations ${whereClause}`
+    ).get(...(status ? [status] : [])) as { c: number };
+
+    return NextResponse.json({ rows, total: totalRow.c, page });
   }
 
   return NextResponse.json({ error: "view inválido" }, { status: 400 });
 }
 
 export async function POST(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const body = await req.json();
   if (!body.service_date) {
     return NextResponse.json({ error: "Fecha requerida" }, { status: 400 });
   }
-  const reservation = insertReservation({
-    deal_id:      body.deal_id      ?? null,
-    contact_id:   body.contact_id   ?? null,
-    client_name:  body.client_name  ?? null,
-    service_name: body.service_name ?? null,
-    service_date: Number(body.service_date),
-    people_count: Number(body.people_count ?? 1),
-    total_value:  body.total_value  ? Number(body.total_value) : null,
-    status:       body.status       ?? "pending",
-    notes:        body.notes        ?? null,
-  });
+
+  const code = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+  const reservation = db.prepare(`
+    INSERT INTO reservations
+      (deal_id, contact_id, reservation_code, client_name, service_name,
+       service_date, people_count, total_value, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    RETURNING *
+  `).get(
+    body.deal_id      ?? null,
+    body.contact_id   ?? null,
+    code,
+    body.client_name  ?? null,
+    body.service_name ?? null,
+    Number(body.service_date),
+    Number(body.people_count ?? 1),
+    body.total_value  ? Number(body.total_value) : null,
+    body.status       ?? "pending",
+    body.notes        ?? null,
+  );
+
   return NextResponse.json({ reservation }, { status: 201 });
 }

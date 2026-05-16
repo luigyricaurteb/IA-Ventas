@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteExpense } from "@/lib/db";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 
 interface Ctx { params: Promise<{ id: string }> }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   const { id } = await params;
-  deleteExpense(Number(id));
+  db.prepare("DELETE FROM accounting_expense WHERE id = ?").run(Number(id));
   return NextResponse.json({ ok: true });
 }

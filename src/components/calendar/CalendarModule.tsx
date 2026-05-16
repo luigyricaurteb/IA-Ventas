@@ -194,6 +194,10 @@ export default function CalendarModule() {
             <button onClick={() => setView("month")} className={`px-3 py-1 rounded text-sm font-medium ${view === "month" ? "bg-white shadow" : "text-gray-500"}`}>Mes</button>
             <button onClick={() => setView("list")} className={`px-3 py-1 rounded text-sm font-medium ${view === "list" ? "bg-white shadow" : "text-gray-500"}`}>Lista</button>
           </div>
+          <a href="/api/calendar/ical" download="reservas.ics"
+            className="border border-gray-300 text-gray-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+            📅 Exportar iCal
+          </a>
           <button onClick={() => { setEditing(null); setShowForm(true); }} className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600">+ Nueva reserva</button>
         </div>
       </div>

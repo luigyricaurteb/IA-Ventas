@@ -1,9 +1,6 @@
 export const dynamic = "force-dynamic";
-import { NextResponse } from "next/server";
-import db, {
-  getOrCreateConversation, upsertContact, setBotState,
-  getOrCreateDeal, updateDealStage, insertMessage,
-} from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 import OpenAI from "openai";
 
 const client = new OpenAI({
@@ -21,7 +18,11 @@ interface ScanResult {
   state?: string;
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const ctx = getAuthCtx(req);
+  if (!ctx) return unauthorized();
+  const { db } = ctx;
+
   // Conversaciones con mensajes pero sin estado de bot definido (o en INIT)
   const conversations = db.prepare<[], { id: number; phone: string; name: string | null }>(`
     SELECT c.id, c.phone, c.name
@@ -98,7 +99,20 @@ Extrae la información disponible y devuelve SOLO un JSON con estos campos (null
       if (extracted.people_count) contactData.people_count = parseInt(extracted.people_count) || null;
 
       if (Object.keys(contactData).length > 0) {
-        upsertContact(conv.id, contactData);
+        const existingContact = db.prepare(
+          "SELECT id FROM contacts WHERE conversation_id = ?"
+        ).get(conv.id) as { id: number } | null;
+
+        if (existingContact) {
+          const sets = Object.keys(contactData).map((k) => `${k} = ?`).join(", ");
+          db.prepare(`UPDATE contacts SET ${sets}, updated_at = unixepoch() WHERE id = ?`)
+            .run(...Object.values(contactData), existingContact.id);
+        } else {
+          const cols = ["conversation_id", ...Object.keys(contactData)].join(", ");
+          const placeholders = ["?", ...Object.keys(contactData).map(() => "?")].join(", ");
+          db.prepare(`INSERT INTO contacts (${cols}) VALUES (${placeholders})`)
+            .run(conv.id, ...Object.values(contactData));
+        }
       }
 
       // Actualizar nombre de conversación
@@ -107,14 +121,39 @@ Extrae la información disponible y devuelve SOLO un JSON con estos campos (null
       }
 
       // Setear estado del bot
-      const botState = (extracted.bot_state ?? "BROWSING") as Parameters<typeof setBotState>[1];
-      setBotState(conv.id, botState, contactData as Record<string, unknown>);
+      const botState = extracted.bot_state ?? "BROWSING";
+      const existing = db.prepare(
+        "SELECT conversation_id FROM bot_conversation_state WHERE conversation_id = ?"
+      ).get(conv.id);
+      if (existing) {
+        db.prepare(
+          "UPDATE bot_conversation_state SET state = ?, data = ?, updated_at = unixepoch() WHERE conversation_id = ?"
+        ).run(botState, JSON.stringify(contactData), conv.id);
+      } else {
+        db.prepare(
+          "INSERT INTO bot_conversation_state (conversation_id, state, data) VALUES (?, ?, ?)"
+        ).run(conv.id, botState, JSON.stringify(contactData));
+      }
 
       // Crear/actualizar deal en CRM
-      const deal = getOrCreateDeal(conv.id);
+      let deal = db.prepare<[number], { id: number; stage: string }>(
+        "SELECT id, stage FROM crm_deals WHERE conversation_id = ? LIMIT 1"
+      ).get(conv.id);
+
+      if (!deal) {
+        const contact = db.prepare<[number], { id: number }>(
+          "SELECT id FROM contacts WHERE conversation_id = ? LIMIT 1"
+        ).get(conv.id);
+        deal = db.prepare<[number | null, number], { id: number; stage: string }>(
+          "INSERT INTO crm_deals (contact_id, conversation_id) VALUES (?, ?) RETURNING id, stage"
+        ).get(contact?.id ?? null, conv.id)!;
+      }
+
       const validStages = ["NUEVO","CALIFICADO","PROPUESTA","NEGOCIACION","GANADO","PERDIDO"];
-      if (extracted.stage && validStages.includes(extracted.stage)) {
-        updateDealStage(deal.id, extracted.stage as Parameters<typeof updateDealStage>[1]);
+      if (deal && extracted.stage && validStages.includes(extracted.stage) && extracted.stage !== deal.stage) {
+        db.prepare(
+          "UPDATE crm_deals SET stage = ?, stage_changed_at = unixepoch(), updated_at = unixepoch() WHERE id = ?"
+        ).run(extracted.stage, deal.id);
       }
 
       results.push({

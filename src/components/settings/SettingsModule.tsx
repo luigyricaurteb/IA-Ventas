@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-type Tab = "company" | "banks" | "smtp" | "learning" | "users" | "drive";
+type Tab = "company" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla";
 
 const MODULE_LIST: { id: string; label: string; icon: string }[] = [
   { id: "chat",       label: "Chat",         icon: "💬" },
@@ -23,6 +23,7 @@ interface SystemUser { id: number; username: string; name: string; permissions: 
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
 interface AiLearning { id: number; topic: string; content: string; created_at: number }
 interface DriveSource { id: number; name: string; drive_url: string; file_type: string; topic: string; last_synced_at: number | null; sync_status: string; sync_error: string | null }
+interface MsgTemplate { id: number; name: string; content: string; category: string | null }
 
 function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; label: string; icon: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -55,6 +56,9 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [newDrive, setNewDrive] = useState({ name: "", drive_url: "", topic: "" });
   const [driveSyncing, setDriveSyncing] = useState<number | null>(null);
   const [driveMsg, setDriveMsg] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<MsgTemplate[]>([]);
+  const [newTpl, setNewTpl] = useState({ name: "", content: "", category: "" });
+  const [slaMinutes, setSlaMinutes] = useState(30);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -65,6 +69,8 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     fetch("/api/settings/banks").then((r) => r.json()).then((d) => setBanks(d.banks));
     fetch("/api/settings/smtp").then((r) => r.json()).then((d) => setSmtp(d.config));
     fetch("/api/settings/learnings").then((r) => r.json()).then((d) => setLearnings(d.learnings));
+    fetch("/api/templates").then((r) => r.json()).then((d) => setTemplates(d.templates ?? []));
+    fetch("/api/sla").then((r) => r.json()).then((d) => { if (d.sla_minutes) setSlaMinutes(d.sla_minutes); });
     if (isAdmin) {
       fetch("/api/users").then((r) => r.json()).then((d) => setUsers(d.users ?? []));
       fetch("/api/settings/drive").then((r) => r.json()).then((d) => setDriveSources(d.sources ?? []));
@@ -176,13 +182,30 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     setDriveSources(driveSources.filter((s) => s.id !== id));
   }
 
+  async function addTemplate() {
+    if (!newTpl.name || !newTpl.content) return;
+    await fetch("/api/templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newTpl) });
+    setNewTpl({ name: "", content: "", category: "" });
+    fetch("/api/templates").then(r => r.json()).then(d => setTemplates(d.templates ?? []));
+  }
+  async function deleteTemplate(id: number) {
+    await fetch(`/api/templates/${id}`, { method: "DELETE" });
+    setTemplates(templates.filter(t => t.id !== id));
+  }
+  async function saveSla() {
+    await fetch("/api/sla", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ minutes: slaMinutes }) });
+    showSaved();
+  }
+
   const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
-    { id: "company",  label: "Empresa" },
-    { id: "banks",    label: "Cuentas bancarias" },
-    { id: "smtp",     label: "Email SMTP" },
-    { id: "learning", label: `${aiName} IA` },
-    { id: "drive",    label: "Google Drive", adminOnly: true },
-    { id: "users",    label: "Usuarios", adminOnly: true },
+    { id: "company",   label: "Empresa" },
+    { id: "banks",     label: "Cuentas bancarias" },
+    { id: "smtp",      label: "Email SMTP" },
+    { id: "learning",  label: `${aiName} IA` },
+    { id: "templates", label: "Plantillas" },
+    { id: "sla",       label: "SLA", adminOnly: true },
+    { id: "drive",     label: "Google Drive", adminOnly: true },
+    { id: "users",     label: "Usuarios", adminOnly: true },
   ];
   const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin) as { id: Tab; label: string }[];
 
@@ -381,6 +404,71 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PLANTILLAS ── */}
+      {tab === "templates" && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
+            Las plantillas aparecen en el chat para enviarlas con un clic. Úsalas para respuestas frecuentes.
+          </div>
+          <div className="space-y-2">
+            {templates.map(t => (
+              <div key={t.id} className="bg-white border rounded-xl p-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium text-gray-800 text-sm">{t.name}</p>
+                    {t.category && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t.category}</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 whitespace-pre-wrap">{t.content}</p>
+                </div>
+                <button onClick={() => deleteTemplate(t.id)} className="text-red-400 hover:text-red-600 text-sm shrink-0">Eliminar</button>
+              </div>
+            ))}
+            {templates.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Sin plantillas todavía.</p>}
+          </div>
+          <div className="bg-gray-50 border rounded-xl p-4 space-y-3">
+            <p className="text-sm font-medium text-gray-700">+ Nueva plantilla</p>
+            <div className="grid grid-cols-2 gap-3">
+              <input placeholder="Nombre (ej: Bienvenida)" value={newTpl.name} onChange={e => setNewTpl({...newTpl, name: e.target.value})} className="border rounded-lg px-3 py-2 text-sm" />
+              <input placeholder="Categoría (opcional)" value={newTpl.category} onChange={e => setNewTpl({...newTpl, category: e.target.value})} className="border rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <textarea value={newTpl.content} onChange={e => setNewTpl({...newTpl, content: e.target.value})}
+              rows={3} placeholder="Texto de la plantilla..." className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
+            <button onClick={addTemplate} disabled={!newTpl.name || !newTpl.content}
+              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">Agregar plantilla</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SLA ── */}
+      {tab === "sla" && (
+        <div className="space-y-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+            <h2 className="font-semibold text-orange-800 mb-1">Tiempo de respuesta SLA</h2>
+            <p className="text-sm text-orange-700">Si un agente en modo HUMANO no responde al cliente dentro de este tiempo, aparecerá una alerta en el header del dashboard.</p>
+          </div>
+          <div className="bg-white border rounded-xl p-4">
+            <label className="text-sm font-medium text-gray-700">Tiempo máximo de respuesta (minutos)</label>
+            <div className="flex gap-3 mt-2">
+              <input type="number" min={1} max={1440} value={slaMinutes} onChange={e => setSlaMinutes(Number(e.target.value))}
+                className="w-32 border rounded-lg px-3 py-2 text-sm" />
+              <button onClick={saveSla} className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600">
+                {saved ? "✓ Guardado" : "Guardar"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Recomendado: 30 minutos para atención de calidad.</p>
+          </div>
+          <div className="bg-white border rounded-xl p-4">
+            <p className="text-sm font-medium text-gray-700 mb-2">Link para formulario web de captación</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-gray-100 rounded-lg px-3 py-2 text-gray-600 font-mono break-all">
+                {typeof window !== "undefined" ? `${window.location.origin}/form/[slug-de-empresa]` : "/form/[slug]"}
+              </code>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Comparte este enlace para captar leads que se crean como conversaciones en el sistema.</p>
           </div>
         </div>
       )}
