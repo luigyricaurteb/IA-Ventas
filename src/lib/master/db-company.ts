@@ -370,6 +370,23 @@ function initCompanySchema(db: Database.Database): void {
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
+    -- ── Abonos / pagos parciales ──────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS partial_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deal_id INTEGER NOT NULL REFERENCES crm_deals(id),
+      conversation_id INTEGER NOT NULL,
+      proof_id INTEGER REFERENCES payment_proofs(id),
+      amount REAL NOT NULL,
+      ai_amount REAL,
+      ai_reference TEXT,
+      ai_payer TEXT,
+      ai_date TEXT,
+      ai_bank TEXT,
+      verified INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
     -- ── Sesiones JWT (no usadas con JWT stateless, pero por compatibilidad) ──
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -385,8 +402,15 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE conversations ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
     "ALTER TABLE conversations ADD COLUMN sla_warned INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE crm_deals ADD COLUMN lead_score INTEGER DEFAULT 0",
+    "ALTER TABLE crm_deals ADD COLUMN paid_amount REAL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN permissions TEXT NOT NULL DEFAULT '{}'",
     "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_amount REAL",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_reference TEXT",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_payer TEXT",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_date TEXT",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_bank TEXT",
+    "ALTER TABLE payment_proofs ADD COLUMN ai_raw TEXT",
   ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores

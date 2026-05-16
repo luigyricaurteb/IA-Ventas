@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 interface PaymentProof {
   id: number; filename: string; mimetype: string; reviewed: number; created_at: number;
+  ai_amount?: number | null; ai_reference?: string | null; ai_payer?: string | null;
+  ai_date?: string | null; ai_bank?: string | null;
+  conversation_id?: number;
 }
 interface Message {
   id: number; conversation_id: number;
@@ -126,11 +129,19 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
     } catch {}
   }
 
-  async function approveProof(id: number) {
-    const res = await fetch(`/api/alerts/${id}/approve`, { method: "POST" });
+  async function approveProof(id: number, type: "full" | "partial" = "full", amount?: number) {
+    const res = await fetch(`/api/alerts/${id}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, amount }),
+    });
     if (!res.ok) { const d = await res.json() as { error: string }; alert(d.error ?? "Error al aprobar"); return; }
+    const d = await res.json() as { isFullyPaid?: boolean; saldo?: number; newPaidTotal?: number; totalValue?: number };
     setProofs(prev => prev.map(p => p.id === id ? { ...p, reviewed: 1 } : p));
     await fetchMessages();
+    if (d.isFullyPaid === false && d.saldo) {
+      alert(`Abono registrado. Saldo pendiente: $${d.saldo.toLocaleString("es-CO")} COP`);
+    }
   }
 
   async function toggleMode() {
@@ -305,20 +316,56 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
 
           {/* Comprobantes de pago */}
           {proofs.length > 0 && (
-            <div className="px-4 py-2 border-t bg-amber-50 shrink-0">
-              <p className="text-xs font-semibold text-amber-700 mb-1.5">📎 Comprobantes de pago</p>
-              <div className="flex gap-2 flex-wrap">
+            <div className="px-4 py-3 border-t bg-amber-50 shrink-0">
+              <p className="text-xs font-semibold text-amber-700 mb-2">📎 Comprobantes de pago</p>
+              <div className="space-y-2">
                 {proofs.map(p => (
-                  <div key={p.id} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 border text-xs ${p.reviewed ? "bg-gray-50 border-gray-200 text-gray-400" : "bg-white border-amber-300 text-amber-800"}`}>
-                    <a href={`/uploads/proofs/${p.filename}`} target="_blank" rel="noopener noreferrer" className="underline">
-                      {p.filename.split(".").pop()?.toUpperCase()} · {formatTime(p.created_at)}
-                    </a>
+                  <div key={p.id} className={`rounded-xl border text-xs ${p.reviewed ? "bg-gray-50 border-gray-200" : "bg-white border-amber-300"}`}>
+                    {/* Info extraída por IA */}
+                    <div className="px-3 py-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a href={`/uploads/proofs/${p.filename}`} target="_blank" rel="noopener noreferrer"
+                          className="underline text-blue-600 font-medium">
+                          Ver {p.filename.split(".").pop()?.toUpperCase()}
+                        </a>
+                        <span className="text-gray-400">{formatTime(p.created_at)}</span>
+                        {p.reviewed && <span className="text-emerald-600 font-medium">✓ Aprobado</span>}
+                      </div>
+
+                      {/* Datos extraídos por IA */}
+                      {(p.ai_amount || p.ai_payer || p.ai_reference || p.ai_bank) && (
+                        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-600">
+                          {p.ai_amount && (
+                            <span className="col-span-2 font-bold text-emerald-700 text-sm">
+                              💵 ${p.ai_amount.toLocaleString("es-CO")} COP
+                            </span>
+                          )}
+                          {p.ai_payer    && <span>👤 {p.ai_payer}</span>}
+                          {p.ai_bank     && <span>🏦 {p.ai_bank}</span>}
+                          {p.ai_date     && <span>📅 {p.ai_date}</span>}
+                          {p.ai_reference && <span>🔖 Ref: {p.ai_reference}</span>}
+                        </div>
+                      )}
+                      {!p.ai_amount && !p.reviewed && (
+                        <p className="text-gray-400 mt-1">⏳ Leyendo comprobante...</p>
+                      )}
+                    </div>
+
+                    {/* Botones de aprobación */}
                     {!p.reviewed && (
-                      <button onClick={() => approveProof(p.id)} className="bg-emerald-500 text-white px-2 py-0.5 rounded font-medium hover:bg-emerald-600">
-                        ✓ Aprobar
-                      </button>
+                      <div className="px-3 pb-2 flex gap-2 flex-wrap border-t border-amber-100 pt-2">
+                        <button
+                          onClick={() => approveProof(p.id, "full", p.ai_amount ?? undefined)}
+                          className="bg-emerald-500 text-white px-3 py-1 rounded-lg font-medium hover:bg-emerald-600">
+                          ✓ Aprobar pago completo
+                        </button>
+                        <button
+                          onClick={() => approveProof(p.id, "partial", p.ai_amount ?? undefined)}
+                          className="bg-amber-500 text-white px-3 py-1 rounded-lg font-medium hover:bg-amber-600">
+                          📊 Registrar como abono
+                        </button>
+                      </div>
                     )}
-                    {p.reviewed && <span className="text-emerald-500 font-medium">✓ Aprobado</span>}
                   </div>
                 ))}
               </div>
