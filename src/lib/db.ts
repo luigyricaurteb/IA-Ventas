@@ -12,6 +12,9 @@ if (!fs.existsSync(DATA_DIR)) {
 
 const db = new Database(DB_PATH);
 
+// Timeouts para producción con múltiples procesos concurrentes
+db.pragma("busy_timeout = 30000");
+
 db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
