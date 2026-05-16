@@ -6,8 +6,9 @@ node_modules/
 out/
 
 # Datos runtime (NO versionar — se crean en el servidor)
-data/
-auth/
+# /auth/ solo ignora la carpeta raíz de sesión Baileys, NO src/app/api/auth/
+/data/
+/auth/
 
 # Variables de entorno (NUNCA subir)
 .env.local
