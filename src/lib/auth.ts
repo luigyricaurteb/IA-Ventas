@@ -55,23 +55,31 @@ export function sanitizeInput(value: string): string {
 
 // ── Login MASTER ──────────────────────────────────────────────────────────
 
-export async function loginMaster(username: string, password: string, ip: string): Promise<{
+export async function loginMaster(username: string, password: string, ip: string, companySlug = "platform"): Promise<{
   token: string;
-  user: { id: number; username: string; name: string; role: "master" };
+  user: { id: number; username: string; name: string; role: "master"; company: string; isMaster: boolean; permissions: Record<string, boolean> };
 } | null> {
-  // Rate limiting: máx 5 intentos / 15 min por IP
   if (!checkRateLimit(ip, 5, 900)) return null;
 
   const user = getMasterUser(sanitizeInput(username));
   if (!user) { recordLoginAttempt(ip); return null; }
   if (!verifyPassword(password, user.password_hash, user.salt)) { recordLoginAttempt(ip); return null; }
 
+  // Master tiene acceso a todos los módulos de su empresa
+  const allPermissions: Record<string, boolean> = {
+    chat:true, crm:true, calendar:true, accounting:true, suppliers:true,
+    products:true, campaigns:true, documents:true, analytics:true, settings:true
+  };
+
   const token = createJWT({
-    sub:  String(user.id),
-    role: "master",
-    exp:  Math.floor(Date.now()/1000) + 8*3600, // 8 horas para master
+    sub:         String(user.id),
+    role:        "master",
+    company:     companySlug,
+    permissions: allPermissions,
+    is_admin:    true,
+    exp:         Math.floor(Date.now()/1000) + 12*3600,
   });
-  return { token, user: { id: user.id, username: user.username, name: user.name, role: "master" } };
+  return { token, user: { id: user.id, username: user.username, name: user.name, role: "master", company: companySlug, isMaster: true, permissions: allPermissions } };
 }
 
 // ── Login empresa ─────────────────────────────────────────────────────────

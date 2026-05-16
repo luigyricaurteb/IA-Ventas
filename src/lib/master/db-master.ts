@@ -99,12 +99,24 @@ if (planCount === 0) {
 }
 
 // Usuario master por defecto
-const masterAdmin = (masterDb.prepare("SELECT COUNT(*) as c FROM master_users").get() as { c: number }).c;
-if (masterAdmin === 0) {
+{
   const MASTER_PASS = process.env.MASTER_PASSWORD || "master123";
-  const MASTER_SALT = process.env.MASTER_SALT || "master-fixed-salt-2026";
-  const hash = crypto.pbkdf2Sync(MASTER_PASS, MASTER_SALT, 100000, 64, "sha512").toString("hex");
-  masterDb.prepare("INSERT OR IGNORE INTO master_users (username, name, password_hash, salt) VALUES ('master', 'Administrador Plataforma', ?, ?)").run(hash, MASTER_SALT);
+  const MASTER_SALT_ENV = process.env.MASTER_SALT || "master-fixed-salt-2026";
+  const hash = crypto.pbkdf2Sync(MASTER_PASS, MASTER_SALT_ENV, 100000, 64, "sha512").toString("hex");
+  masterDb.prepare("INSERT OR IGNORE INTO master_users (username, name, password_hash, salt) VALUES ('master', 'Administrador Plataforma', ?, ?)").run(hash, MASTER_SALT_ENV);
+}
+
+// Empresa "platform" — empresa del master (auto-creada)
+{
+  const existing = masterDb.prepare("SELECT id FROM companies WHERE slug='platform'").get();
+  if (!existing) {
+    const STORAGE = process.env.DATA_DIR || path.join(process.cwd(), "data");
+    const dbPath   = path.join(STORAGE, "company_platform.db");
+    const authPath = path.join(STORAGE, "auth", "company_platform");
+    try { fs.mkdirSync(authPath, { recursive: true }); } catch {}
+    const planId = (masterDb.prepare("SELECT id FROM plans ORDER BY price_monthly DESC LIMIT 1").get() as { id: number } | null)?.id ?? null;
+    masterDb.prepare("INSERT OR IGNORE INTO companies (slug,name,email,db_path,auth_path,status,plan_id) VALUES ('platform','Mi Empresa (Plataforma)','admin@plataforma.com',?,?,'active',?)").run(dbPath, authPath, planId);
+  }
 }
 
 // ── Tipos ─────────────────────────────────────────────────────────────────

@@ -59,8 +59,11 @@ export default function ConnectionGate() {
   useEffect(() => {
     if (!currentUser) return;
     const allowed = getAllowedModules(currentUser.permissions, currentUser.isMaster);
-    if (allowed.length > 0 && !allowed.includes(activeModule)) setActiveModule(allowed[0] as Module);
-  }, [currentUser, activeModule]);
+    if (allowed.length > 0 && !allowed.includes(activeModule as Module)) {
+      setActiveModule(allowed[0] as Module);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -71,11 +74,11 @@ export default function ConnectionGate() {
   }, []);
 
   useEffect(() => {
-    if (!connected || currentUser?.isMaster) return;
+    if (!connected) return;
     fetchConversations();
     const interval = setInterval(fetchConversations, 2000);
     return () => clearInterval(interval);
-  }, [connected, fetchConversations, currentUser]);
+  }, [connected, fetchConversations]);
 
   function handleConnected(p: string) { setPhone(p); setConnected(true); }
   function handleDisconnect() { setConnected(false); setPhone(null); setSelectedId(null); setConversations([]); }
@@ -103,12 +106,8 @@ export default function ConnectionGate() {
     return <div className="min-h-screen flex items-center justify-center bg-gray-900"><div className="w-8 h-8 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /></div>;
   }
 
-  // Master ve su propio dashboard completo
-  if (currentUser?.isMaster) {
-    return <MasterDashboard onLogout={handleLogout} />;
-  }
-
-  if (!connected) return <QRScreen onConnected={handleConnected} />;
+  // Usuarios normales sin WhatsApp conectado → pantalla QR
+  if (!connected && !currentUser?.isMaster) return <QRScreen onConnected={handleConnected} />;
 
   const selectedConv  = conversations.find(c => c.id === selectedId) ?? null;
   const perms         = currentUser?.permissions ?? {};
@@ -123,26 +122,35 @@ export default function ConnectionGate() {
         <DashboardHeader phone={phone} onDisconnect={handleDisconnect} currentUser={currentUser} onLogout={handleLogout} />
 
         <div className="flex flex-1 overflow-hidden">
+          {/* Módulo exclusivo master: gestión de plataforma */}
+          {activeModule === "master" && isMaster && <MasterDashboard onLogout={handleLogout} />}
+
           {activeModule === "chat" && canAccess(perms, "chat", isMaster) && (
-            <>
-              <div className="w-72 shrink-0 border-r border-gray-200 bg-white flex flex-col">
-                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversaciones</h2>
-                  <button onClick={handleScan} disabled={scanning} title="Escanear con IA" className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
-                    {scanning ? "⏳" : "🔍 Escanear"}
-                  </button>
+            connected ? (
+              <>
+                <div className="w-72 shrink-0 border-r border-gray-200 bg-white flex flex-col">
+                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversaciones</h2>
+                    <button onClick={handleScan} disabled={scanning} title="Escanear con IA" className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
+                      {scanning ? "⏳" : "🔍 Escanear"}
+                    </button>
+                  </div>
+                  {scanResult && <div className="px-3 py-1.5 bg-emerald-50 border-b text-xs text-emerald-700">{scanResult}</div>}
+                  <ConversationList conversations={conversations} selectedId={selectedId} onSelect={setSelectedId} />
                 </div>
-                {scanResult && <div className="px-3 py-1.5 bg-emerald-50 border-b text-xs text-emerald-700">{scanResult}</div>}
-                <ConversationList conversations={conversations} selectedId={selectedId} onSelect={setSelectedId} />
+                <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
+                  <JulietaAlertsPanel />
+                  {selectedConv
+                    ? <ConversationPanel conversation={selectedConv} onModeChange={handleModeChange} onDelete={handleDelete} />
+                    : <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">Selecciona una conversación</div>
+                  }
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 overflow-auto">
+                <QRScreen onConnected={handleConnected} />
               </div>
-              <div className="flex-1 overflow-hidden bg-gray-50 flex flex-col">
-                <JulietaAlertsPanel />
-                {selectedConv
-                  ? <ConversationPanel conversation={selectedConv} onModeChange={handleModeChange} onDelete={handleDelete} />
-                  : <div className="flex flex-1 items-center justify-center text-gray-400 text-sm">Selecciona una conversación</div>
-                }
-              </div>
-            </>
+            )
           )}
           {activeModule === "crm"        && canAccess(perms,"crm",isMaster)        && <KanbanBoard />}
           {activeModule === "calendar"   && canAccess(perms,"calendar",isMaster)   && <CalendarModule />}

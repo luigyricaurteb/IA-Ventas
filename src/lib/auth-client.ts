@@ -1,10 +1,10 @@
 // Módulo cliente — sin imports de Node/DB
 
-export type Module = "chat"|"crm"|"calendar"|"accounting"|"suppliers"|"products"|"campaigns"|"documents"|"settings"|"analytics";
+export type Module = "chat"|"crm"|"calendar"|"accounting"|"suppliers"|"products"|"campaigns"|"documents"|"settings"|"analytics"|"master";
 export const ALL_MODULES: Module[] = ["chat","crm","calendar","accounting","suppliers","products","campaigns","documents","settings","analytics"];
 
 export function getAllowedModules(permissions: Record<string, boolean> | undefined, isMaster = false): Module[] {
-  if (isMaster) return [...ALL_MODULES];
+  if (isMaster) return (["master", ...ALL_MODULES] as Module[]);
   if (!permissions) return [];
   return ALL_MODULES.filter(m => permissions[m] === true);
 }

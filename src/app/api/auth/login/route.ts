@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
   let result: { token: string; user: unknown } | null = null;
 
   if (isMaster || !companySlug) {
-    result = await loginMaster(username, password, ip);
+    // Master siempre opera sobre la empresa "platform"
+    result = await loginMaster(username, password, ip, "platform");
   } else {
     result = await loginCompanyUser(companySlug, username, password, ip);
   }

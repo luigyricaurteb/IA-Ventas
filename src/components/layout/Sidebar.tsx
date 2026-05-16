@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics";
+export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master";
 
 interface SidebarProps {
   active: Module;
@@ -10,7 +10,8 @@ interface SidebarProps {
   allowedModules: Module[];
 }
 
-const ALL_ITEMS: { id: Module; label: string; icon: string }[] = [
+const ALL_ITEMS: { id: Module; label: string; icon: string; dividerAfter?: boolean }[] = [
+  { id: "master",      label: "Plataforma",   icon: "🏛️", dividerAfter: true },
   { id: "chat",        label: "Chat",         icon: "💬" },
   { id: "crm",         label: "CRM",          icon: "👥" },
   { id: "calendar",    label: "Calendario",   icon: "📅" },
@@ -47,31 +48,39 @@ export default function Sidebar({ active, onChange, allowedModules }: SidebarPro
       </div>
       {visibleItems.map((item) => {
         const badge = item.id === "chat" ? alertCount : 0;
+        const isMasterItem = item.id === "master";
         return (
-          <button
-            key={item.id}
-            onClick={() => onChange(item.id)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 transition-colors text-left relative ${
-              active === item.id
-                ? "bg-emerald-600 text-white"
-                : "text-gray-400 hover:bg-gray-800 hover:text-white"
-            }`}
-          >
-            <span className="text-lg shrink-0 relative">
-              {item.icon}
+          <div key={item.id}>
+            <button
+              onClick={() => onChange(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 transition-colors text-left relative ${
+                isMasterItem
+                  ? active === item.id
+                    ? "bg-indigo-600 text-white"
+                    : "text-indigo-400 hover:bg-gray-800 hover:text-indigo-300"
+                  : active === item.id
+                    ? "bg-emerald-600 text-white"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+              }`}
+              style={{ width: "calc(100% - 1rem)" }}
+            >
+              <span className="text-lg shrink-0 relative">
+                {item.icon}
+                {badge > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
+                    {badge > 9 ? "9+" : badge}
+                  </span>
+                )}
+              </span>
+              <span className="hidden lg:block text-sm font-medium">{item.label}</span>
               {badge > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
-                  {badge > 9 ? "9+" : badge}
+                <span className="hidden lg:block ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">
+                  {badge}
                 </span>
               )}
-            </span>
-            <span className="hidden lg:block text-sm font-medium">{item.label}</span>
-            {badge > 0 && (
-              <span className="hidden lg:block ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">
-                {badge}
-              </span>
-            )}
-          </button>
+            </button>
+            {item.dividerAfter && <div className="mx-4 my-2 border-t border-gray-700" />}
+          </div>
         );
       })}
     </aside>
