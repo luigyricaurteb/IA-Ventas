@@ -309,61 +309,83 @@ export async function processBotMessage(
 
   // ── CONFIRMING_PAYMENT — cliente debe confirmar el monto leído ───────
   if (currentState === "CONFIRMING_PAYMENT") {
-    const proofId  = (stateData.proof_id as number) ?? null;
-    const aiMonto  = (stateData.ai_monto as number) ?? 0;
-    const total    = (stateData.total as number) ?? 0;
+    const proofId = (stateData.proof_id as number) ?? null;
+    const aiMonto = (stateData.ai_monto as number) ?? 0;
+
+    // Obtener total SIEMPRE desde el DB (no de stateData que puede ser 0)
+    const dealDB = db.prepare("SELECT id, total_value, paid_amount FROM crm_deals WHERE conversation_id=? ORDER BY id DESC LIMIT 1")
+      .get(conversationId) as { id: number; total_value: number | null; paid_amount: number | null } | null;
+    const total     = dealDB?.total_value ?? (stateData.total as number) ?? 0;
+    const paidBefore = dealDB?.paid_amount ?? 0;
+
+    function fmt(n: number) { return `$${n.toLocaleString("es-CO")} COP`; }
 
     if (isYes(text)) {
-      // Cliente confirma el monto
       setState(db, conversationId, "AWAITING_PAYMENT");
 
-      const minAbono = total * 0.5;
-      const dealRow  = getOrCreateDeal(db, conversationId) ? db.prepare("SELECT id FROM crm_deals WHERE conversation_id=? ORDER BY id DESC LIMIT 1").get(conversationId) as { id: number } | null : null;
+      const totalPaid = paidBefore + aiMonto;
+      const saldo     = total > 0 ? Math.max(0, total - totalPaid) : 0;
+      const minAbono  = total * 0.5;
+
+      // Actualizar paid_amount en el deal
+      if (dealDB?.id && aiMonto > 0) {
+        db.prepare("UPDATE crm_deals SET paid_amount=?, stage='NEGOCIACION' WHERE id=?").run(totalPaid, dealDB.id);
+      }
 
       let respuesta: string;
-      if (total > 0 && aiMonto > 0 && aiMonto < minAbono) {
-        // Monto confirmado pero insuficiente (< 50%)
-        respuesta = `⚠️ Gracias por confirmar. Sin embargo, el valor de *$${aiMonto.toLocaleString("es-CO")} COP* es menor al mínimo requerido para reservar.\n\n• Total del servicio: *$${total.toLocaleString("es-CO")} COP*\n• Mínimo para abonar (50%): *$${minAbono.toLocaleString("es-CO")} COP*\n\nPor favor realiza una transferencia por el monto mínimo y envíanos el nuevo comprobante. 🙏`;
-        if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId); // -1 = rechazado
-      } else {
-        // Monto aceptable — notificar al equipo
-        if (dealRow?.id) db.prepare("UPDATE crm_deals SET stage='NEGOCIACION' WHERE id=?").run(dealRow.id);
-        const saldo = aiMonto > 0 && total > 0 ? Math.max(0, total - aiMonto) : 0;
 
-        if (saldo > 0) {
-          respuesta = `✅ ¡Confirmado! Registramos tu abono de *$${aiMonto.toLocaleString("es-CO")} COP*.\n\nSaldo pendiente: *$${saldo.toLocaleString("es-CO")} COP*\n\nUn asesor verificará el pago y te avisará pronto. Si tienes el saldo listo, puedes enviar otro comprobante. 🙏`;
-        } else {
-          respuesta = `✅ ¡Confirmado! Registramos tu pago de *$${aiMonto > 0 ? `$${aiMonto.toLocaleString("es-CO")} COP` : "tu comprobante"}*.\n\nUn asesor lo verificará y confirmará tu reserva pronto. ¡Gracias! 🙏`;
-        }
+      if (total > 0 && aiMonto > 0 && aiMonto < minAbono && totalPaid < minAbono) {
+        // Monto insuficiente — menos del 50%
+        respuesta =
+          `⚠️ Gracias por confirmar el pago de *${fmt(aiMonto)}*.\n\n` +
+          `Sin embargo, el mínimo para reservar es el *50%* del total:\n` +
+          `• Total del servicio: *${fmt(total)}*\n` +
+          `• Mínimo requerido (50%): *${fmt(minAbono)}*\n\n` +
+          `Por favor realiza una nueva transferencia por el monto mínimo y envíanos el comprobante. 🙏`;
+        if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId);
+
+      } else if (saldo > 0) {
+        // Pago parcial válido (≥ 50%) — hay saldo pendiente
+        respuesta =
+          `✅ *¡Abono confirmado!*\n\n` +
+          `💵 Abono recibido: *${fmt(aiMonto)}*\n` +
+          (total > 0 ? `📊 Total del servicio: *${fmt(total)}*\n` : "") +
+          `📊 Total pagado hasta ahora: *${fmt(totalPaid)}*\n` +
+          `⚠️ *Saldo pendiente: ${fmt(saldo)}*\n\n` +
+          `Un asesor verificará tu pago. Para completar la reserva, deberás cancelar el saldo pendiente. Puedes enviarlo cuando quieras con otro comprobante. 🙏`;
+
+      } else {
+        // Pago completo
+        respuesta =
+          `✅ *¡Pago confirmado!*\n\n` +
+          `💵 Valor recibido: *${fmt(aiMonto)}*\n` +
+          (total > 0 ? `📊 Total del servicio: *${fmt(total)}*\n` : "") +
+          `\nUn asesor verificará tu comprobante y confirmará tu reserva pronto. ¡Gracias por confiar en nosotros! 🙏`;
       }
 
       await send(db, sock, jid, phone, conversationId, respuesta);
 
     } else if (isNo(text)) {
-      // Cliente dice que el monto es incorrecto
-      if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId); // marcar como rechazado
+      if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=-1 WHERE id=?").run(proofId);
       setState(db, conversationId, "ACTIVE");
       await send(db, sock, jid, phone, conversationId,
-        `Entendido. Por favor envíanos el comprobante correcto o indícanos el monto exacto que transferiste para registrarlo manualmente. 📎`
+        `Entendido. Por favor envíanos el comprobante correcto, o escríbenos el monto exacto que transferiste. 📎`
       );
 
     } else {
-      // El cliente escribió un número directamente (el monto real)
-      const numMatch = text.replace(/[.,\s]/g, "").match(/\d+/);
+      // El cliente escribe el monto directamente
+      const numMatch = text.replace(/[$.:\s]/g, "").replace(/[.,]/g, "").match(/\d{4,}/);
       if (numMatch && Number(numMatch[0]) > 0) {
         const manualMonto = Number(numMatch[0]);
-        if (proofId) {
-          db.prepare("UPDATE payment_proofs SET ai_amount=? WHERE id=?").run(manualMonto, proofId);
-          // Actualizar state data con el monto manual
-          const newData = { ...stateData, ai_monto: manualMonto };
-          setState(db, conversationId, "CONFIRMING_PAYMENT", newData);
-          await send(db, sock, jid, phone, conversationId,
-            `Anotado. ¿Confirmamos un pago de *$${manualMonto.toLocaleString("es-CO")} COP*? Responde *SI* para confirmar o *NO* para cancelar.`
-          );
-        }
+        if (proofId) db.prepare("UPDATE payment_proofs SET ai_amount=? WHERE id=?").run(manualMonto, proofId);
+        const newData = { ...stateData, ai_monto: manualMonto };
+        setState(db, conversationId, "CONFIRMING_PAYMENT", newData);
+        await send(db, sock, jid, phone, conversationId,
+          `Anotado. ¿Confirmamos un pago de *$${manualMonto.toLocaleString("es-CO")} COP*? Responde *SI* para confirmar o *NO* para corregir.`
+        );
       } else {
         await send(db, sock, jid, phone, conversationId,
-          `Por favor responde *SI* si el monto detectado es correcto, *NO* si es incorrecto, o escribe el monto exacto que transferiste.`
+          `Por favor responde *SI* si el monto leído es correcto, *NO* si es incorrecto, o escribe el valor que transferiste (ej: *245000*).`
         );
       }
     }

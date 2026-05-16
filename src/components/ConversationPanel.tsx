@@ -39,6 +39,42 @@ function MessageBubble({ role, content, createdAt }: { role: Message["role"]; co
       </div>
     );
   }
+
+  // Detectar si el contenido es un comprobante (imagen/archivo)
+  const proofMatch = content.match(/\[Comprobante (?:enviado|recibido): (.+?)\]/);
+  if (proofMatch) {
+    const filename = proofMatch[1];
+    const isImage  = /\.(jpg|jpeg|png|webp|heic)$/i.test(filename);
+    return (
+      <div className="flex justify-start mb-2">
+        <div className="max-w-[75%]">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base">{isImage ? "📷" : "📎"}</span>
+              <p className="text-xs font-semibold text-amber-700">Comprobante de pago</p>
+            </div>
+            {isImage ? (
+              <a href={`/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer">
+                <img
+                  src={`/uploads/proofs/${filename}`}
+                  alt="Comprobante"
+                  className="rounded-xl max-w-[200px] max-h-[200px] object-contain border border-amber-200 hover:opacity-90 transition-opacity cursor-pointer"
+                  onError={e => { (e.target as HTMLImageElement).style.display="none"; }}
+                />
+              </a>
+            ) : (
+              <a href={`/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-600 underline break-all">
+                {filename}
+              </a>
+            )}
+            <p className="text-xs text-amber-500 mt-1">{formatTime(createdAt)}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isLeft = role === "user";
   const bubbleClass = isLeft
     ? "bg-white border border-gray-200 text-gray-800"
@@ -81,7 +117,9 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   const [resetting, setResetting]     = useState(false);
   const [learning, setLearning]       = useState(false);
   const [learnResult, setLearnResult] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef    = useRef<HTMLDivElement>(null);
+  const scrollRef    = useRef<HTMLDivElement>(null);
+  const isNearBottom = useRef(true);  // ¿el usuario está cerca del fondo?
   const convId = conversation.id;
 
   const fetchMessages = useCallback(async () => {
@@ -103,14 +141,21 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId]);
 
+  // Auto-scroll SOLO si el usuario está cerca del fondo (no interrumpe lectura de mensajes viejos)
   useEffect(() => {
-    if (tab === "chat") bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (tab === "chat" && isNearBottom.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, tab]);
 
   useEffect(() => {
-    const iv = setInterval(fetchMessages, 2000);
+    const iv = setInterval(async () => {
+      await fetchMessages();
+      await fetchProofs(); // también actualizar comprobantes mientras la conv. está abierta
+    }, 3000);
     return () => clearInterval(iv);
-  }, [fetchMessages]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchMessages, convId]);
 
   async function fetchProofs() {
     try {
@@ -306,13 +351,33 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
       {tab === "chat" && (
         <>
           {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50"
+            onScroll={() => {
+              const el = scrollRef.current;
+              if (!el) return;
+              // Si el usuario está a menos de 100px del fondo → considerarlo "cerca del fondo"
+              isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+            }}
+          >
             {messages.length === 0 && (
               <div className="text-center text-gray-400 text-sm mt-8">Sin mensajes aún.</div>
             )}
             {messages.map(m => <MessageBubble key={m.id} role={m.role} content={m.content} createdAt={m.created_at} />)}
             <div ref={bottomRef} />
           </div>
+
+          {/* Alerta de pago pendiente — prominente */}
+          {proofs.some(p => !p.reviewed) && (
+            <div className="mx-4 mt-2 bg-amber-500 text-white rounded-xl px-4 py-2.5 flex items-center gap-2 shrink-0 animate-pulse">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <p className="text-sm font-bold">Comprobante de pago recibido</p>
+                <p className="text-xs opacity-90">Revisa y aprueba o registra como abono</p>
+              </div>
+            </div>
+          )}
 
           {/* Comprobantes de pago */}
           {proofs.length > 0 && (
