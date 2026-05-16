@@ -74,7 +74,8 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   const [noteDraft, setNoteDraft] = useState("");
   const [summary, setSummary]   = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [csatSent, setCsatSent] = useState(false);
+  const [csatSent, setCsatSent]     = useState(false);
+  const [resetting, setResetting]   = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const convId = conversation.id;
 
@@ -197,6 +198,14 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
     onDelete(convId); setShowDeleteConfirm(false);
   }
 
+  async function handleReset() {
+    if (!confirm("¿Reiniciar conversación? El bot comenzará un nuevo flujo desde cero en el próximo mensaje del cliente. Los mensajes anteriores no se borran.")) return;
+    setResetting(true);
+    await fetch(`/api/conversations/${convId}/reset`, { method: "POST" });
+    setResetting(false);
+    await fetchMessages();
+  }
+
   return (
     <div className="flex flex-col h-full">
 
@@ -308,11 +317,16 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
             </button>
             <button onClick={handleCsat} disabled={csatSent}
               className="text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded-lg disabled:opacity-50">
-              {csatSent ? "✓ CSAT enviada" : "⭐ Pedir calificación"}
+              {csatSent ? "✓ CSAT enviada" : "⭐ Calificación"}
             </button>
             <button onClick={() => setTab("notes")}
               className="text-xs text-yellow-700 bg-yellow-50 hover:bg-yellow-100 px-2 py-1 rounded-lg">
               📌 Nota
+            </button>
+            <button onClick={handleReset} disabled={resetting}
+              className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-lg disabled:opacity-50"
+              title="Reinicia el flujo del bot para esta conversación. No borra los mensajes.">
+              {resetting ? "⏳" : "🔄 Nueva conv."}
             </button>
           </div>
 

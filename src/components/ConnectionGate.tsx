@@ -75,12 +75,12 @@ export default function ConnectionGate() {
     } catch {}
   }, []);
 
+  // Cargar conversaciones siempre (con o sin WhatsApp conectado) y hacer polling
   useEffect(() => {
-    if (!connected) return;
     fetchConversations();
-    const interval = setInterval(fetchConversations, 2000);
+    const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
-  }, [connected, fetchConversations]);
+  }, [fetchConversations]);
 
   function handleConnected(p: string) { setPhone(p); setConnected(true); }
   function handleDisconnect() { setConnected(false); setPhone(null); setSelectedId(null); setConversations([]); }
