@@ -9,6 +9,7 @@ import type { WASocket } from "@whiskeysockets/baileys";
 import pino from "pino";
 import QRCodeTerminal from "qrcode-terminal";
 import path from "node:path";
+import fs from "node:fs";
 import { getCompanyDb } from "../master/db-company";
 import { handleIncomingMessage } from "./handler";
 
@@ -38,6 +39,27 @@ export async function startCompany(slug: string): Promise<void> {
 
   const db = getCompanyDb(slug);
   const authDir = path.join(AUTH_BASE, `company_${slug}`);
+
+  // Migración automática: si existen credenciales en el directorio raíz (sesión previa),
+  // muévelas al directorio de empresa para no perder la sesión activa
+  if (!fs.existsSync(authDir) && fs.existsSync(AUTH_BASE)) {
+    const legacyCreds = path.join(AUTH_BASE, "creds.json");
+    if (fs.existsSync(legacyCreds)) {
+      console.log(`[bot:${slug}] Migrando sesión previa de Baileys a ${authDir}`);
+      try {
+        fs.mkdirSync(authDir, { recursive: true });
+        for (const file of fs.readdirSync(AUTH_BASE)) {
+          if (file.startsWith(".") || fs.statSync(path.join(AUTH_BASE, file)).isDirectory()) continue;
+          fs.renameSync(path.join(AUTH_BASE, file), path.join(authDir, file));
+        }
+        console.log(`[bot:${slug}] Sesión migrada correctamente`);
+      } catch (e) {
+        console.warn(`[bot:${slug}] Error migrando sesión:`, e);
+      }
+    }
+  }
+
+  if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
 
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
 

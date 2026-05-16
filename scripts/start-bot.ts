@@ -1,9 +1,13 @@
 // env-loader DEBE ser el primer import
 import "./env-loader";
 
+import fs from "node:fs";
+import path from "node:path";
 import { startCompany, getHandle, getAllHandles } from "../src/lib/baileys/client";
 import { listCompanies, getExpiringSubscriptions } from "../src/lib/master/db-master";
 import { getCompanyDb } from "../src/lib/master/db-company";
+
+const RESTART_FLAG = path.resolve(process.cwd(), "data", ".restart");
 
 async function startAllCompanies() {
   const companies = listCompanies().filter(c => c.status === "active");
@@ -132,6 +136,19 @@ async function main() {
       }
     }
   }, 2 * 60 * 1000);
+
+  // Restart flag: detecta cuando el dashboard pide reiniciar el bot
+  setInterval(async () => {
+    if (!fs.existsSync(RESTART_FLAG)) return;
+    try { fs.unlinkSync(RESTART_FLAG); } catch {}
+    console.log("[bot] Flag de reinicio detectado. Reiniciando bots...");
+    // Apagar todos los handles activos
+    for (const [, handle] of getAllHandles()) {
+      try { await handle.shutdown(); } catch {}
+    }
+    await new Promise(r => setTimeout(r, 2000));
+    await startAllCompanies();
+  }, 1000);
 
   console.log("[bot] Sistema iniciado. Esperando mensajes...");
 }
