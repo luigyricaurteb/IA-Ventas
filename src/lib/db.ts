@@ -930,14 +930,13 @@ export function deleteSession(token: string): void {
   db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
 }
 
-// Crear usuario admin por defecto si no existe ninguno
+// Crear usuario admin por defecto — INSERT OR IGNORE para que no falle si ya existe
 {
-  const userCount = (db.prepare("SELECT COUNT(*) as c FROM users").get() as { c: number }).c;
-  if (userCount === 0) {
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto.pbkdf2Sync("admin123", salt, 100000, 64, "sha512").toString("hex");
-    db.prepare("INSERT INTO users (username, name, password_hash, salt, role) VALUES ('admin', 'Administrador', ?, ?, 'admin')").run(hash, salt);
-  }
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.pbkdf2Sync("admin123", salt, 100000, 64, "sha512").toString("hex");
+  db.prepare(
+    "INSERT OR IGNORE INTO users (username, name, password_hash, salt, role) VALUES ('admin', 'Administrador', ?, ?, 'admin')"
+  ).run(hash, salt);
 }
 
 // ── Migración segura: nuevas tablas en BD existente ──────────────────────
