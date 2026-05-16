@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listUsers, insertUser } from "@/lib/db";
+import { listUsers, insertUser, getUserByUsername } from "@/lib/db";
 import { hashPassword, getUserFromToken } from "@/lib/auth";
 import type { UserRole } from "@/lib/db";
 
@@ -21,6 +21,11 @@ export async function POST(req: NextRequest) {
   if (!body.username || !body.password || !body.name) {
     return NextResponse.json({ error: "Username, contraseña y nombre requeridos" }, { status: 400 });
   }
+
+  if (getUserByUsername(body.username)) {
+    return NextResponse.json({ error: "El nombre de usuario ya existe" }, { status: 409 });
+  }
+
   const { hash, salt } = hashPassword(body.password);
   const user = insertUser({
     username: body.username, name: body.name,

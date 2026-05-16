@@ -903,9 +903,10 @@ export function listUsers(): Omit<User, "password_hash" | "salt">[] {
   return db.prepare("SELECT id, username, name, role, active, created_at FROM users ORDER BY id").all() as Omit<User, "password_hash" | "salt">[];
 }
 export function insertUser(data: { username: string; name: string; password_hash: string; salt: string; role: UserRole }): User {
-  return db.prepare<[string, string, string, string, string], User>(
-    "INSERT INTO users (username, name, password_hash, salt, role) VALUES (?, ?, ?, ?, ?) RETURNING *"
-  ).get(data.username, data.name, data.password_hash, data.salt, data.role)!;
+  db.prepare<[string, string, string, string, string]>(
+    "INSERT OR IGNORE INTO users (username, name, password_hash, salt, role) VALUES (?, ?, ?, ?, ?)"
+  ).run(data.username, data.name, data.password_hash, data.salt, data.role);
+  return db.prepare<[string], User>("SELECT * FROM users WHERE username = ?").get(data.username)!;
 }
 export function updateUser(id: number, data: Partial<{ name: string; role: UserRole; active: number; password_hash: string; salt: string }>): void {
   const fields = Object.keys(data).map((k) => `${k} = ?`).join(", ");
