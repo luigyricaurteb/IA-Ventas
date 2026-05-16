@@ -306,6 +306,21 @@ function initCompanySchema(db: Database.Database): void {
       email TEXT PRIMARY KEY, created_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
 
+    -- ── Fuentes Google Drive ──────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS drive_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      drive_url TEXT NOT NULL,
+      file_id TEXT NOT NULL,
+      file_type TEXT NOT NULL DEFAULT 'sheet',
+      topic TEXT NOT NULL,
+      last_synced_at INTEGER,
+      sync_status TEXT DEFAULT 'pending',
+      sync_error TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+
     -- ── Alertas Julieta ───────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS julieta_alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

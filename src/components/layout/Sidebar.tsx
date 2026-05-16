@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master";
+export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master" | "help";
 
 interface SidebarProps {
   active: Module;
@@ -22,6 +22,7 @@ const ALL_ITEMS: { id: Module; label: string; icon: string; dividerAfter?: boole
   { id: "campaigns",   label: "Campañas",     icon: "📧" },
   { id: "documents",   label: "Documentos",   icon: "📄" },
   { id: "settings",    label: "Ajustes",      icon: "⚙️" },
+  { id: "help",        label: "Manual",       icon: "📖" },
 ];
 
 export default function Sidebar({ active, onChange, allowedModules }: SidebarProps) {
