@@ -7,14 +7,15 @@ interface SlaBreachItem { id: number; phone: string; name: string | null; last_u
 interface DashboardHeaderProps {
   phone: string | null;
   onDisconnect: () => void;
-  currentUser?: { name: string; role?: string } | null;
+  currentUser?: { name: string; role?: string; isMaster?: boolean } | null;
   onLogout?: () => void;
 }
 
 export default function DashboardHeader({ phone, onDisconnect, currentUser, onLogout }: DashboardHeaderProps) {
   const [slaBreaches, setSlaBreaches] = useState(0);
-  const [showSla, setShowSla] = useState(false);
-  const [slaList, setSlaList] = useState<SlaBreachItem[]>([]);
+  const [showSla, setShowSla]         = useState(false);
+  const [slaList, setSlaList]         = useState<SlaBreachItem[]>([]);
+  const [subDays, setSubDays]         = useState<number | null>(null);
 
   useEffect(() => {
     async function checkSla() {
@@ -26,10 +27,19 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
         setSlaList(d.breaches ?? []);
       } catch {}
     }
-    checkSla();
-    const iv = setInterval(checkSla, 30000);
+    async function checkSub() {
+      if (currentUser?.isMaster) return; // master no necesita alerta de suscripción
+      try {
+        const res = await fetch("/api/subscription");
+        if (!res.ok) return;
+        const d = await res.json() as { daysLeft: number | null; isPermanent: boolean };
+        if (!d.isPermanent) setSubDays(d.daysLeft);
+      } catch {}
+    }
+    checkSla(); checkSub();
+    const iv = setInterval(() => { checkSla(); checkSub(); }, 60000);
     return () => clearInterval(iv);
-  }, []);
+  }, [currentUser]);
 
   async function handleDisconnect() {
     if (!confirm("¿Desconectar el número? Tendrás que escanear el QR nuevamente.")) return;
@@ -45,6 +55,18 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
         {phone && <span className="text-sm text-gray-400 ml-2">+{phone}</span>}
       </div>
       <div className="flex items-center gap-4">
+        {/* Alerta de vencimiento de suscripción */}
+        {subDays !== null && subDays <= 30 && (
+          <a href="#" onClick={e => { e.preventDefault(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+              subDays <= 3 ? "bg-red-50 border-red-200 text-red-700 animate-pulse"
+              : subDays <= 7 ? "bg-orange-50 border-orange-200 text-orange-700"
+              : "bg-yellow-50 border-yellow-200 text-yellow-700"
+            }`}>
+            💳 {subDays <= 0 ? "¡Plan vencido!" : `Plan vence en ${subDays}d`}
+          </a>
+        )}
+
         {/* SLA Alert */}
         {slaBreaches > 0 && (
           <div className="relative">

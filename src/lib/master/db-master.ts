@@ -38,8 +38,10 @@ masterDb.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
+    nit TEXT,
     email TEXT,
     phone TEXT,
+    address TEXT,
     logo_filename TEXT,
     plan_id INTEGER REFERENCES plans(id),
     status TEXT CHECK(status IN ('active','suspended','trial','pending')) NOT NULL DEFAULT 'pending',
@@ -89,6 +91,12 @@ masterDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_login_attempts ON login_attempts(identifier, attempted_at);
 `);
 
+// Migraciones seguras para columnas añadidas después del despliegue inicial
+for (const sql of [
+  "ALTER TABLE companies ADD COLUMN nit TEXT",
+  "ALTER TABLE companies ADD COLUMN address TEXT",
+]) { try { masterDb.exec(sql); } catch {} }
+
 // Planes por defecto
 const planCount = (masterDb.prepare("SELECT COUNT(*) as c FROM plans").get() as { c: number }).c;
 if (planCount === 0) {
@@ -135,7 +143,8 @@ export interface Plan {
 
 export interface Company {
   id: number; slug: string; name: string;
-  email: string | null; phone: string | null; logo_filename: string | null;
+  nit: string | null; email: string | null; phone: string | null;
+  address: string | null; logo_filename: string | null;
   plan_id: number | null; status: "active" | "suspended" | "trial" | "pending";
   db_path: string; auth_path: string;
   created_at: number; updated_at: number;
@@ -188,13 +197,13 @@ export function getCompanyBySlug(slug: string): Company | null {
 export function getCompanyById(id: number): Company | null {
   return masterDb.prepare<[number], Company>("SELECT * FROM companies WHERE id = ?").get(id) ?? null;
 }
-export function createCompany(data: { slug: string; name: string; email?: string; phone?: string; plan_id?: number }): Company {
+export function createCompany(data: { slug: string; name: string; nit?: string; email?: string; phone?: string; address?: string; plan_id?: number; status?: string }): Company {
   const dbPath   = path.join(STORAGE, `company_${data.slug}.db`);
   const authPath = path.join(STORAGE, "auth", `company_${data.slug}`);
   fs.mkdirSync(authPath, { recursive: true });
   return masterDb.prepare<unknown[], Company>(
-    "INSERT INTO companies (slug,name,email,phone,plan_id,db_path,auth_path,status) VALUES (?,?,?,?,?,?,?,'pending') RETURNING *"
-  ).get(data.slug, data.name, data.email??null, data.phone??null, data.plan_id??null, dbPath, authPath)!;
+    "INSERT INTO companies (slug,name,nit,email,phone,address,plan_id,db_path,auth_path,status) VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *"
+  ).get(data.slug, data.name, data.nit??null, data.email??null, data.phone??null, data.address??null, data.plan_id??null, dbPath, authPath, data.status??'pending')!;
 }
 export function updateCompany(id: number, data: Partial<Company>): void {
   const fields = Object.keys(data).filter(k=>k!=='id').map(k=>`${k}=?`).join(",");

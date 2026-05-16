@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-interface Company { id: number; slug: string; name: string; email: string | null; phone: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null }
+interface Company { id: number; slug: string; name: string; nit: string | null; email: string | null; phone: string | null; address: string | null; logo_filename: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null }
 interface Plan { id: number; name: string; description: string | null; price_monthly: number; billing_cycle: string; modules: string; max_users: number; max_wa_numbers: number; active: number }
 interface Subscription { id: number; company_id: number; plan_id: number; billing_cycle: string; status: string; payment_amount: number | null; payment_proof_file: string | null; notes: string | null; created_at: number }
 interface CompanyUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
@@ -36,7 +36,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
   // Empresa
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [showNewCompany, setShowNewCompany] = useState(false);
-  const [companyForm, setCompanyForm] = useState({ name:"", slug:"", email:"", phone:"", plan_id:"", status:"pending" });
+  const [companyForm, setCompanyForm] = useState({ name:"", slug:"", nit:"", email:"", phone:"", address:"", plan_id:"", status:"active" });
+  const [adminForm, setAdminForm] = useState({ username:"", name:"", password:"" });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   // Plan
   const [editingPlan, setEditingPlan]   = useState<Plan | null>(null);
@@ -62,23 +65,45 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
 
   // ── Empresa ──────────────────────────────────────────────────────────────
   function openNewCompany() {
-    setCompanyForm({ name:"", slug:"", email:"", phone:"", plan_id:"", status:"pending" });
+    setCompanyForm({ name:"", slug:"", nit:"", email:"", phone:"", address:"", plan_id:"", status:"active" });
+    setAdminForm({ username:"admin", name:"Administrador", password:"" });
+    setLogoFile(null); setLogoPreview(null);
     setEditingCompany(null); setShowNewCompany(true);
   }
   function openEditCompany(c: Company) {
-    setCompanyForm({ name:c.name, slug:c.slug, email:c.email||"", phone:c.phone||"", plan_id:c.plan_id?.toString()||"", status:c.status });
+    setCompanyForm({ name:c.name, slug:c.slug, nit:c.nit||"", email:c.email||"", phone:c.phone||"", address:c.address||"", plan_id:c.plan_id?.toString()||"", status:c.status });
+    setAdminForm({ username:"", name:"", password:"" });
+    setLogoFile(null); setLogoPreview(c.logo_filename ? `/uploads/master/${c.logo_filename}` : null);
     setEditingCompany(c); setShowNewCompany(true);
+  }
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setLogoFile(file);
+    if (file) setLogoPreview(URL.createObjectURL(file));
   }
   async function saveCompany() {
     setSaving(true);
-    if (editingCompany) {
-      await fetch(`/api/master/companies/${editingCompany.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ name:companyForm.name, email:companyForm.email||null, phone:companyForm.phone||null, plan_id:companyForm.plan_id?Number(companyForm.plan_id):null, status:companyForm.status })});
-    } else {
-      const slug = companyForm.slug.toLowerCase().replace(/[^a-z0-9-]/g,"").slice(0,50);
-      await fetch("/api/master/companies",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...companyForm,slug})});
-    }
-    setShowNewCompany(false); setEditingCompany(null); fetchAll(); setSaving(false);
+    try {
+      if (editingCompany) {
+        await fetch(`/api/master/companies/${editingCompany.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ name:companyForm.name, nit:companyForm.nit||null, email:companyForm.email||null, phone:companyForm.phone||null, address:companyForm.address||null, plan_id:companyForm.plan_id?Number(companyForm.plan_id):null, status:companyForm.status })});
+        if (logoFile) {
+          const fd = new FormData(); fd.append("logo", logoFile);
+          await fetch(`/api/master/companies/${editingCompany.id}`,{method:"POST",body:fd});
+        }
+      } else {
+        const slug = companyForm.slug.toLowerCase().replace(/[^a-z0-9-]/g,"").slice(0,50);
+        const res = await fetch("/api/master/companies",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({...companyForm, slug, admin_username:adminForm.username, admin_name:adminForm.name, admin_password:adminForm.password})});
+        const d = await res.json() as { company?: { id: number }; error?: string };
+        if (!res.ok) { alert(d.error ?? "Error al crear empresa"); setSaving(false); return; }
+        if (logoFile && d.company?.id) {
+          const fd = new FormData(); fd.append("logo", logoFile);
+          await fetch(`/api/master/companies/${d.company.id}`,{method:"POST",body:fd});
+        }
+      }
+      setShowNewCompany(false); setEditingCompany(null); fetchAll();
+    } finally { setSaving(false); }
   }
   async function deleteCompany(c: Company) {
     if (!confirm(`¿Eliminar "${c.name}" permanentemente? Se borrarán todos sus datos, conversaciones y usuarios. Esta acción es irreversible.`)) return;
@@ -204,7 +229,8 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SC[c.status]||""}`}>{c.status}</span>
                           {days !== null && days <= 5 && days >= 0 && <span className="text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">⚠️ Vence en {days}d</span>}
                         </div>
-                        <p className="text-gray-400 text-xs mt-0.5">/{c.slug} · {c.plan_name||"Sin plan"} · {c.email||""}{c.phone?` · ${c.phone}`:""}</p>
+                        <p className="text-gray-400 text-xs mt-0.5">/{c.slug} · {c.plan_name||"Sin plan"}</p>
+                        <p className="text-gray-500 text-xs">{[c.nit,c.email,c.phone,c.address].filter(Boolean).join(" · ") || ""}</p>
                       </div>
                       <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                         <button onClick={()=>openUsers(c)} className="text-xs bg-indigo-900 text-indigo-300 hover:bg-indigo-800 px-3 py-1.5 rounded-lg">👥 Usuarios</button>
@@ -422,43 +448,110 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
       {/* ── Modal empresa (crear / editar) ── */}
       {showNewCompany && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-md border border-gray-700 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold mb-4">{editingCompany?"Editar empresa":"Nueva empresa"}</h3>
-            <div className="space-y-3">
-              {([["name","Nombre *"],["slug","Slug (URL) *"],["email","Email"],["phone","Teléfono"]] as [string,string][]).map(([k,l])=>(
-                <div key={k}>
-                  <label className="text-gray-400 text-xs">{l}</label>
-                  <input value={(companyForm as Record<string,string>)[k]} onChange={e=>setCompanyForm({...companyForm,[k]:e.target.value})}
-                    disabled={k==="slug"&&!!editingCompany}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500 disabled:opacity-50" />
-                </div>
-              ))}
-              <div>
-                <label className="text-gray-400 text-xs">Plan</label>
-                <select value={companyForm.plan_id} onChange={e=>setCompanyForm({...companyForm,plan_id:e.target.value})}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
-                  <option value="">Sin plan</option>
-                  {plans.map(p=><option key={p.id} value={p.id}>{p.name} — ${fmt(p.price_monthly)} COP</option>)}
-                </select>
+          <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-xl border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-white font-bold mb-4 text-lg">{editingCompany ? "✏️ Editar empresa" : "🏢 Registrar nueva empresa"}</h3>
+
+            {/* Logo */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-16 h-16 rounded-xl bg-gray-700 border border-gray-600 flex items-center justify-center overflow-hidden">
+                {logoPreview
+                  ? <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+                  : <span className="text-gray-500 text-2xl">🏢</span>}
               </div>
-              {editingCompany && (
+              <div>
+                <label className="text-gray-400 text-xs block mb-1">Logo de la empresa</label>
+                <label className="cursor-pointer bg-gray-700 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-lg text-xs hover:bg-gray-600">
+                  Subir imagen
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                </label>
+                <p className="text-gray-500 text-xs mt-1">JPG, PNG o WEBP</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">Datos de la empresa</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([["name","Nombre de la empresa *"],["nit","NIT / RUT"],["email","Correo electrónico"],["phone","Teléfono"],["address","Dirección"],["slug","Slug / URL *"]] as [string,string][]).map(([k,l])=>(
+                  <div key={k} className={k==="address"||k==="name"?"col-span-2":""}>
+                    <label className="text-gray-400 text-xs">{l}</label>
+                    <input value={(companyForm as Record<string,string>)[k]}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const update: Record<string,string> = { [k]: val };
+                        // Auto-generar slug desde nombre
+                        if (k === "name" && !editingCompany && !companyForm.slug) {
+                          update.slug = val.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 30);
+                        }
+                        setCompanyForm(prev => ({ ...prev, ...update }));
+                      }}
+                      disabled={k==="slug"&&!!editingCompany}
+                      placeholder={k==="slug" ? "mi-empresa" : k==="nit" ? "900123456-1" : ""}
+                      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500 disabled:opacity-50" />
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-gray-400 text-xs">Estado</label>
-                  <select value={companyForm.status} onChange={e=>setCompanyForm({...companyForm,status:e.target.value})}
+                  <label className="text-gray-400 text-xs">Plan asignado</label>
+                  <select value={companyForm.plan_id} onChange={e=>setCompanyForm({...companyForm,plan_id:e.target.value})}
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
-                    <option value="active">Activa</option>
-                    <option value="suspended">Suspendida</option>
-                    <option value="trial">Trial</option>
-                    <option value="pending">Pendiente</option>
+                    <option value="">Sin plan</option>
+                    {plans.map(p=><option key={p.id} value={p.id}>{p.name} — ${fmt(p.price_monthly)} COP</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="text-gray-400 text-xs">Estado inicial</label>
+                  <select value={companyForm.status} onChange={e=>setCompanyForm({...companyForm,status:e.target.value})}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1">
+                    <option value="active">✅ Activa</option>
+                    <option value="trial">🔵 Trial</option>
+                    <option value="pending">🟡 Pendiente</option>
+                    <option value="suspended">🔴 Suspendida</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Admin user — solo en creación */}
+              {!editingCompany && (
+                <>
+                  <div className="border-t border-gray-700 pt-3">
+                    <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-2">Usuario administrador</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-gray-400 text-xs">Nombre completo *</label>
+                        <input value={adminForm.name} onChange={e=>setAdminForm({...adminForm,name:e.target.value})}
+                          placeholder="Nombre del admin"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-xs">Usuario (login) *</label>
+                        <input value={adminForm.username} onChange={e=>setAdminForm({...adminForm,username:e.target.value})}
+                          placeholder="admin"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-gray-400 text-xs">Contraseña *</label>
+                        <input type="password" value={adminForm.password} onChange={e=>setAdminForm({...adminForm,password:e.target.value})}
+                          placeholder="Mínimo 8 caracteres"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500" />
+                      </div>
+                    </div>
+                    <p className="text-gray-500 text-xs mt-1.5">El admin tendrá acceso a todos los módulos del plan seleccionado.</p>
+                  </div>
+                </>
               )}
             </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={()=>{ setShowNewCompany(false); setEditingCompany(null); }} className="flex-1 border border-gray-600 text-gray-300 rounded-lg py-2 text-sm">Cancelar</button>
-              <button onClick={saveCompany} disabled={!companyForm.name||(!editingCompany&&!companyForm.slug)||saving}
-                className="flex-1 bg-emerald-500 text-white rounded-lg py-2 text-sm disabled:opacity-50">
-                {saving?"Guardando...":(editingCompany?"Guardar cambios":"Crear empresa")}
+
+            <div className="flex gap-2 mt-5">
+              <button onClick={()=>{ setShowNewCompany(false); setEditingCompany(null); }}
+                className="flex-1 border border-gray-600 text-gray-300 rounded-lg py-2.5 text-sm">
+                Cancelar
+              </button>
+              <button onClick={saveCompany}
+                disabled={!companyForm.name || (!editingCompany && (!companyForm.slug || !adminForm.username || !adminForm.password)) || saving}
+                className="flex-1 bg-emerald-500 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 hover:bg-emerald-600">
+                {saving ? "Guardando..." : editingCompany ? "Guardar cambios" : "Registrar empresa"}
               </button>
             </div>
           </div>

@@ -19,6 +19,7 @@ import JulietaAlertsPanel from "./chat/JulietaAlertsPanel";
 import MasterDashboard from "./master/MasterDashboard";
 import HelpModule from "./help/HelpModule";
 import FlowBuilder from "./chat/FlowBuilder";
+import SubscriptionModule from "./subscription/SubscriptionModule";
 import { getAllowedModules, canAccess } from "@/lib/auth-client";
 
 interface Conversation {
@@ -163,8 +164,9 @@ export default function ConnectionGate() {
           {activeModule === "campaigns"  && canAccess(perms,"campaigns",isMaster)  && <CampaignsModule />}
           {activeModule === "documents"  && canAccess(perms,"documents",isMaster)  && <DocumentsModule />}
           {activeModule === "settings"   && canAccess(perms,"settings",isMaster)   && <SettingsModule currentUser={currentUser} />}
-          {activeModule === "flows"      && <FlowBuilder />}
-          {activeModule === "help"       && <HelpModule />}
+          {activeModule === "flows"        && <FlowBuilder />}
+          {activeModule === "subscription" && <SubscriptionModule />}
+          {activeModule === "help"         && <HelpModule />}
         </div>
       </div>
     </div>
