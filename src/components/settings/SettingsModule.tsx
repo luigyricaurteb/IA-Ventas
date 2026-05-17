@@ -52,6 +52,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [waPhone, setWaPhone] = useState<string | null>(null);
   const [waQr, setWaQr] = useState<string | null>(null);
   const [waDisconnecting, setWaDisconnecting] = useState(false);
+  const [waRestarting, setWaRestarting] = useState(false);
   const waPollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [newUser, setNewUser] = useState({ username: "", name: "", password: "", permissions: {} as Record<string, boolean>, is_admin: false });
@@ -121,6 +122,14 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     await fetch("/api/connection/disconnect", { method: "POST" });
     setWaStatus("disconnected"); setWaPhone(null); setWaQr(null);
     setWaDisconnecting(false);
+  }
+
+  async function restartWa() {
+    setWaRestarting(true);
+    setWaQr(null); setWaPhone(null); setWaStatus("disconnected");
+    await fetch("/api/connection/restart", { method: "POST" });
+    // Esperar 3s y empezar a hacer poll para el QR
+    setTimeout(() => setWaRestarting(false), 3000);
   }
 
   useEffect(() => {
@@ -429,11 +438,25 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
           )}
 
-          {/* Desconectado — instrucciones */}
+          {/* Desconectado — instrucciones + botón de reconexión */}
           {waStatus === "disconnected" && !waQr && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-              <p className="font-medium mb-1">Bot desconectado</p>
-              <p>Para conectar WhatsApp al bot, reinicia el bot desde el servidor o espera a que se reconecte automáticamente. El QR aparecerá aquí en unos segundos.</p>
+            <div className="space-y-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <p className="font-medium mb-1">WhatsApp desconectado</p>
+                <p>Haz clic en <strong>"Solicitar QR"</strong> para generar un nuevo código y volver a vincular WhatsApp.</p>
+              </div>
+              <button
+                onClick={restartWa}
+                disabled={waRestarting}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {waRestarting ? (
+                  <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Solicitando QR...</>
+                ) : (
+                  "📱 Solicitar QR para vincular WhatsApp"
+                )}
+              </button>
+              <p className="text-xs text-gray-400 text-center">El QR aparecerá en esta pantalla en los próximos 30 segundos</p>
             </div>
           )}
 

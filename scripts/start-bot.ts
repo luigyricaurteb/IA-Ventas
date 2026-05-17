@@ -7,7 +7,20 @@ import { startCompany, getHandle, getAllHandles } from "../src/lib/baileys/clien
 import { listCompanies, getExpiringSubscriptions } from "../src/lib/master/db-master";
 import { getCompanyDb } from "../src/lib/master/db-company";
 
-const RESTART_FLAG = path.resolve(process.cwd(), "data", ".restart");
+// Buscar el flag en múltiples ubicaciones posibles (Railway vs local)
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
+const RESTART_FLAG_PATHS = [
+  path.join(DATA_DIR, ".restart"),
+  path.resolve(process.cwd(), "data", ".restart"),
+  path.resolve(process.cwd(), ".restart"),
+];
+
+function findRestartFlag(): string | null {
+  for (const p of RESTART_FLAG_PATHS) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
 
 async function startAllCompanies() {
   const companies = listCompanies().filter(c => c.status === "active");
@@ -138,9 +151,11 @@ async function main() {
   }, 2 * 60 * 1000);
 
   // Restart flag: detecta cuando el dashboard pide reiniciar el bot
+  // Busca en múltiples rutas para compatibilidad Railway/local
   setInterval(async () => {
-    if (!fs.existsSync(RESTART_FLAG)) return;
-    try { fs.unlinkSync(RESTART_FLAG); } catch {}
+    const flagPath = findRestartFlag();
+    if (!flagPath) return;
+    try { fs.unlinkSync(flagPath); } catch {}
     console.log("[bot] Flag de reinicio detectado. Reiniciando bots...");
     // Apagar todos los handles activos
     for (const [, handle] of getAllHandles()) {
