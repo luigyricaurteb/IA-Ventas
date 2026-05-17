@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const deals = db.prepare(`
     SELECT d.*,
-           c.full_name as contact_name,
+           COALESCE(c.full_name, conv.name) as contact_name,
            c.email as contact_email,
            conv.phone as contact_phone,
            p.name as product_name

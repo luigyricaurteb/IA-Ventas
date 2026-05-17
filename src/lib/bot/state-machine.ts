@@ -209,20 +209,22 @@ export async function processBotMessage(
       "SELECT * FROM legal_documents WHERE type='data_treatment' AND active=1 ORDER BY id DESC LIMIT 1"
     ).get() as { id: number; title: string; content: string } | null;
 
+    getOrCreateDeal(db, conversationId);
+
     if (doc) {
+      // Con política → mostrar primero, luego recolectar datos
       const summary = doc.content.slice(0, 320) + (doc.content.length > 320 ? "..." : "");
       await sendMany(db, sock, jid, phone, conversationId, [
         `¡Hola! Bienvenido/a a *${companyName}* 👋`,
         `Antes de continuar necesito tu autorización para tratar tus datos personales (Ley 1581 de 2012).\n\n📄 *${doc.title}*\n\n${summary}\n\nResponde *SI* para aceptar o *NO* para rechazar.`,
       ]);
       setState(db, conversationId, "CONSENT_PENDING");
-      getOrCreateDeal(db, conversationId);
     } else {
-      // Sin política → ir directo a ACTIVE
-      setState(db, conversationId, "ACTIVE");
-      getOrCreateDeal(db, conversationId);
-      const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
-      await send(db, sock, jid, phone, conversationId, reply);
+      // Sin política → saludar y pedir nombre directamente
+      await send(db, sock, jid, phone, conversationId,
+        `¡Hola! Bienvenido/a a *${companyName}* 👋\n\nPara poder ayudarte mejor, ¿me podrías compartir tu nombre completo?`
+      );
+      setState(db, conversationId, "COLLECTING_CONTACT", { step: "name" });
     }
     return;
   }
@@ -235,30 +237,37 @@ export async function processBotMessage(
       const did = getOrCreateDeal(db, conversationId);
       if (did) db.prepare("UPDATE crm_deals SET stage='CALIFICADO' WHERE id=?").run(did);
 
-      // Verificar si ya tenemos nombre del cliente
+      // SIEMPRE pedir nombre y email — condición general del sistema
       const existingContact = db.prepare("SELECT full_name, email FROM contacts WHERE conversation_id=? LIMIT 1")
         .get(conversationId) as { full_name: string | null; email: string | null } | null;
-      const hasName = !!(existingContact?.full_name || pushName);
 
-      if (!hasName) {
+      const savedName = existingContact?.full_name ?? pushName ?? null;
+      const savedEmail = existingContact?.email ?? null;
+
+      if (!savedName) {
+        // No tenemos nombre — pedirlo
         setState(db, conversationId, "COLLECTING_CONTACT", { step: "name" });
         await send(db, sock, jid, phone, conversationId,
           `¡Gracias por aceptar! 😊 Para brindarte una mejor atención, ¿me podrías compartir tu nombre completo?`
         );
-      } else {
-        // Tenemos nombre pero quizás no email
-        const hasEmail = !!existingContact?.email;
-        if (!hasEmail) {
-          const name = existingContact?.full_name ?? pushName ?? "cliente";
-          setState(db, conversationId, "COLLECTING_CONTACT", { step: "email", name });
-          await send(db, sock, jid, phone, conversationId,
-            `¡Gracias, ${name}! ¿Me compartes tu correo electrónico? Lo usaremos para enviarte información y confirmaciones. 📧`
-          );
-        } else {
-          setState(db, conversationId, "ACTIVE");
-          const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
-          await send(db, sock, jid, phone, conversationId, reply);
+      } else if (!savedEmail) {
+        // Tenemos nombre pero no email
+        if (savedName && !existingContact?.full_name) {
+          // Guardar pushName como nombre si no está en contactos
+          const ec = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
+          if (ec) db.prepare("UPDATE contacts SET full_name=? WHERE id=?").run(savedName, ec.id);
+          else db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?)").run(conversationId, savedName);
         }
+        setState(db, conversationId, "COLLECTING_CONTACT", { step: "email", name: savedName });
+        await send(db, sock, jid, phone, conversationId,
+          `¡Gracias, ${savedName}! 😊 ¿Me compartes tu correo electrónico para enviarte información y confirmaciones? 📧`
+        );
+      } else {
+        // Ya tenemos nombre y email — ir a ACTIVE
+        setState(db, conversationId, "ACTIVE");
+        await send(db, sock, jid, phone, conversationId,
+          `¡Perfecto! Ya tengo tu información. ¿En qué puedo ayudarte hoy? 😊`
+        );
       }
     } else if (isNo(text)) {
       if (doc) db.prepare("INSERT INTO consent_log (conversation_id, document_id, accepted) VALUES (?,?,0)").run(conversationId, doc.id);
@@ -285,14 +294,20 @@ export async function processBotMessage(
         await send(db, sock, jid, phone, conversationId, `Por favor dime tu nombre completo para continuar.`);
         return;
       }
-      // Guardar nombre
+      // Guardar nombre en conversación y contacto
       db.prepare("UPDATE conversations SET name=? WHERE id=?").run(name, conversationId);
       const existing = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
+      let contactId: number;
       if (existing) {
         db.prepare("UPDATE contacts SET full_name=? WHERE id=?").run(name, existing.id);
+        contactId = existing.id;
       } else {
-        db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?)").run(conversationId, name);
+        const ins = db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?) RETURNING id").get(conversationId, name) as { id: number };
+        contactId = ins.id;
       }
+      // Actualizar el deal con el contact_id para que el CRM muestre el nombre
+      db.prepare("UPDATE crm_deals SET contact_id=? WHERE conversation_id=? AND (contact_id IS NULL OR contact_id=0)").run(contactId, conversationId);
+
       // Pasar a recopilar email
       setState(db, conversationId, "COLLECTING_CONTACT", { step: "email", name });
       await send(db, sock, jid, phone, conversationId,
