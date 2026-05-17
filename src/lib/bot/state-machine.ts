@@ -25,6 +25,7 @@ import { autoLearn } from "./auto-learn";
 
 type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
+  | "COLLECTING_CONTACT"
   | "ACTIVE" | "COLLECTING_PEOPLE"
   | "QUOTE_SENT" | "AWAITING_PAYMENT" | "CONFIRMING_PAYMENT" | "DONE";
 
@@ -137,7 +138,8 @@ export async function processBotMessage(
   jid: string,
   text: string,
   history: { role: string; content: string }[],
-  slug = "platform"
+  slug = "platform",
+  pushName?: string
 ): Promise<void> {
   const db = getCompanyDb(slug);
   console.log(`[bot:${slug}] processBotMessage conv=${conversationId} text="${text.slice(0,60)}"`);
@@ -230,11 +232,34 @@ export async function processBotMessage(
     const doc = db.prepare("SELECT id FROM legal_documents WHERE type='data_treatment' AND active=1 ORDER BY id DESC LIMIT 1").get() as { id: number } | null;
     if (isYes(text)) {
       if (doc) db.prepare("INSERT INTO consent_log (conversation_id, document_id, accepted) VALUES (?,?,1)").run(conversationId, doc.id);
-      setState(db, conversationId, "ACTIVE");
       const did = getOrCreateDeal(db, conversationId);
       if (did) db.prepare("UPDATE crm_deals SET stage='CALIFICADO' WHERE id=?").run(did);
-      const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
-      await send(db, sock, jid, phone, conversationId, reply);
+
+      // Verificar si ya tenemos nombre del cliente
+      const existingContact = db.prepare("SELECT full_name, email FROM contacts WHERE conversation_id=? LIMIT 1")
+        .get(conversationId) as { full_name: string | null; email: string | null } | null;
+      const hasName = !!(existingContact?.full_name || pushName);
+
+      if (!hasName) {
+        setState(db, conversationId, "COLLECTING_CONTACT", { step: "name" });
+        await send(db, sock, jid, phone, conversationId,
+          `¡Gracias por aceptar! 😊 Para brindarte una mejor atención, ¿me podrías compartir tu nombre completo?`
+        );
+      } else {
+        // Tenemos nombre pero quizás no email
+        const hasEmail = !!existingContact?.email;
+        if (!hasEmail) {
+          const name = existingContact?.full_name ?? pushName ?? "cliente";
+          setState(db, conversationId, "COLLECTING_CONTACT", { step: "email", name });
+          await send(db, sock, jid, phone, conversationId,
+            `¡Gracias, ${name}! ¿Me compartes tu correo electrónico? Lo usaremos para enviarte información y confirmaciones. 📧`
+          );
+        } else {
+          setState(db, conversationId, "ACTIVE");
+          const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
+          await send(db, sock, jid, phone, conversationId, reply);
+        }
+      }
     } else if (isNo(text)) {
       if (doc) db.prepare("INSERT INTO consent_log (conversation_id, document_id, accepted) VALUES (?,?,0)").run(conversationId, doc.id);
       db.prepare(`INSERT INTO bot_conversation_state (conversation_id, opted_out, state) VALUES (?,1,'CONSENT_REJECTED')
@@ -246,6 +271,65 @@ export async function processBotMessage(
       await send(db, sock, jid, phone, conversationId,
         `Por favor responde *SI* para aceptar o *NO* para rechazar la política de tratamiento de datos.`
       );
+    }
+    return;
+  }
+
+  // ── COLLECTING_CONTACT — recopila nombre y email del cliente ──────────
+  if (currentState === "COLLECTING_CONTACT") {
+    const step = (stateData.step as string) ?? "name";
+
+    if (step === "name") {
+      const name = text.trim();
+      if (name.length < 2 || /^\d+$/.test(name)) {
+        await send(db, sock, jid, phone, conversationId, `Por favor dime tu nombre completo para continuar.`);
+        return;
+      }
+      // Guardar nombre
+      db.prepare("UPDATE conversations SET name=? WHERE id=?").run(name, conversationId);
+      const existing = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
+      if (existing) {
+        db.prepare("UPDATE contacts SET full_name=? WHERE id=?").run(name, existing.id);
+      } else {
+        db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?)").run(conversationId, name);
+      }
+      // Pasar a recopilar email
+      setState(db, conversationId, "COLLECTING_CONTACT", { step: "email", name });
+      await send(db, sock, jid, phone, conversationId,
+        `¡Perfecto, ${name}! 😊 ¿Me compartes tu correo electrónico? Lo usaremos para enviarte información y confirmaciones. 📧`
+      );
+    } else if (step === "email") {
+      const name = (stateData.name as string) ?? pushName ?? "cliente";
+      const emailInput = text.trim().toLowerCase();
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput);
+      const skipped = ["no", "no tengo", "omitir", "saltar", "skip", "ninguno", "n/a"].some(k => emailInput.includes(k));
+
+      if (isEmail) {
+        const existingC = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
+        if (existingC) {
+          db.prepare("UPDATE contacts SET email=? WHERE id=?").run(emailInput, existingC.id);
+        } else {
+          db.prepare("INSERT INTO contacts (conversation_id, full_name, email) VALUES (?,?,?)").run(conversationId, name, emailInput);
+        }
+      }
+
+      // Ir a ACTIVE — con o sin email
+      setState(db, conversationId, "ACTIVE");
+
+      if (!isEmail && !skipped) {
+        // Respuesta inválida — dejar pasar igual (no bloquear)
+        await send(db, sock, jid, phone, conversationId,
+          `No reconocí ese correo, pero no hay problema — lo puedes compartir después si lo deseas. ¿En qué te puedo ayudar hoy? 😊`
+        );
+      } else {
+        const thanks = isEmail ? `Gracias, ${name}! Ya tengo tus datos. ` : `Entendido, ${name}. `;
+        const reply = await aiReply(db, sock, jid, phone, conversationId,
+          `${thanks}¿En qué te puedo ayudar hoy?`,
+          history, slug, companyName, aiName);
+        await send(db, sock, jid, phone, conversationId, reply);
+      }
+
+      autoLearn(db, conversationId).catch(() => {});
     }
     return;
   }

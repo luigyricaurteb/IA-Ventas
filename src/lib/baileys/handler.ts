@@ -228,6 +228,54 @@ export async function handleIncomingMessage(
       return;
     }
 
+    // ── Mensajes de catálogo WhatsApp Business ────────────────────────────
+    const m = msg.message as Record<string, unknown> | null;
+    const productMsg = m?.productMessage as {
+      product?: {
+        title?: string; description?: string;
+        priceAmount1000?: { low?: number; high?: number } | number;
+        currencyCode?: string; retailerId?: string;
+      }
+    } | undefined;
+
+    const orderMsg = m?.orderMessage as {
+      products?: { name?: string; price?: number; quantity?: number; currency?: string }[];
+      totalAmount1000?: number; message?: string;
+    } | undefined;
+
+    if (productMsg?.product) {
+      const p = productMsg.product;
+      const rawPrice = typeof p.priceAmount1000 === "object"
+        ? (p.priceAmount1000?.low ?? 0) / 1000
+        : (typeof p.priceAmount1000 === "number" ? p.priceAmount1000 / 1000 : 0);
+      const priceStr = rawPrice > 0 ? `$${rawPrice.toLocaleString("es-CO")} ${p.currencyCode ?? "COP"}` : "";
+      const catalog = [
+        `📦 *Producto del catálogo: ${p.title ?? "Sin nombre"}*`,
+        p.description ? `📝 ${p.description}` : null,
+        priceStr ? `💰 Precio: ${priceStr}` : null,
+        p.retailerId ? `🔖 Ref: ${p.retailerId}` : null,
+        `\n[El cliente envió este producto del catálogo de WhatsApp Business]`,
+      ].filter(Boolean).join("\n");
+
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "user", catalog);
+      db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
+      console.log(`[bot:${slug}] 🛍️ Producto de catálogo WA Business: ${p.title}`);
+      await processBotMessage(sock, conv.id, phone, remoteJid, catalog, [], slug, pushName);
+      return;
+    }
+
+    if (orderMsg?.products && orderMsg.products.length > 0) {
+      const items = orderMsg.products.map(p =>
+        `• ${p.name ?? "Producto"} x${p.quantity ?? 1}${p.price ? ` — $${p.price.toLocaleString("es-CO")}` : ""}`
+      ).join("\n");
+      const orderText = `🛒 *Pedido recibido:*\n${items}${orderMsg.message ? `\n\n💬 ${orderMsg.message}` : ""}\n\n[El cliente realizó un pedido desde el catálogo de WhatsApp Business]`;
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "user", orderText);
+      db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
+      console.log(`[bot:${slug}] 🛒 Pedido WA Business: ${orderMsg.products.length} item(s)`);
+      await processBotMessage(sock, conv.id, phone, remoteJid, orderText, [], slug, pushName);
+      return;
+    }
+
     // ── Mensaje de texto ──────────────────────────────────────────────────
     const text =
       msg.message?.conversation ??
@@ -270,7 +318,7 @@ export async function handleIncomingMessage(
       "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 20"
     ).all(conv.id) as { role: string; content: string }[];
 
-    await processBotMessage(sock, conv.id, phone, remoteJid, text, history, slug);
+    await processBotMessage(sock, conv.id, phone, remoteJid, text, history, slug, pushName);
 
   } catch (err) {
     console.error(`[bot:${slug}] Error CRÍTICO en handleIncomingMessage:`, err);

@@ -95,6 +95,20 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  async function testSmtp() {
+    setSmtpTesting(true); setSmtpTestResult(null);
+    const res = await fetch("/api/settings/smtp/test", { method: "POST" });
+    const d = await res.json() as { ok: boolean; sentTo?: string; error?: string };
+    setSmtpTestResult({
+      ok: d.ok,
+      msg: d.ok ? `✅ Email enviado a ${d.sentTo}` : `❌ ${d.error}`,
+    });
+    setSmtpTesting(false);
+  }
+
   async function disconnectWa() {
     if (!confirm("¿Desconectar WhatsApp? El bot dejará de funcionar hasta que escanees el QR nuevamente.")) return;
     setWaDisconnecting(true);
@@ -490,9 +504,22 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
               <input value={smtp.from_email ?? ""} onChange={(e) => setSmtp({ ...smtp, from_email: e.target.value })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
             </div>
           </div>
-          <button onClick={saveSmtp} disabled={saving} className="bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
-            {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar SMTP"}
-          </button>
+          {smtpTestResult && (
+            <div className={`rounded-xl px-4 py-3 text-sm font-medium ${smtpTestResult.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+              {smtpTestResult.msg}
+              {!smtpTestResult.ok && smtpTestResult.msg.includes("Correo de contacto") && (
+                <p className="text-xs mt-1 font-normal">Ve a la pestaña <strong>Empresa</strong> y llena el campo <strong>Correo de contacto</strong> — ese es el email que recibe las alertas.</p>
+              )}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={saveSmtp} disabled={saving} className="bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+              {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar SMTP"}
+            </button>
+            <button onClick={testSmtp} disabled={smtpTesting} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+              {smtpTesting ? "Probando..." : "📧 Probar conexión"}
+            </button>
+          </div>
         </div>
       )}
 
