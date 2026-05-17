@@ -421,6 +421,8 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN notify_new_conversation INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE company_config ADD COLUMN notify_new_payment INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE company_config ADD COLUMN notify_new_reservation INTEGER NOT NULL DEFAULT 1",
+    // Origen del aprendizaje: manual | auto
+    "ALTER TABLE ai_learnings ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
   ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores

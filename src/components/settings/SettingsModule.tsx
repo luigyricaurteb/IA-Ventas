@@ -21,7 +21,7 @@ interface BankAccount { id: number; bank_name: string; account_type: string; acc
 interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null; notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number }
 interface SystemUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
-interface AiLearning { id: number; topic: string; content: string; created_at: number }
+interface AiLearning { id: number; topic: string; content: string; created_at: number; source?: string }
 interface EditingLearning { id: number; topic: string; content: string }
 interface DriveSource { id: number; name: string; drive_url: string; file_type: string; topic: string; last_synced_at: number | null; sync_status: string; sync_error: string | null }
 interface MsgTemplate { id: number; name: string; content: string; category: string | null }
@@ -496,8 +496,13 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
       )}
 
       {/* ── APRENDIZAJE IA ── */}
-      {tab === "learning" && (
+      {tab === "learning" && (() => {
+        const visibleLearnings = learnings.filter(l => !l.topic.startsWith("[Drive]"));
+        const autoLearnings    = visibleLearnings.filter(l => l.source === "auto" || l.topic.startsWith("[Auto]"));
+        const manualLearnings  = visibleLearnings.filter(l => l.source !== "auto" && !l.topic.startsWith("[Auto]"));
+        return (
         <div className="space-y-6">
+          {/* Identidad y personalidad */}
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">🤖</span>
@@ -518,12 +523,61 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
               {saved ? "✓ Guardado" : saving ? "Guardando..." : `Guardar configuración de ${aiName}`}
             </button>
           </div>
+
+          {/* Aprendizajes automáticos */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="font-semibold text-gray-800">Conocimiento manual</h2>
-                <p className="text-xs text-gray-400">{learnings.filter(l => !l.topic.startsWith("[Drive]")).length} items · {aiName} usa esto como contexto</p>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="font-semibold text-gray-800">🧠 Aprendizaje autónomo</h2>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{autoLearnings.length} patrones</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">{aiName} aprende automáticamente de las conversaciones. Puedes editar o eliminar cualquier aprendizaje para afinar sus respuestas futuras.</p>
+            {autoLearnings.length === 0 ? (
+              <div className="text-center py-6 bg-gray-50 rounded-xl text-gray-400 text-sm">
+                <p className="text-2xl mb-2">🔄</p>
+                <p>Aún no hay aprendizajes automáticos.</p>
+                <p className="text-xs mt-1">{aiName} comenzará a aprender después de algunas conversaciones.</p>
               </div>
+            ) : (
+              <div className="space-y-2">
+                {autoLearnings.map((l) => (
+                  <div key={l.id} className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    {editingLearning?.id === l.id ? (
+                      <div className="space-y-2">
+                        <input value={editingLearning.topic} onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
+                          className="w-full border rounded-lg px-3 py-1.5 text-sm font-medium bg-white" />
+                        <textarea value={editingLearning.content} onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
+                          rows={3} className="w-full border rounded-lg px-3 py-2 text-sm resize-none bg-white" />
+                        <div className="flex gap-2">
+                          <button onClick={saveEditLearning} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">Guardar</button>
+                          <button onClick={() => setEditingLearning(null)} className="border px-4 py-1.5 rounded-lg text-sm text-gray-600 bg-white">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-medium">{l.topic.replace("[Auto] ","")}</span>
+                            <span className="text-[10px] text-blue-400">Auto · {new Date(l.created_at * 1000).toLocaleDateString("es-CO")}</span>
+                          </div>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-4">{l.content}</p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })} className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded">✏️</button>
+                          <button onClick={() => deleteLearning(l.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">🗑</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Conocimiento manual */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="font-semibold text-gray-800">📝 Conocimiento manual</h2>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{manualLearnings.length} items</span>
             </div>
             <div className="bg-gray-50 border rounded-xl p-4 mb-4 space-y-3">
               <p className="text-sm font-medium text-gray-700">+ Agregar conocimiento</p>
@@ -533,45 +587,31 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
               <button onClick={addLearning} disabled={!newLearning.topic || !newLearning.content}
                 className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">Agregar</button>
             </div>
-            {learnings.filter(l => !l.topic.startsWith("[Drive]")).length === 0 && (
-              <div className="text-center py-6 text-gray-400 text-sm">{aiName} aún no tiene conocimientos manuales.</div>
+            {manualLearnings.length === 0 && (
+              <div className="text-center py-4 text-gray-400 text-sm">{aiName} aún no tiene conocimientos manuales.</div>
             )}
             <div className="space-y-2">
-              {learnings.filter(l => !l.topic.startsWith("[Drive]")).map((l) => (
+              {manualLearnings.map((l) => (
                 <div key={l.id} className="bg-white border rounded-xl p-4">
                   {editingLearning?.id === l.id ? (
-                    // Edición inline
                     <div className="space-y-2">
-                      <input
-                        value={editingLearning.topic}
-                        onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
-                        className="w-full border rounded-lg px-3 py-1.5 text-sm font-medium"
-                        placeholder="Tema"
-                      />
-                      <textarea
-                        value={editingLearning.content}
-                        onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
-                        rows={4}
-                        className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
-                        placeholder="Contenido"
-                      />
+                      <input value={editingLearning.topic} onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
+                        className="w-full border rounded-lg px-3 py-1.5 text-sm font-medium" placeholder="Tema" />
+                      <textarea value={editingLearning.content} onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
+                        rows={4} className="w-full border rounded-lg px-3 py-2 text-sm resize-none" placeholder="Contenido" />
                       <div className="flex gap-2">
                         <button onClick={saveEditLearning} className="bg-purple-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-purple-700">Guardar</button>
                         <button onClick={() => setEditingLearning(null)} className="border px-4 py-1.5 rounded-lg text-sm text-gray-600">Cancelar</button>
                       </div>
                     </div>
                   ) : (
-                    // Vista normal
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-medium">{l.topic}</span>
                         <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap line-clamp-4">{l.content}</p>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button
-                          onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })}
-                          className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded"
-                        >✏️</button>
+                        <button onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })} className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded">✏️</button>
                         <button onClick={() => deleteLearning(l.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">🗑</button>
                       </div>
                     </div>
@@ -581,7 +621,8 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── PLANTILLAS ── */}
       {tab === "templates" && (

@@ -21,16 +21,28 @@ import type Database from "better-sqlite3";
 import { getCompanyDb } from "../master/db-company";
 import { generateStructuredReply, isUncertainResponse } from "../openrouter";
 import { sendWithAntiBlock, sendMultipleWithAntiBlock, isOptOutMessage } from "./anti-block";
+import { autoLearn } from "./auto-learn";
 
 type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
   | "ACTIVE" | "COLLECTING_PEOPLE"
   | "QUOTE_SENT" | "AWAITING_PAYMENT" | "CONFIRMING_PAYMENT" | "DONE";
 
-const YES_KW = ["si","sí","acepto","ok","yes","claro","dale","de acuerdo","correcto","adelante","afirmativo","exacto"];
-const NO_KW  = ["no","rechazo","no acepto","nope","negativo"];
+const YES_KW    = ["si","sí","acepto","ok","yes","claro","dale","de acuerdo","correcto","adelante","afirmativo","exacto","confirmado","así es","eso es"];
+const NO_KW     = ["no","rechazo","no acepto","nope","negativo","para nada","en absoluto"];
+const CANCEL_KW = [
+  "ya no quiero","no lo quiero","no quiero","cancela","cancelar","cancelado",
+  "ya no me interesa","no me interesa","ya no aplica","no voy a comprar",
+  "no lo voy a tomar","me arrepentí","me arrepenti","cambié de opinión","cambie de opinion",
+  "ya no voy","ya no vamos","olvídalo","olvidalo","dejalo","déjalo",
+  "no voy a pagar","ya no necesito","gracias pero no","no gracias",
+  "lo pensé mejor","lo pense mejor","no me sirve","no me conviene",
+  "lo dejo","no lo tomaré","no lo tomare",
+];
+
 function isYes(t: string) { return YES_KW.some(k => t.toLowerCase().trim().includes(k)); }
-function isNo(t: string)  { return NO_KW.some(k  => t.toLowerCase().trim() === k); }
+function isNo(t: string)  { return NO_KW.some(k => t.toLowerCase().trim() === k || t.toLowerCase().trim().startsWith(k + " ")); }
+function isCancellation(t: string) { const l = t.toLowerCase().trim(); return CANCEL_KW.some(k => l.includes(k)); }
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -166,6 +178,18 @@ export async function processBotMessage(
     try { return bs?.data ? JSON.parse(bs.data) : {}; } catch { return {}; }
   })();
 
+  // ── Detección global de cancelación ──────────────────────────────────
+  // Si el cliente quiere cancelar en cualquier estado de flujo comercial,
+  // reset a ACTIVE y dejamos que la IA responda con empatía
+  const FLOW_STATES: BotState[] = ["COLLECTING_PEOPLE","QUOTE_SENT","AWAITING_PAYMENT","CONFIRMING_PAYMENT"];
+  if (FLOW_STATES.includes(currentState) && isCancellation(text)) {
+    setState(db, conversationId, "ACTIVE");
+    const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
+    await send(db, sock, jid, phone, conversationId, reply);
+    autoLearn(db, conversationId).catch(() => {});
+    return;
+  }
+
   // ── INIT ──────────────────────────────────────────────────────────────
   if (currentState === "INIT") {
     // Si hay mensajes previos (conversación existente), ir directo a ACTIVE
@@ -251,6 +275,7 @@ export async function processBotMessage(
     // Respuesta libre de la IA
     const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName, products);
     await send(db, sock, jid, phone, conversationId, reply);
+    autoLearn(db, conversationId).catch(() => {});
     return;
   }
 
@@ -258,7 +283,10 @@ export async function processBotMessage(
   if (currentState === "COLLECTING_PEOPLE") {
     const numMatch = text.match(/\d+/);
     if (!numMatch) {
-      await send(db, sock, jid, phone, conversationId, `¿Para cuántas personas? Indícame un número.`);
+      // Respuesta no numérica — dejar que la IA maneje (puede ser pregunta, aclaración, etc.)
+      const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
+      await send(db, sock, jid, phone, conversationId, reply);
+      autoLearn(db, conversationId).catch(() => {});
       return;
     }
     const people    = parseInt(numMatch[0]);
@@ -373,7 +401,7 @@ export async function processBotMessage(
       );
 
     } else {
-      // El cliente escribe el monto directamente
+      // ¿Escribió un monto directamente?
       const numMatch = text.replace(/[$.:\s]/g, "").replace(/[.,]/g, "").match(/\d{4,}/);
       if (numMatch && Number(numMatch[0]) > 0) {
         const manualMonto = Number(numMatch[0]);
@@ -384,9 +412,11 @@ export async function processBotMessage(
           `Anotado. ¿Confirmamos un pago de *$${manualMonto.toLocaleString("es-CO")} COP*? Responde *SI* para confirmar o *NO* para corregir.`
         );
       } else {
-        await send(db, sock, jid, phone, conversationId,
-          `Por favor responde *SI* si el monto leído es correcto, *NO* si es incorrecto, o escribe el valor que transferiste (ej: *245000*).`
-        );
+        // Respuesta ambigua — la IA la maneja con contexto completo
+        setState(db, conversationId, "ACTIVE");
+        const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
+        await send(db, sock, jid, phone, conversationId, reply);
+        autoLearn(db, conversationId).catch(() => {});
       }
     }
     return;
@@ -396,6 +426,7 @@ export async function processBotMessage(
   console.log(`[bot:${slug}] Estado ${currentState} → IA libre`);
   const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
   await send(db, sock, jid, phone, conversationId, reply);
+  autoLearn(db, conversationId).catch(() => {});
 }
 
 // ── Función centralizada de respuesta IA ─────────────────────────────────────
