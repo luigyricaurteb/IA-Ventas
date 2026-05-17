@@ -55,7 +55,13 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ from: `"${smtp.from_name ?? company.name ?? "Agente DMC"}" <${fromAddr}>`, to: [company.email], subject: "✅ Prueba Resend — Agente DMC", html }),
       });
       const d = await res.json() as { id?: string; name?: string; message?: string };
-      if (!res.ok) return NextResponse.json({ ok: false, error: `Resend error: ${d.message ?? d.name ?? res.status}` });
+      if (!res.ok) {
+        let msg = d.message ?? d.name ?? String(res.status);
+        if (msg.includes("domain is not verified") || msg.includes("gmail.com")) {
+          msg = `El email remitente "${fromAddr}" no está verificado en Resend. Usa "onboarding@resend.dev" como remitente (el destinatario que recibe las alertas se configura en Ajustes → Empresa → Correo de contacto).`;
+        }
+        return NextResponse.json({ ok: false, error: msg });
+      }
       return NextResponse.json({ ok: true, sentTo: company.email, provider: "resend" });
     }
 

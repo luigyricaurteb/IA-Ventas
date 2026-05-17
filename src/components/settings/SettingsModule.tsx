@@ -499,15 +499,34 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           {/* Resend */}
           {smtp.provider === "resend" && (
             <div className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-2">
-                <p className="font-semibold">Cómo obtener tu API Key de Resend (gratis):</p>
+              {/* Explicación clave — from vs to */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-3">
+                <p className="font-semibold">📌 Importante — dos emails distintos:</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <p className="font-semibold text-blue-700 mb-1">📤 Email que ENVÍA (remitente)</p>
+                    <p className="text-gray-600">Debe ser de un dominio verificado en Resend.</p>
+                    <p className="text-gray-500 mt-1">Para pruebas: usa <strong>onboarding@resend.dev</strong></p>
+                    <p className="text-orange-600 mt-1 font-medium">❌ No uses Gmail aquí</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-blue-100">
+                    <p className="font-semibold text-emerald-700 mb-1">📥 Email que RECIBE (destinatario)</p>
+                    <p className="text-gray-600">Cualquier correo, incluyendo Gmail.</p>
+                    <p className="text-gray-500 mt-1">Se configura en <strong>Ajustes → Empresa → Correo de contacto</strong></p>
+                    <p className="text-emerald-600 mt-1 font-medium">✅ Aquí sí puedes poner tu Gmail</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-1">
+                <p className="font-semibold">Cómo obtener tu API Key (gratis):</p>
                 <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>Ve a <strong>resend.com</strong> → Crear cuenta gratis</li>
-                  <li>En el dashboard → <strong>API Keys</strong> → Create API Key</li>
-                  <li>Pega la key aquí abajo</li>
-                  <li>Para el remitente: al inicio usa <strong>onboarding@resend.dev</strong> (sin verificar dominio). Cuando tengas dominio propio, agrégalo en Resend → Domains</li>
+                  <li>Ve a <strong>resend.com</strong> → Crear cuenta gratuita</li>
+                  <li>Dashboard → <strong>API Keys</strong> → Create API Key</li>
+                  <li>Pega la key aquí abajo y guarda</li>
                 </ol>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="text-sm font-medium text-gray-700">API Key de Resend *</label>
@@ -516,10 +535,10 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                     className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono" />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Email remitente</label>
+                  <label className="text-sm font-medium text-gray-700">Email remitente (from)</label>
                   <input value={smtp.resend_from ?? ""} onChange={(e) => setSmtp({...smtp, resend_from: e.target.value})}
                     placeholder="onboarding@resend.dev" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-                  <p className="text-xs text-gray-400 mt-1">Usa onboarding@resend.dev para pruebas</p>
+                  <p className="text-xs text-orange-500 mt-1 font-medium">⚠️ Usa onboarding@resend.dev — no Gmail</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700">Nombre remitente</label>
