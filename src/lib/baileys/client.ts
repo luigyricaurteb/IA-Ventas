@@ -154,6 +154,76 @@ export async function startCompany(slug: string): Promise<void> {
     }
   });
 
+  // ── Contactos: resolver LIDs a números reales en tiempo real ─────────────
+  // contacts.upsert llega cuando WhatsApp envía info de contactos durante la sesión.
+  // Cada Contact puede tener: id (@s.whatsapp.net o @lid), lid? (@lid), jid? (@s.whatsapp.net)
+  sock.ev.on("contacts.upsert", (contacts) => {
+    let resolved = 0;
+    for (const c of contacts) {
+      try {
+        let phone: string | null = null;
+        let lid: string | null = null;
+
+        // Caso A: id es el teléfono real y lid tiene el LID
+        if (c.id?.endsWith("@s.whatsapp.net") && c.lid) {
+          phone = c.id.split("@")[0];
+          lid   = c.lid.split("@")[0];
+        }
+        // Caso B: id es el LID y jid tiene el teléfono real
+        else if (c.id?.endsWith("@lid") && c.jid) {
+          lid   = c.id.split("@")[0];
+          phone = c.jid.split("@")[0];
+        }
+
+        if (!phone || !lid) continue;
+
+        // Buscar conversaciones con ese LID y actualizar al teléfono real
+        const lidConvs = db.prepare("SELECT id, name FROM conversations WHERE phone=?").all(lid) as { id: number; name: string | null }[];
+        for (const conv of lidConvs) {
+          const existing = db.prepare("SELECT id FROM conversations WHERE phone=? AND id!=?").get(phone, conv.id) as { id: number } | null;
+          if (existing) {
+            // Ya existe conversación con teléfono real → mover mensajes y borrar LID
+            db.prepare("UPDATE messages SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("UPDATE bot_conversation_state SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("UPDATE contacts SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("UPDATE crm_deals SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("UPDATE payment_proofs SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("UPDATE outbox SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+            db.prepare("DELETE FROM conversations WHERE id=?").run(conv.id);
+          } else {
+            // No existe conversación con teléfono real → cambiar el teléfono
+            const name = c.name || c.notify || conv.name || null;
+            db.prepare("UPDATE conversations SET phone=?, name=COALESCE(?,name) WHERE id=?").run(phone, name, conv.id);
+          }
+          resolved++;
+        }
+      } catch {}
+    }
+    if (resolved > 0) console.log(`[bot:${slug}] ✅ ${resolved} conversaciones LID resueltas a número real`);
+  });
+
+  // También al update de contactos
+  sock.ev.on("contacts.update", (updates) => {
+    for (const c of updates) {
+      try {
+        if (!c.id) continue;
+        let phone: string | null = null;
+        let lid: string | null = null;
+        if (c.id.endsWith("@s.whatsapp.net") && c.lid) {
+          phone = c.id.split("@")[0]; lid = c.lid.split("@")[0];
+        } else if (c.id.endsWith("@lid") && (c as { jid?: string }).jid) {
+          lid = c.id.split("@")[0]; phone = ((c as { jid?: string }).jid!).split("@")[0];
+        }
+        if (!phone || !lid) continue;
+        const lidConv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(lid) as { id: number } | null;
+        if (lidConv) {
+          db.prepare("UPDATE conversations SET phone=? WHERE id=? AND phone=?").run(phone, lidConv.id, lid);
+          console.log(`[bot:${slug}] 🔧 LID ${lid} → ${phone}`);
+        }
+      } catch {}
+    }
+  });
+
   // ── Historial al conectar (conversaciones previas) ──────────────────────
   sock.ev.on("messaging-history.set", ({ messages, chats, contacts, isLatest }) => {
     console.log(`[bot:${slug}] messaging-history.set — ${chats.length} chats, ${messages.length} msgs, isLatest=${isLatest}`);
