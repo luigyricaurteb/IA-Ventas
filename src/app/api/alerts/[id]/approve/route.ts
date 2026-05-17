@@ -102,23 +102,44 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // 3. Crear reserva SOLO si pago completo
+  // 3. Crear o actualizar reserva (SIEMPRE — pago completo = confirmed, abono = pending)
   let reservation = null;
   let reservationCode: string | null = null;
 
-  if (isFullyPaid && deal) {
+  if (deal) {
+    // Verificar si ya existe una reserva para este deal (abono anterior)
+    const existingRes = db.prepare("SELECT id, reservation_code FROM reservations WHERE deal_id=? ORDER BY id DESC LIMIT 1")
+      .get(deal.id) as { id: number; reservation_code: string } | null;
+
     let serviceDate = Math.floor(Date.now() / 1000) + 86400;
     if (travelDate) { const p = Date.parse(travelDate); if (!isNaN(p)) serviceDate = Math.floor(p / 1000); }
-    reservationCode = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-    reservation = db.prepare(`
-      INSERT INTO reservations (deal_id,contact_id,reservation_code,client_name,service_name,service_date,people_count,total_value,status,notes)
-      VALUES (?,?,?,?,?,?,?,?,'confirmed',?) RETURNING *`
-    ).get(
-      deal.id, deal.contact_id ?? null, reservationCode,
-      clientName, serviceName, serviceDate,
-      deal.people_count ?? 1, totalExpected > 0 ? totalExpected : approvedAmount,
-      travelDate ? `Fecha solicitada: ${travelDate}` : null
-    );
+
+    const reservationStatus = isFullyPaid ? "confirmed" : "pending";
+    const totalForReservation = totalExpected > 0 ? totalExpected : (isFullyPaid ? approvedAmount : null);
+    const reservationNotes = [
+      travelDate ? `Fecha solicitada: ${travelDate}` : null,
+      !isFullyPaid ? `Abono: $${approvedAmount.toLocaleString("es-CO")} COP${saldo > 0 ? ` | Saldo pendiente: $${saldo.toLocaleString("es-CO")} COP` : ""}` : null,
+    ].filter(Boolean).join(" · ") || null;
+
+    if (existingRes) {
+      // Actualizar reserva existente
+      reservationCode = existingRes.reservation_code;
+      db.prepare("UPDATE reservations SET status=?, notes=?, total_value=COALESCE(?,total_value), updated_at=unixepoch() WHERE id=?")
+        .run(reservationStatus, reservationNotes, totalForReservation, existingRes.id);
+      reservation = db.prepare("SELECT * FROM reservations WHERE id=?").get(existingRes.id);
+    } else {
+      // Crear nueva reserva
+      reservationCode = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+      reservation = db.prepare(`
+        INSERT INTO reservations (deal_id,contact_id,reservation_code,client_name,service_name,service_date,people_count,total_value,status,notes)
+        VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING *`
+      ).get(
+        deal.id, deal.contact_id ?? null, reservationCode,
+        clientName, serviceName, serviceDate,
+        deal.people_count ?? 1, totalForReservation,
+        reservationStatus, reservationNotes
+      );
+    }
   }
 
   // 4. Registrar ingreso en contabilidad
@@ -152,17 +173,21 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         (deal?.people_count ? `👥 ${deal.people_count} persona${deal.people_count !== 1 ? "s" : ""}\n` : "") +
         (travelDate ? `📅 Fecha: ${travelDate}\n` : "") +
         (reservationCode ? `🔖 Código de reserva: *${reservationCode}*\n` : "") +
-        `💰 Total pagado: *${fmtAmt(approvedAmount)}*\n\n` +
-        `¡Gracias por confiar en *${companyName}*! Pronto recibirás todos los detalles. 🙏`;
+        `💰 Pago total: *${fmtAmt(totalExpected > 0 ? totalExpected : approvedAmount)}*\n\n` +
+        `¡Gracias por confiar en *${companyName}*! Nos pondremos en contacto con todos los detalles. 🙏`;
     } else {
       confirmMsg =
-        `✅ *Abono registrado, ${clientName}!*\n\n` +
+        `📋 *Abono registrado y reserva creada, ${clientName}!*\n\n` +
         `📦 Servicio: ${serviceName}\n` +
-        `💵 Abono recibido: *${fmtAmt(approvedAmount)}*\n` +
-        `📊 Total pagado acumulado: *${fmtAmt(newPaidTotal)}*\n` +
-        (totalExpected > 0 ? `💳 Total del servicio: ${fmtAmt(totalExpected)}\n` : "") +
-        (saldo > 0 ? `⚠️ *Saldo pendiente: ${fmtAmt(saldo)}*\n` : "") +
-        `\nUn asesor ha verificado tu pago. ${saldo > 0 ? "Tu reserva se activará cuando pagues el saldo pendiente." : "¡Gracias!"} 🙏`;
+        (deal?.people_count ? `👥 ${deal.people_count} persona${deal.people_count !== 1 ? "s" : ""}\n` : "") +
+        (travelDate ? `📅 Fecha solicitada: ${travelDate}\n` : "") +
+        (reservationCode ? `🔖 Código de reserva: *${reservationCode}*\n` : "") +
+        `\n💵 Abono recibido: *${fmtAmt(approvedAmount)}*\n` +
+        (totalExpected > 0 ? `💳 Valor total del servicio: ${fmtAmt(totalExpected)}\n` : "") +
+        (saldo > 0
+          ? `⚠️ *Saldo pendiente: ${fmtAmt(saldo)}*\n\nTu reserva está *apartada* y se confirmará al cancelar el saldo. Puedes pagar el día del servicio.`
+          : `✅ Pago completo. ¡Tu reserva está confirmada!`) +
+        `\n\n¡Gracias por confiar en *${companyName}*! 🙏`;
     }
 
     // Insertar en outbox para que el bot lo envíe por WhatsApp
