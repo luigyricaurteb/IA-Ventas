@@ -198,8 +198,9 @@ Responde SOLO con el JSON, sin texto adicional.` }
 
         // ── Si NO es comprobante de pago: describir y pedir contexto ─────
         if (imageType !== "payment") {
+          const imgContent = imageDescription ? `📷 ${imageDescription}` : "📷 [Imagen enviada]";
           db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
-            .run(conv.id, "user", imageDescription ? `[Imagen enviada: ${imageDescription}]` : "[Imagen enviada]");
+            .run(conv.id, "user", imgContent);
           db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
 
           // Intentar dar una respuesta con contexto de la conversación
@@ -237,9 +238,10 @@ Responde SOLO con el JSON, sin texto adicional.` }
         fs.writeFileSync(filePath, buffer);
         console.log(`[bot:${slug}] ✅ Comprobante guardado: ${filename}`);
 
-        // Registrar mensaje del usuario
+        // Registrar mensaje del usuario y actualizar last_message_at
         db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
           .run(conv.id, "user", `[Comprobante enviado: ${filename}]`);
+        db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
 
         // Obtener deal
         const dealRow = db.prepare("SELECT id, total_value, paid_amount FROM crm_deals WHERE conversation_id=? ORDER BY id DESC LIMIT 1")

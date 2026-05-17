@@ -169,6 +169,39 @@ function toLong(v: unknown): number | null {
 }
 
 // ── Importar historial de conversaciones desde Baileys ───────────────────────
+// Extrae el contenido de cualquier tipo de mensaje de WhatsApp
+function extractMsgContent(msg: import("@whiskeysockets/baileys").proto.IWebMessageInfo): string | null {
+  const m = msg.message;
+  if (!m) return null;
+
+  // Texto plano
+  if (m.conversation) return m.conversation;
+  if (m.extendedTextMessage?.text) return m.extendedTextMessage.text;
+
+  // Multimedia con caption
+  const caption =
+    m.imageMessage?.caption ||
+    m.videoMessage?.caption ||
+    m.documentMessage?.caption ||
+    m.documentWithCaptionMessage?.message?.documentMessage?.caption || null;
+
+  // Descripción por tipo
+  if (m.imageMessage) return caption ? `📷 ${caption}` : "📷 [Imagen]";
+  if (m.videoMessage) return caption ? `🎬 ${caption}` : "🎬 [Video]";
+  if (m.audioMessage) return m.audioMessage.ptt ? "🎤 [Nota de voz]" : "🎵 [Audio]";
+  if (m.documentMessage) return caption ? `📎 ${caption}` : `📎 [${m.documentMessage.fileName ?? "Documento"}]`;
+  if (m.stickerMessage) return "🎭 [Sticker]";
+  if (m.contactMessage) return `👤 [Contacto: ${m.contactMessage.displayName ?? ""}]`;
+  if (m.locationMessage) return "📍 [Ubicación]";
+  if (m.liveLocationMessage) return "📍 [Ubicación en vivo]";
+  if (m.reactionMessage) return null; // Reacciones no las guardamos
+  if (m.viewOnceMessage?.message) return "👁 [Mensaje de una vez]";
+  if ((m as Record<string, unknown>).productMessage) return "🛍️ [Producto de catálogo]";
+  if ((m as Record<string, unknown>).orderMessage) return "🛒 [Pedido]";
+
+  return null;
+}
+
 function importHistory(
   db: import("better-sqlite3").Database,
   slug: string,
@@ -182,23 +215,34 @@ function importHistory(
     if (c.name || c.notify) contactNames.set(c.id, c.name || c.notify || "");
   }
 
-  // Primero crear conversaciones para todos los chats individuales
+  // 1. Crear/actualizar conversaciones para todos los chats individuales
   let convsCreated = 0;
   for (const chat of chats) {
-    if (!chat.id.endsWith("@s.whatsapp.net")) continue; // ignorar grupos
+    if (!chat.id.endsWith("@s.whatsapp.net")) continue;
     const phone = chat.id.split("@")[0];
     const name  = chat.name || contactNames.get(chat.id) || null;
     const ts    = toLong(chat.conversationTimestamp);
     try {
-      db.prepare(
-        "INSERT INTO conversations (phone, name, last_message_at) VALUES (?,?,?) ON CONFLICT(phone) DO UPDATE SET name=COALESCE(excluded.name, name), last_message_at=COALESCE(excluded.last_message_at, last_message_at)"
-      ).run(phone, name, ts);
+      db.prepare(`
+        INSERT INTO conversations (phone, name, last_message_at)
+        VALUES (?,?,?)
+        ON CONFLICT(phone) DO UPDATE SET
+          name = COALESCE(excluded.name, name),
+          last_message_at = CASE
+            WHEN excluded.last_message_at > COALESCE(last_message_at, 0)
+            THEN excluded.last_message_at
+            ELSE last_message_at
+          END
+      `).run(phone, name, ts);
       convsCreated++;
     } catch {}
   }
 
-  // Luego insertar mensajes del historial
+  // 2. Insertar mensajes del historial (TODOS los tipos, no solo texto)
   let msgsImported = 0;
+  // Agrupar por conversación para actualizar last_message_at con el mensaje más reciente
+  const convLatestTs = new Map<number, number>();
+
   for (const msg of messages) {
     try {
       const jid = msg.key.remoteJid ?? "";
@@ -208,16 +252,13 @@ function importHistory(
       const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
       if (!conv) continue;
 
-      const text =
-        msg.message?.conversation ??
-        msg.message?.extendedTextMessage?.text ??
-        null;
+      const text = extractMsgContent(msg);
       if (!text) continue;
 
       const role = msg.key.fromMe ? "assistant" : "user";
       const ts = toLong(msg.messageTimestamp) ?? Math.floor(Date.now() / 1000);
 
-      // Evitar duplicados por (conversation_id, role, created_at)
+      // Deduplicar
       const exists = db.prepare(
         "SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1"
       ).get(conv.id, role, ts);
@@ -226,10 +267,24 @@ function importHistory(
       db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)")
         .run(conv.id, role, text, ts);
       msgsImported++;
+
+      // Rastrear el timestamp más reciente por conversación
+      const current = convLatestTs.get(conv.id) ?? 0;
+      if (ts > current) convLatestTs.set(conv.id, ts);
     } catch {}
   }
 
-  console.log(`[bot:${slug}] ✅ Historial importado: ${convsCreated} conversaciones, ${msgsImported} mensajes`);
+  // 3. Actualizar last_message_at con el timestamp real del mensaje más reciente
+  for (const [convId, ts] of convLatestTs) {
+    try {
+      db.prepare(`
+        UPDATE conversations SET last_message_at = ?
+        WHERE id = ? AND (last_message_at IS NULL OR last_message_at < ?)
+      `).run(ts, convId, ts);
+    } catch {}
+  }
+
+  console.log(`[bot:${slug}] ✅ Historial: ${convsCreated} conversaciones, ${msgsImported} mensajes importados`);
 }
 
 function importHistoricalMessages(
@@ -243,12 +298,25 @@ function importHistoricalMessages(
       const phone = jid.split("@")[0];
       const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
       if (!conv) continue;
-      const text = msg.message?.conversation ?? msg.message?.extendedTextMessage?.text ?? null;
+
+      const text = extractMsgContent(msg);
       if (!text) continue;
+
       const role = msg.key.fromMe ? "assistant" : "user";
       const ts = toLong(msg.messageTimestamp) ?? Math.floor(Date.now() / 1000);
-      const exists = db.prepare("SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1").get(conv.id, role, ts);
-      if (!exists) db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)").run(conv.id, role, text, ts);
+
+      const exists = db.prepare(
+        "SELECT id FROM messages WHERE conversation_id=? AND role=? AND created_at=? LIMIT 1"
+      ).get(conv.id, role, ts);
+
+      if (!exists) {
+        db.prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?,?,?,?)")
+          .run(conv.id, role, text, ts);
+        // Actualizar last_message_at para que el chat suba en la lista
+        db.prepare(
+          "UPDATE conversations SET last_message_at=? WHERE id=? AND (last_message_at IS NULL OR last_message_at < ?)"
+        ).run(ts, conv.id, ts);
+      }
     } catch {}
   }
 }
