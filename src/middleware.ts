@@ -7,7 +7,8 @@ export function middleware(request: NextRequest) {
 
   const isLoginPage   = pathname === "/login";
   const isAuthApi     = pathname.startsWith("/api/auth");
-  const isPublicAsset = pathname.startsWith("/uploads") || pathname.startsWith("/_next") || pathname === "/favicon.ico";
+  const isPublicAsset = pathname.startsWith("/uploads") || pathname.startsWith("/_next") || pathname === "/favicon.ico"
+    || pathname.endsWith(".html") || pathname.endsWith(".pdf") || pathname.endsWith(".webmanifest");
   const isPublicApi   = pathname.startsWith("/api/public");
 
   if (isPublicAsset || isAuthApi || isPublicApi) return NextResponse.next();

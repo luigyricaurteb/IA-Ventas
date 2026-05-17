@@ -149,14 +149,93 @@ export async function handleIncomingMessage(
         return;
       }
 
-      // Descargar y guardar el archivo
+      // Descargar el archivo
       try {
         if (!fs.existsSync(PROOFS_DIR)) fs.mkdirSync(PROOFS_DIR, { recursive: true });
         const buffer   = await downloadMediaMessage(msg, "buffer", {}) as Buffer;
+        const apiKey   = process.env.OPENROUTER_API_KEY ?? "";
+        const isImage  = ["jpg","png","webp","heic","heif"].includes(ext);
+        const mimeForAI = ext === "png" ? "image/png" : "image/jpeg";
+
+        // ── Clasificar la imagen ANTES de procesarla ──────────────────────
+        let imageType: "payment" | "other" = "other";
+        let imageDescription = "";
+
+        if (apiKey && isImage) {
+          try {
+            const imgB64 = buffer.toString("base64");
+            const classRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+              body: JSON.stringify({
+                model: "openai/gpt-4o-mini",
+                messages: [{ role: "user", content: [
+                  { type: "image_url", image_url: { url: `data:${mimeForAI};base64,${imgB64}` } },
+                  { type: "text", text: `Analiza esta imagen y responde con UN JSON:
+{"tipo":"COMPROBANTE|OTRO","descripcion":"descripción breve en español de máximo 2 oraciones de lo que muestra la imagen"}
+
+COMPROBANTE: si es transferencia bancaria, recibo de pago, voucher, captura de app bancaria con transacción, Nequi/Daviplata.
+OTRO: capturas de pantalla de conversaciones, fotos de productos/lugares, documentos de identidad, imágenes informativas, cualquier otra cosa.
+
+Responde SOLO con el JSON, sin texto adicional.` }
+                ]}],
+                max_tokens: 150, temperature: 0,
+              }),
+              signal: AbortSignal.timeout(15000),
+            });
+            const classData = await classRes.json() as { choices?: { message?: { content?: string } }[] };
+            const raw = classData.choices?.[0]?.message?.content ?? "{}";
+            const jm = raw.match(/\{[\s\S]*\}/);
+            if (jm) {
+              const parsed = JSON.parse(jm[0]) as { tipo?: string; descripcion?: string };
+              imageType = (parsed.tipo ?? "").includes("COMPROBANTE") ? "payment" : "other";
+              imageDescription = parsed.descripcion ?? "";
+            }
+          } catch { /* clasificación falla → asumir 'other' */ }
+        }
+
+        console.log(`[bot:${slug}] 🖼️ Imagen clasificada: ${imageType} — ${imageDescription.slice(0, 60)}`);
+
+        // ── Si NO es comprobante de pago: describir y pedir contexto ─────
+        if (imageType !== "payment") {
+          db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
+            .run(conv.id, "user", imageDescription ? `[Imagen enviada: ${imageDescription}]` : "[Imagen enviada]");
+          db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
+
+          // Intentar dar una respuesta con contexto de la conversación
+          const history = db.prepare(
+            "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY created_at ASC LIMIT 15"
+          ).all(conv.id) as { role: string; content: string }[];
+
+          const cfg = db.prepare("SELECT ai_name, name FROM company_config WHERE id=1").get() as { ai_name: string | null; name: string | null } | null;
+          const aiName2 = cfg?.ai_name ?? "Julieta";
+          const { generateReply, isUncertainResponse } = await import("../openrouter");
+
+          const contextMsg = imageDescription
+            ? `El cliente acaba de enviar una imagen. Lo que muestra la imagen: ${imageDescription}. Responde de forma natural y útil.`
+            : "El cliente acaba de enviar una imagen. Pregúntale amablemente qué necesita o qué intenta mostrarnos.";
+
+          const histWithImage = [...history, { role: "user", content: contextMsg }];
+          let reply: string;
+          try {
+            reply = await generateReply(histWithImage, slug);
+            if (isUncertainResponse(reply) || !reply) {
+              reply = `📷 Recibí tu imagen${imageDescription ? ` — parece ser: *${imageDescription}*` : ""}.\n\n¿Puedes contarme qué necesitas o qué nos estás intentando mostrar? Uno de nuestros asesores te ayudará pronto. 😊`;
+            }
+          } catch {
+            reply = `Recibí tu imagen. ¿Puedes contarme más sobre lo que necesitas? Un asesor te responderá en breve 😊`;
+          }
+
+          await sendWithAntiBlock(sock, remoteJid, reply, phone);
+          db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "assistant", reply);
+          return;
+        }
+
+        // ── Es comprobante de pago → flujo normal ─────────────────────────
         const filename = `proof_${slug}_${conv.id}_${Date.now()}.${ext}`;
         const filePath = path.join(PROOFS_DIR, filename);
         fs.writeFileSync(filePath, buffer);
-        console.log(`[bot:${slug}] ✅ Archivo guardado: ${filename}`);
+        console.log(`[bot:${slug}] ✅ Comprobante guardado: ${filename}`);
 
         // Registrar mensaje del usuario
         db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
@@ -172,16 +251,13 @@ export async function handleIncomingMessage(
           "INSERT INTO payment_proofs (conversation_id, deal_id, filename, mimetype) VALUES (?,?,?,?) RETURNING id"
         ).get(conv.id, dealId, filename, mimetype) as { id: number };
 
-        // ── Leer con IA (visión) ────────────────────────────────────────────
+        // ── Leer con IA el comprobante (ya clasificado como pago) ─────────────
         let aiMonto = 0;
         let aiInfo: Record<string, string | number | null> = {};
-        const apiKey = process.env.OPENROUTER_API_KEY ?? "";
-        const isImage = ["jpg","png","webp","heic","heif"].includes(ext);
 
         if (apiKey && isImage) {
           try {
             const imageBase64 = buffer.toString("base64");
-            const mimeForAI   = ext === "png" ? "image/png" : "image/jpeg";
 
             const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
               method: "POST",
@@ -354,11 +430,14 @@ export async function handleIncomingMessage(
       }
     }
 
-    // Si es conversación nueva, reenviar alerta con el primer mensaje
-    if (isNewConv) {
+    // Alerta de email: conversación nueva O conversación que llevaba 1h+ inactiva
+    const lastMsgAt = (db.prepare("SELECT last_message_at FROM conversations WHERE id=?").get(conv.id) as { last_message_at: number | null } | null)?.last_message_at ?? 0;
+    const idleSecs  = Math.floor(Date.now() / 1000) - lastMsgAt;
+    const shouldAlert = isNewConv || idleSecs > 3600; // nueva o inactiva por 1h+
+    if (shouldAlert) {
       sendAlert(db, "new_conversation", {
         phone: `+${phone}`,
-        name: pushName ?? null,
+        name: conv.name ?? pushName ?? null,
         time: new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" }),
         preview: text.slice(0, 120),
       }).catch(() => {});
