@@ -80,7 +80,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       db.prepare("INSERT INTO crm_activities (deal_id, type, description) VALUES (?,?,?)").run(deal.id, "payment", `Abono verificado — $${approvedAmount.toLocaleString("es-CO")} COP. Saldo: $${saldo.toLocaleString("es-CO")} COP`);
     }
 
-    // Registrar pago parcial
+    // Registrar pago parcial para trazabilidad
     db.prepare(`INSERT INTO partial_payments (deal_id, conversation_id, proof_id, amount, ai_amount, ai_reference, ai_payer, ai_date, ai_bank, verified)
       VALUES (?,?,?,?,?,?,?,?,?,1)`).run(
       deal.id, proof.conversation_id, proofId,
@@ -90,18 +90,42 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   // 3. Crear reserva solo si pago completo
   let reservation = null;
+  let reservationCode: string | null = null;
+
   if (isFullyPaid && deal) {
     let serviceDate = Math.floor(Date.now() / 1000) + 86400;
     if (travelDate) { const p = Date.parse(travelDate); if (!isNaN(p)) serviceDate = Math.floor(p / 1000); }
-    const code = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-    reservation = db.prepare(`INSERT INTO reservations (deal_id,contact_id,reservation_code,client_name,service_name,service_date,people_count,total_value,status,notes) VALUES (?,?,?,?,?,?,?,?,'confirmed',?) RETURNING *`)
-      .get(deal.id, deal.contact_id ?? null, code, clientName, serviceName, serviceDate, deal.people_count ?? 1, totalValue, travelDate ? `Fecha: ${travelDate}` : null);
+    reservationCode = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    reservation = db.prepare(`
+      INSERT INTO reservations (deal_id,contact_id,reservation_code,client_name,service_name,service_date,people_count,total_value,status,notes)
+      VALUES (?,?,?,?,?,?,?,?,'confirmed',?) RETURNING *`
+    ).get(deal.id, deal.contact_id ?? null, reservationCode, clientName, serviceName, serviceDate, deal.people_count ?? 1, totalValue, travelDate ? `Fecha: ${travelDate}` : null);
+  }
 
-    // Ingreso en contabilidad
-    if (totalValue > 0) {
-      db.prepare("INSERT INTO accounting_income (reservation_id,deal_id,client_name,service_name,amount,currency,notes,income_date) VALUES (?,?,?,?,?,'COP',?,?)")
-        .run((reservation as { id: number }).id, deal.id, clientName, serviceName, totalValue, "Pago completo verificado", Math.floor(Date.now()/1000));
-    }
+  // 4. Registrar ingreso en contabilidad SIEMPRE (pago completo o abono)
+  if (deal && approvedAmount > 0) {
+    const paymentNote = isFullyPaid
+      ? `Pago completo · Comprobante #${proofId}${proof.ai_reference ? ` · Ref: ${proof.ai_reference}` : ""}${proof.ai_bank ? ` · ${proof.ai_bank}` : ""}`
+      : `Abono (${Math.round((approvedAmount/(totalValue||approvedAmount))*100)}% del total) · Comprobante #${proofId}${proof.ai_reference ? ` · Ref: ${proof.ai_reference}` : ""}${proof.ai_bank ? ` · ${proof.ai_bank}` : ""} · Saldo pendiente: $${saldo.toLocaleString("es-CO")} COP`;
+
+    db.prepare(`
+      INSERT INTO accounting_income
+        (reservation_id, deal_id, client_name, service_name, amount, currency,
+         notes, income_date, proof_id, payment_type, balance_remaining, reservation_code, paid_total)
+      VALUES (?,?,?,?,?,'COP',?,unixepoch(),?,?,?,?,?)
+    `).run(
+      reservation ? (reservation as { id: number }).id : null,
+      deal.id,
+      clientName,
+      serviceName,
+      approvedAmount,
+      paymentNote,
+      proofId,
+      isFullyPaid ? "full" : "partial",
+      saldo,
+      reservationCode,
+      newPaidTotal
+    );
   }
 
   // 4. Enviar mensaje al cliente

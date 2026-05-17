@@ -411,6 +411,12 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE payment_proofs ADD COLUMN ai_date TEXT",
     "ALTER TABLE payment_proofs ADD COLUMN ai_bank TEXT",
     "ALTER TABLE payment_proofs ADD COLUMN ai_raw TEXT",
+    // Campos nuevos para trazabilidad contable
+    "ALTER TABLE accounting_income ADD COLUMN proof_id INTEGER",
+    "ALTER TABLE accounting_income ADD COLUMN payment_type TEXT DEFAULT 'full'",
+    "ALTER TABLE accounting_income ADD COLUMN balance_remaining REAL DEFAULT 0",
+    "ALTER TABLE accounting_income ADD COLUMN reservation_code TEXT",
+    "ALTER TABLE accounting_income ADD COLUMN paid_total REAL",
   ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores
