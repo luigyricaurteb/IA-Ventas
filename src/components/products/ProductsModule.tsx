@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ProductImage { id: number; filename: string; order_index: number }
 interface Product {
   id: number; name: string; description: string | null;
   price_per_person: number; ai_instructions: string | null;
   active: number; images: ProductImage[];
+}
+interface ImportPreview {
+  name: string; description: string | null;
+  price_per_person: number; ai_instructions: string | null;
 }
 
 const EMPTY: Omit<Product, "id" | "images"> = {
@@ -19,6 +23,17 @@ export default function ProductsModule() {
   const [form, setForm] = useState({ ...EMPTY });
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Import state
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview[] | null>(null);
+  const [importTotal, setImportTotal] = useState(0);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importColumns, setImportColumns] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function fetch_() {
     const res = await fetch("/api/products");
@@ -63,13 +78,61 @@ export default function ProductsModule() {
     fetch_();
   }
 
+  async function handleImportFile(file: File) {
+    setImportFile(file);
+    setImportPreview(null);
+    setImportResult(null);
+    setImportErrors([]);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("mode", "preview");
+    const res = await fetch("/api/products/import", { method: "POST", body: fd });
+    const d = await res.json() as { preview?: ImportPreview[]; total?: number; errors?: string[]; columns?: string[]; error?: string };
+    if (!res.ok) { setImportErrors([d.error ?? "Error"]); return; }
+    setImportPreview(d.preview ?? []);
+    setImportTotal(d.total ?? 0);
+    setImportErrors(d.errors ?? []);
+    setImportColumns(d.columns ?? []);
+  }
+
+  async function confirmImport() {
+    if (!importFile) return;
+    setImporting(true);
+    const fd = new FormData();
+    fd.append("file", importFile);
+    fd.append("mode", "import");
+    const res = await fetch("/api/products/import", { method: "POST", body: fd });
+    const d = await res.json() as { imported?: number; skipped?: number; errors?: string[] };
+    setImporting(false);
+    setImportResult({ imported: d.imported ?? 0, skipped: d.skipped ?? 0 });
+    setImportErrors(d.errors ?? []);
+    fetch_();
+  }
+
+  function closeImport() {
+    setShowImport(false);
+    setImportFile(null);
+    setImportPreview(null);
+    setImportTotal(0);
+    setImportErrors([]);
+    setImportColumns([]);
+    setImportResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   return (
     <div className="flex-1 overflow-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-800">Productos & Servicios</h1>
-        <button onClick={openNew} className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600">
-          + Nuevo producto
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowImport(true); setImportPreview(null); setImportResult(null); setImportErrors([]); }}
+            className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+            📥 Importar CSV/Excel
+          </button>
+          <button onClick={openNew} className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600">
+            + Nuevo producto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -160,6 +223,150 @@ export default function ProductsModule() {
                   {editing ? "Guardar cambios" : "Crear producto"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal importar CSV/Excel ── */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-5 border-b flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Importar productos</h2>
+                <p className="text-xs text-gray-400">CSV, XLSX o XLS — exportado de WhatsApp Business, Excel o cualquier sistema</p>
+              </div>
+              <button onClick={closeImport} className="text-gray-400 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Instrucciones */}
+              {!importPreview && !importResult && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 space-y-2">
+                  <p className="font-semibold">Cómo exportar desde WhatsApp Business:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Abre WhatsApp Business → Catálogo (ícono de tienda)</li>
+                    <li>Toca los 3 puntos ⋮ → &ldquo;Compartir catálogo&rdquo;</li>
+                    <li>Selecciona &ldquo;Exportar como CSV&rdquo; o descarga el Excel</li>
+                    <li>Sube ese archivo aquí</li>
+                  </ol>
+                  <p className="text-xs text-blue-600 mt-1">También funciona con cualquier Excel o CSV con columnas: <strong>nombre, precio, descripción</strong>.</p>
+                </div>
+              )}
+
+              {/* Resultado de importación exitosa */}
+              {importResult && (
+                <div className="text-center py-6">
+                  <div className="text-5xl mb-3">✅</div>
+                  <p className="text-xl font-bold text-gray-800">{importResult.imported} productos importados</p>
+                  {importResult.skipped > 0 && <p className="text-sm text-gray-500 mt-1">{importResult.skipped} omitidos (ya existían con el mismo nombre)</p>}
+                  {importErrors.length > 0 && (
+                    <div className="mt-3 text-left bg-orange-50 border border-orange-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-orange-700 mb-1">Advertencias:</p>
+                      {importErrors.map((e, i) => <p key={i} className="text-xs text-orange-600">{e}</p>)}
+                    </div>
+                  )}
+                  <button onClick={closeImport} className="mt-5 bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600">
+                    Cerrar y ver productos
+                  </button>
+                </div>
+              )}
+
+              {/* Zona de subida */}
+              {!importResult && (
+                <>
+                  <div>
+                    <label
+                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImportFile(f); }}
+                    >
+                      <span className="text-3xl mb-2">📂</span>
+                      <span className="text-sm text-gray-600 font-medium">{importFile ? importFile.name : "Arrastra tu archivo o haz clic para seleccionar"}</span>
+                      <span className="text-xs text-gray-400 mt-1">CSV · XLSX · XLS</span>
+                      <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
+                    </label>
+                  </div>
+
+                  {/* Columnas detectadas */}
+                  {importColumns.length > 0 && (
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-2">Columnas detectadas en el archivo:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {importColumns.map(c => <span key={c} className="text-xs bg-white border rounded-full px-2 py-0.5 text-gray-600">{c}</span>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Errores de parseo */}
+                  {importErrors.length > 0 && !importPreview && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-xs font-semibold text-red-700 mb-1">Errores:</p>
+                      {importErrors.map((e, i) => <p key={i} className="text-xs text-red-600">{e}</p>)}
+                    </div>
+                  )}
+
+                  {/* Preview */}
+                  {importPreview && importPreview.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-semibold text-gray-700">
+                          Vista previa — {importTotal} producto{importTotal !== 1 ? "s" : ""} encontrado{importTotal !== 1 ? "s" : ""}
+                        </p>
+                        {importTotal > 10 && <span className="text-xs text-gray-400">Mostrando primeros 10</span>}
+                      </div>
+                      <div className="border rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50 border-b">
+                            <tr>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Nombre</th>
+                              <th className="text-right px-3 py-2 text-gray-500 font-semibold">Precio</th>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Descripción</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {importPreview.map((p, i) => (
+                              <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-gray-800 max-w-[140px] truncate">{p.name}</td>
+                                <td className="px-3 py-2 text-right text-emerald-600 font-semibold whitespace-nowrap">
+                                  {p.price_per_person > 0 ? `$${p.price_per_person.toLocaleString("es-CO")}` : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500 max-w-[200px] truncate">{p.description ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {importErrors.length > 0 && (
+                        <div className="mt-2 bg-orange-50 border border-orange-200 rounded-xl p-3">
+                          <p className="text-xs font-semibold text-orange-700 mb-1">Advertencias:</p>
+                          {importErrors.slice(0,5).map((e, i) => <p key={i} className="text-xs text-orange-600">{e}</p>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {importPreview !== null && importPreview.length === 0 && (
+                    <div className="text-center py-4 text-gray-400 text-sm">
+                      No se encontraron productos válidos en el archivo.
+                    </div>
+                  )}
+
+                  {/* Botones */}
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={closeImport} className="flex-1 border rounded-lg py-2 text-sm text-gray-600">Cancelar</button>
+                    <button
+                      onClick={confirmImport}
+                      disabled={!importPreview || importPreview.length === 0 || importing}
+                      className="flex-1 bg-emerald-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      {importing ? "Importando..." : `Importar ${importTotal} producto${importTotal !== 1 ? "s" : ""}`}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
