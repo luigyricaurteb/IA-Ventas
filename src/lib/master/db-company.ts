@@ -423,6 +423,8 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN notify_new_reservation INTEGER NOT NULL DEFAULT 1",
     // Origen del aprendizaje: manual | auto
     "ALTER TABLE ai_learnings ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
+    // Takeover humano: timestamp de la última vez que el humano respondió desde su celular
+    "ALTER TABLE conversations ADD COLUMN human_took_over_at INTEGER",
     // Resend como alternativa a SMTP (no requiere puertos bloqueados por Railway)
     "ALTER TABLE smtp_config ADD COLUMN provider TEXT NOT NULL DEFAULT 'smtp'",
     "ALTER TABLE smtp_config ADD COLUMN resend_api_key TEXT",

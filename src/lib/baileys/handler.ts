@@ -60,13 +60,41 @@ function extractMediaMessage(msg: proto.IWebMessageInfo): MediaLike | null {
   return null;
 }
 
+const HUMAN_RESUME_SECS = 5 * 60; // 5 minutos
+
 export async function handleIncomingMessage(
   sock: WASocket,
   msg: proto.IWebMessageInfo,
   slug = "platform"
 ): Promise<void> {
   try {
-    if (msg.key.fromMe) return;
+    // ── Mensaje enviado por la empresa desde su propio WhatsApp ────────────
+    if (msg.key.fromMe) {
+      const remoteJid = msg.key.remoteJid ?? "";
+      if (!remoteJid.endsWith("@s.whatsapp.net")) return;
+      const phone = remoteJid.split("@")[0];
+      const db    = getCompanyDb(slug);
+
+      const conv = db.prepare("SELECT id, mode FROM conversations WHERE phone=?").get(phone) as { id: number; mode: string } | null;
+      if (!conv) return;
+
+      const text =
+        msg.message?.conversation ??
+        msg.message?.extendedTextMessage?.text ?? null;
+      if (!text) return;
+
+      // Verificar si es eco del bot (mismo contenido en los últimos 30s)
+      const botEcho = db.prepare(
+        "SELECT id FROM messages WHERE conversation_id=? AND role='assistant' AND content=? AND created_at > ? LIMIT 1"
+      ).get(conv.id, text, Math.floor(Date.now() / 1000) - 30) as { id: number } | null;
+      if (botEcho) return; // Es nuestro propio mensaje rebotando — ignorar
+
+      // Es el admin respondiendo desde su celular → modo HUMAN + guardar mensaje
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "assistant", text);
+      db.prepare("UPDATE conversations SET mode='HUMAN', human_took_over_at=unixepoch(), last_message_at=unixepoch() WHERE id=?").run(conv.id);
+      console.log(`[bot:${slug}] 📱 Admin respondió desde celular → modo HUMAN activado para ${phone}`);
+      return;
+    }
 
     const remoteJid = msg.key.remoteJid ?? "";
     if (remoteJid.endsWith("@g.us")) return;
@@ -337,16 +365,29 @@ export async function handleIncomingMessage(
     }
     db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
 
-    // Solo procesar con IA si está en modo AI
-    const freshMode = db.prepare("SELECT mode FROM conversations WHERE id=?").get(conv.id) as { mode: string } | null;
-    if (freshMode?.mode !== "AI") {
-      console.log(`[bot:${slug}] Modo HUMAN — no procesando con IA`);
-      return;
+    // ── Verificar modo y auto-reactivación ───────────────────────────────
+    const freshConv = db.prepare(
+      "SELECT mode, human_took_over_at FROM conversations WHERE id=?"
+    ).get(conv.id) as { mode: string; human_took_over_at: number | null } | null;
+
+    if (freshConv?.mode !== "AI") {
+      const tookOverAt = freshConv?.human_took_over_at ?? 0;
+      const elapsed = Math.floor(Date.now() / 1000) - tookOverAt;
+
+      if (elapsed < HUMAN_RESUME_SECS) {
+        const remaining = Math.ceil((HUMAN_RESUME_SECS - elapsed) / 60);
+        console.log(`[bot:${slug}] Modo HUMAN — auto-reactivación en ${remaining} min para ${phone}`);
+        return;
+      }
+
+      // Pasaron 5+ minutos sin respuesta humana → reactivar IA automáticamente
+      db.prepare("UPDATE conversations SET mode='AI', human_took_over_at=NULL WHERE id=?").run(conv.id);
+      console.log(`[bot:${slug}] ⏱ Auto-reactivando IA después de ${Math.round(elapsed / 60)} min sin respuesta humana — ${phone}`);
     }
 
-    // Historial para la IA
+    // Historial completo para la IA (lee toda la conversación)
     const history = db.prepare(
-      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 20"
+      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 30"
     ).all(conv.id) as { role: string; content: string }[];
 
     await processBotMessage(sock, conv.id, phone, remoteJid, text, history, slug, pushName);

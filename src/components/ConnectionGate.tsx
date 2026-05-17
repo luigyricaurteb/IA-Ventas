@@ -105,6 +105,15 @@ export default function ConnectionGate() {
     setScanning(false);
     setTimeout(() => setScanResult(null), 5000);
   }
+  async function handleSyncNames() {
+    setScanning(true); setScanResult(null);
+    const res = await fetch("/api/conversations/sync-names", { method: "POST" });
+    const d   = await res.json() as { conversations_updated?: number; contacts_created?: number };
+    setScanResult(`✓ ${d.conversations_updated ?? 0} nombres actualizados, ${d.contacts_created ?? 0} contactos creados`);
+    setScanning(false);
+    fetchConversations();
+    setTimeout(() => setScanResult(null), 6000);
+  }
 
   if (!initialChecked) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-900"><div className="w-8 h-8 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /></div>;
@@ -171,9 +180,14 @@ export default function ConnectionGate() {
                         </span>
                       )}
                     </h2>
-                    <button onClick={handleScan} disabled={scanning} className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
-                      {scanning ? "⏳" : "🔍 Escanear"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={handleSyncNames} disabled={scanning} className="text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-50" title="Actualizar nombres desde contactos">
+                        {scanning ? "⏳" : "👤"}
+                      </button>
+                      <button onClick={handleScan} disabled={scanning} className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50">
+                        {scanning ? "⏳" : "🔍"}
+                      </button>
+                    </div>
                   </div>
                   {scanResult && <div className="px-3 py-1.5 bg-emerald-50 border-b text-xs text-emerald-700">{scanResult}</div>}
                   <ConversationList conversations={conversations} selectedId={selectedId} onSelect={id => setSelectedId(id)} />

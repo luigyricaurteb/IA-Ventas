@@ -524,7 +524,16 @@ export async function processBotMessage(
   // ── DONE / fallback — siempre la IA responde ──────────────────────────
   console.log(`[bot:${slug}] Estado ${currentState} → IA libre`);
   const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
-  await send(db, sock, jid, phone, conversationId, reply);
+
+  // Si la IA no tiene respuesta (auto-reactivación post-silencio humano), avisar
+  if (isUncertainResponse(reply)) {
+    const cfg = db.prepare("SELECT ai_name FROM company_config WHERE id=1").get() as { ai_name: string | null } | null;
+    const fallback = `Disculpa la espera 😊 Estamos revisando tu consulta y te responderemos lo más pronto posible. ¡Gracias por tu paciencia!`;
+    await send(db, sock, jid, phone, conversationId, fallback);
+  } else {
+    await send(db, sock, jid, phone, conversationId, reply);
+  }
+  void cfg;
   autoLearn(db, conversationId).catch(() => {});
 }
 
