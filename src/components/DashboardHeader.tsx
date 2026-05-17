@@ -65,9 +65,9 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="w-2 h-2 rounded-full bg-emerald-500 hidden md:block" />
-        <span className="font-semibold text-gray-800 text-sm md:text-base">{companyName}</span>
-        {phone && <span className="text-xs md:text-sm text-gray-400">+{phone}</span>}
+        <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+        <span className="font-semibold text-gray-800 text-sm truncate max-w-[120px] md:max-w-none">{companyName}</span>
+        {phone && <span className="hidden sm:inline text-xs md:text-sm text-gray-400 shrink-0">+{phone}</span>}
       </div>
       <div className="flex items-center gap-4">
         {/* Alerta de vencimiento de suscripción */}

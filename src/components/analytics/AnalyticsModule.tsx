@@ -49,7 +49,7 @@ export default function AnalyticsModule() {
   const maxHour   = Math.max(...(data.peakHours ?? []).map(h => h.count), 1);
 
   return (
-    <div className="flex-1 overflow-auto p-6 space-y-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <h1 className="text-xl font-bold text-gray-800">Analytics</h1>
 
       <div>

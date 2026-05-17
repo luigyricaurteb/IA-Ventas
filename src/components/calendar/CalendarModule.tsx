@@ -283,7 +283,7 @@ export default function CalendarModule() {
 
       {/* Vista Lista */}
       {view === "list" && (
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-4 md:p-6">
           <div className="flex gap-3 mb-4 flex-wrap">
             {["", "pending", "confirmed", "completed", "cancelled"].map((s) => (
               <button key={s} onClick={() => { setListStatus(s); setListPage(0); }}

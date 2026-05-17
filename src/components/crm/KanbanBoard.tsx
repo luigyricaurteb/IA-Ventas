@@ -155,12 +155,12 @@ export default function KanbanBoard() {
 
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
-      <div className="px-6 py-4 border-b bg-white">
-        <h1 className="text-xl font-bold text-gray-800">CRM — Pipeline</h1>
-        <p className="text-sm text-gray-400">{deals.length} negocios · actualización en tiempo real</p>
+      <div className="px-4 md:px-6 py-3 border-b bg-white">
+        <h1 className="text-lg md:text-xl font-bold text-gray-800">CRM — Pipeline</h1>
+        <p className="text-xs md:text-sm text-gray-400">{deals.length} negocios</p>
       </div>
-      <div className="flex-1 overflow-x-auto p-4">
-        <div className="flex gap-3 h-full" style={{ minWidth: `${STAGES.length * 220}px` }}>
+      <div className="flex-1 overflow-x-auto p-2 md:p-4">
+        <div className="flex gap-2 md:gap-3 h-full" style={{ minWidth: `${STAGES.length * 180}px` }}>
           {STAGES.map((stage) => {
             const stageDeals = byStage(stage.id);
             return (

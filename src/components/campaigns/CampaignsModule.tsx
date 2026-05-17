@@ -60,7 +60,7 @@ export default function CampaignsModule() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Email Marketing</h1>

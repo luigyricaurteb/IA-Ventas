@@ -310,7 +310,7 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
             <button
               onClick={toggleMode}
               title={mode === "AI" ? "Cambiar a modo HUMANO (responder tú)" : "Cambiar a modo IA (Julieta responde)"}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all border-2 ${
+              className={`flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 shrink-0 ${
                 mode === "AI"
                   ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600"
                   : "bg-amber-400 text-white border-amber-400 hover:bg-amber-500"

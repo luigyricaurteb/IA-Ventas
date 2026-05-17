@@ -292,15 +292,18 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin) as { id: Tab; label: string }[];
 
   return (
-    <div className="flex-1 overflow-auto p-6 max-w-3xl">
-      <h1 className="text-xl font-bold text-gray-800 mb-6">Configuración</h1>
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 flex-wrap">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors min-w-[100px] ${tab === t.id ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
-            {t.label}
-          </button>
-        ))}
+    <div className="flex-1 overflow-auto p-4 md:p-6 max-w-3xl w-full">
+      <h1 className="text-xl font-bold text-gray-800 mb-4">Configuración</h1>
+      {/* Tabs — scroll horizontal en móvil */}
+      <div className="overflow-x-auto mb-6 -mx-4 md:mx-0 px-4 md:px-0">
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 min-w-max md:min-w-0 md:flex-wrap">
+          {TABS.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`shrink-0 px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${tab === t.id ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── EMPRESA ── */}

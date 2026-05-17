@@ -78,7 +78,7 @@ export default function SuppliersModule() {
       </div>
 
       {/* Detalle */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {!detail && (
           <div className="flex h-full items-center justify-center text-gray-400 text-sm">Selecciona un proveedor</div>
         )}

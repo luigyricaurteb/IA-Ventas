@@ -207,7 +207,7 @@ export default function ProductsModule() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold text-gray-800">Productos & Servicios</h1>
         <div className="flex gap-2">
