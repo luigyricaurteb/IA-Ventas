@@ -24,9 +24,10 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const update: Record<string, unknown> = {};
-  const fields = ["host","port","secure","user","from_name","from_email"] as const;
+  const fields = ["host","port","secure","user","from_name","from_email","provider","resend_from"] as const;
   for (const f of fields) if (body[f] !== undefined) update[f] = body[f];
   if (body.password && body.password !== "••••••••") update.password = body.password;
+  if (body.resend_api_key && body.resend_api_key !== "••••••••") update.resend_api_key = body.resend_api_key;
 
   if (Object.keys(update).length > 0) {
     const fieldNames = Object.keys(update);

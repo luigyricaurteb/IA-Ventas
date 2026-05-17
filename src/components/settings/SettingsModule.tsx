@@ -20,7 +20,7 @@ const MODULE_LIST: { id: string; label: string; icon: string }[] = [
 interface BankAccount { id: number; bank_name: string; account_type: string; account_number: string; account_holder: string | null }
 interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null; notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number }
 interface SystemUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
-interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
+interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null; provider?: string; resend_api_key?: string; resend_from?: string }
 interface AiLearning { id: number; topic: string; content: string; created_at: number; source?: string }
 interface EditingLearning { id: number; topic: string; content: string }
 interface DriveSource { id: number; name: string; drive_url: string; file_type: string; topic: string; last_synced_at: number | null; sync_status: string; sync_error: string | null }
@@ -58,7 +58,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [editingUser, setEditingUser] = useState<number | null>(null);
   const [editUserModal, setEditUserModal] = useState<{ id: number; name: string; password: string; is_admin: boolean } | null>(null);
   const [banks, setBanks] = useState<BankAccount[]>([]);
-  const [smtp, setSmtp] = useState<SmtpConfig>({ host: "", port: 587, secure: 0, user: "", from_name: "", from_email: "" });
+  const [smtp, setSmtp] = useState<SmtpConfig>({ host: "", port: 587, secure: 0, user: "", from_name: "", from_email: "", provider: "smtp", resend_api_key: "", resend_from: "" });
   const [learnings, setLearnings] = useState<AiLearning[]>([]);
   const [newLearning, setNewLearning]       = useState({ topic: "", content: "" });
   const [editingLearning, setEditingLearning] = useState<EditingLearning | null>(null);
@@ -477,39 +477,97 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
       {/* ── SMTP ── */}
       {tab === "smtp" && (
         <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
-            Compatible con Gmail (usa contraseña de aplicación), Outlook o cualquier servidor SMTP.
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="text-sm font-medium text-gray-700">Servidor SMTP</label>
-              <input value={smtp.host ?? ""} onChange={(e) => setSmtp({ ...smtp, host: e.target.value })} placeholder="smtp.gmail.com" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Puerto</label>
-              <input type="number" value={smtp.port} onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-            </div>
-            <div className="flex items-center gap-2 mt-6">
-              <input type="checkbox" checked={smtp.secure === 1} onChange={(e) => setSmtp({ ...smtp, secure: e.target.checked ? 1 : 0 })} id="ssl" />
-              <label htmlFor="ssl" className="text-sm text-gray-700">Usar SSL (puerto 465)</label>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Usuario / Email</label>
-              <input value={smtp.user ?? ""} onChange={(e) => setSmtp({ ...smtp, user: e.target.value })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Contraseña de aplicación</label>
-              <input type="password" placeholder="••••••••" onChange={(e) => setSmtp({ ...smtp, ...{ password: e.target.value } as unknown as SmtpConfig })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Nombre remitente</label>
-              <input value={smtp.from_name ?? ""} onChange={(e) => setSmtp({ ...smtp, from_name: e.target.value })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Email remitente</label>
-              <input value={smtp.from_email ?? ""} onChange={(e) => setSmtp({ ...smtp, from_email: e.target.value })} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+          {/* Selector de proveedor */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Proveedor de email</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setSmtp({...smtp, provider: "resend"})}
+                className={`border-2 rounded-xl p-4 text-left transition-colors ${smtp.provider === "resend" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <p className="font-semibold text-gray-800 text-sm">🚀 Resend</p>
+                <p className="text-xs text-gray-500 mt-0.5">Recomendado — API HTTPS, funciona en Railway</p>
+                <p className="text-xs text-emerald-600 mt-1">Gratis: 3.000 emails/mes</p>
+              </button>
+              <button onClick={() => setSmtp({...smtp, provider: "smtp"})}
+                className={`border-2 rounded-xl p-4 text-left transition-colors ${smtp.provider !== "resend" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <p className="font-semibold text-gray-800 text-sm">📬 SMTP</p>
+                <p className="text-xs text-gray-500 mt-0.5">Gmail, Outlook, servidor propio</p>
+                <p className="text-xs text-orange-500 mt-1">Puerto 587/465 puede ser bloqueado</p>
+              </button>
             </div>
           </div>
+
+          {/* Resend */}
+          {smtp.provider === "resend" && (
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-2">
+                <p className="font-semibold">Cómo obtener tu API Key de Resend (gratis):</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <li>Ve a <strong>resend.com</strong> → Crear cuenta gratis</li>
+                  <li>En el dashboard → <strong>API Keys</strong> → Create API Key</li>
+                  <li>Pega la key aquí abajo</li>
+                  <li>Para el remitente: al inicio usa <strong>onboarding@resend.dev</strong> (sin verificar dominio). Cuando tengas dominio propio, agrégalo en Resend → Domains</li>
+                </ol>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-700">API Key de Resend *</label>
+                  <input type="password" placeholder="re_••••••••••••••••••••••••••"
+                    onChange={(e) => setSmtp({...smtp, resend_api_key: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email remitente</label>
+                  <input value={smtp.resend_from ?? ""} onChange={(e) => setSmtp({...smtp, resend_from: e.target.value})}
+                    placeholder="onboarding@resend.dev" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                  <p className="text-xs text-gray-400 mt-1">Usa onboarding@resend.dev para pruebas</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Nombre remitente</label>
+                  <input value={smtp.from_name ?? ""} onChange={(e) => setSmtp({...smtp, from_name: e.target.value})}
+                    placeholder="Vyara Group" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SMTP tradicional */}
+          {smtp.provider !== "resend" && (
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
+                ⚠️ Railway bloquea los puertos SMTP (587, 465). Si tienes problemas de conexión, usa <strong>Resend</strong> en su lugar.
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-700">Servidor SMTP</label>
+                  <input value={smtp.host ?? ""} onChange={(e) => setSmtp({...smtp, host: e.target.value})} placeholder="smtp.gmail.com" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Puerto</label>
+                  <input type="number" value={smtp.port} onChange={(e) => setSmtp({...smtp, port: Number(e.target.value)})} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div className="flex items-center gap-2 mt-6">
+                  <input type="checkbox" checked={smtp.secure === 1} onChange={(e) => setSmtp({...smtp, secure: e.target.checked ? 1 : 0})} id="ssl" />
+                  <label htmlFor="ssl" className="text-sm text-gray-700">Usar SSL (puerto 465)</label>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Usuario / Email</label>
+                  <input value={smtp.user ?? ""} onChange={(e) => setSmtp({...smtp, user: e.target.value})} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Contraseña de aplicación</label>
+                  <input type="password" placeholder="••••••••" onChange={(e) => setSmtp({...smtp, ...{ password: e.target.value } as unknown as SmtpConfig})} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Nombre remitente</label>
+                  <input value={smtp.from_name ?? ""} onChange={(e) => setSmtp({...smtp, from_name: e.target.value})} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email remitente</label>
+                  <input value={smtp.from_email ?? ""} onChange={(e) => setSmtp({...smtp, from_email: e.target.value})} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
           {smtpTestResult && (
             <div className={`rounded-xl px-4 py-3 text-sm font-medium ${smtpTestResult.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
               {smtpTestResult.msg}

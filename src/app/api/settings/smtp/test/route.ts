@@ -3,6 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
 import nodemailer from "nodemailer";
 
+interface SmtpRow {
+  host: string | null; port: number; secure: number;
+  user: string | null; password: string | null;
+  from_name: string | null; from_email: string | null;
+  provider: string | null; resend_api_key: string | null; resend_from: string | null;
+}
+
 function friendlyError(e: unknown): string {
   if (e === null || e === undefined) return "Error desconocido";
   if (typeof e === "string") return e;
@@ -27,47 +34,47 @@ export async function POST(req: NextRequest) {
   const { db } = ctx;
 
   try {
-    const smtp = db.prepare("SELECT * FROM smtp_config WHERE id=1").get() as {
-      host: string | null; port: number; secure: number;
-      user: string | null; password: string | null; from_name: string | null; from_email: string | null;
-    } | null;
-
-    const company = db.prepare("SELECT email, name FROM company_config WHERE id=1").get() as {
-      email: string | null; name: string | null;
-    } | null;
-
-    // Diagnósticos previos al intento de conexión
-    if (!smtp?.host)     return NextResponse.json({ ok: false, error: "Falta el Servidor SMTP. Escribe smtp.gmail.com" });
-    if (!smtp?.user)     return NextResponse.json({ ok: false, error: "Falta el Usuario / Email SMTP" });
-    if (!smtp?.password) return NextResponse.json({ ok: false, error: "Falta la Contraseña de aplicación. Genera una en myaccount.google.com → Seguridad → Contraseñas de aplicaciones" });
+    const smtp = db.prepare("SELECT * FROM smtp_config WHERE id=1").get() as SmtpRow | null;
+    const company = db.prepare("SELECT email, name FROM company_config WHERE id=1").get() as { email: string | null; name: string | null } | null;
     if (!company?.email) return NextResponse.json({ ok: false, error: "Falta el Correo de contacto en la pestaña Empresa — ese es el email que recibe las alertas" });
 
+    const isResend = smtp?.provider === "resend";
+    const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
+      <h2 style="color:#10b981;margin:0 0 8px">¡Email funcionando!</h2>
+      <p style="color:#374151;margin:0 0 12px">Correo de prueba enviado desde <strong>${company.name ?? "tu empresa"}</strong> vía Agente DMC.</p>
+      <p style="color:#6b7280;font-size:13px;margin:0">Las alertas de nuevas conversaciones, pagos y reservas llegarán correctamente.</p>
+    </div>`;
+
+    if (isResend) {
+      // Resend — usa HTTPS port 443, nunca bloqueado
+      if (!smtp?.resend_api_key) return NextResponse.json({ ok: false, error: "Falta la API Key de Resend. Créala gratis en resend.com" });
+      const fromAddr = smtp.resend_from ?? "onboarding@resend.dev";
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${smtp.resend_api_key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: `"${smtp.from_name ?? company.name ?? "Agente DMC"}" <${fromAddr}>`, to: [company.email], subject: "✅ Prueba Resend — Agente DMC", html }),
+      });
+      const d = await res.json() as { id?: string; name?: string; message?: string };
+      if (!res.ok) return NextResponse.json({ ok: false, error: `Resend error: ${d.message ?? d.name ?? res.status}` });
+      return NextResponse.json({ ok: true, sentTo: company.email, provider: "resend" });
+    }
+
+    // SMTP tradicional
+    if (!smtp?.host)     return NextResponse.json({ ok: false, error: "Falta el Servidor SMTP" });
+    if (!smtp?.user)     return NextResponse.json({ ok: false, error: "Falta el Usuario / Email SMTP" });
+    if (!smtp?.password) return NextResponse.json({ ok: false, error: "Falta la Contraseña de aplicación" });
+
     const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port ?? 587,
-      secure: smtp.secure === 1,
+      host: smtp.host, port: smtp.port ?? 587, secure: smtp.secure === 1,
       auth: { user: smtp.user, pass: smtp.password },
-      connectionTimeout: 10000,
-      greetingTimeout:    8000,
-      socketTimeout:     10000,
+      connectionTimeout: 10000, greetingTimeout: 8000, socketTimeout: 10000,
     });
-
-    // verify() prueba la autenticación sin enviar
     await transporter.verify();
-
-    // Si verify pasó, enviamos el correo de prueba
     await transporter.sendMail({
       from: `"${smtp.from_name ?? company.name ?? "Agente DMC"}" <${smtp.from_email ?? smtp.user}>`,
-      to: company.email,
-      subject: "✅ Prueba SMTP — Agente DMC",
-      html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
-        <h2 style="color:#10b981;margin:0 0 8px">¡Conexión SMTP funcionando!</h2>
-        <p style="color:#374151;margin:0 0 12px">Este correo de prueba fue enviado desde <strong>${company.name ?? "tu empresa"}</strong> a través de Agente DMC.</p>
-        <p style="color:#6b7280;font-size:13px;margin:0">Las alertas de nuevas conversaciones, pagos y reservas llegarán a esta dirección correctamente.</p>
-      </div>`,
+      to: company.email, subject: "✅ Prueba SMTP — Agente DMC", html,
     });
-
-    return NextResponse.json({ ok: true, sentTo: company.email });
+    return NextResponse.json({ ok: true, sentTo: company.email, provider: "smtp" });
 
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: friendlyError(e) });

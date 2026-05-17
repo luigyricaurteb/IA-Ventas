@@ -30,7 +30,12 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 
 type AlertType = "new_conversation" | "new_payment" | "new_reservation";
 
-interface SmtpRow { host: string | null; port: number; secure: number; user: string | null; password: string | null; from_name: string | null; from_email: string | null }
+interface SmtpRow {
+  host: string | null; port: number; secure: number;
+  user: string | null; password: string | null;
+  from_name: string | null; from_email: string | null;
+  provider?: string | null; resend_api_key?: string | null; resend_from?: string | null;
+}
 interface CompanyCfg { email: string | null; name: string | null }
 interface NotifyCfg { notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number }
 
@@ -72,7 +77,14 @@ export async function sendAlert(
     if (cfg?.[flagMap[type]] === 0) return; // disabled
 
     const smtp = db.prepare("SELECT * FROM smtp_config WHERE id=1").get() as SmtpRow | null;
-    if (!smtp?.host || !smtp?.user || !smtp?.password) return; // no SMTP
+    const isResend = smtp?.provider === "resend";
+
+    // Verificar que haya configuración válida
+    if (isResend) {
+      if (!smtp?.resend_api_key) return;
+    } else {
+      if (!smtp?.host || !smtp?.user || !smtp?.password) return;
+    }
 
     const company = db.prepare("SELECT email, name FROM company_config WHERE id=1").get() as CompanyCfg | null;
     if (!company?.email) return; // no recipient
@@ -111,19 +123,39 @@ export async function sendAlert(
 
     if (!subject) return;
 
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure === 1,
-      auth: { user: smtp.user!, pass: smtp.password! },
-    });
+    const html = alertHtml(subject, rows, cName);
 
-    await transporter.sendMail({
-      from: `"${smtp.from_name ?? cName}" <${smtp.from_email ?? smtp.user}>`,
-      to: company.email,
-      subject,
-      html: alertHtml(subject, rows, cName),
-    });
+    if (isResend) {
+      // Resend API — usa HTTPS, nunca bloqueado por Railway
+      const fromAddr = smtp.resend_from ?? `alertas@resend.dev`;
+      const fromDisplay = `"${smtp.from_name ?? cName}" <${fromAddr}>`;
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${smtp.resend_api_key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: fromDisplay, to: [company.email], subject, html }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        console.error("[email:resend] Error:", err.message ?? res.status);
+      }
+    } else {
+      // SMTP tradicional
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transporter = nodemailer.createTransport({
+        host: smtp.host ?? undefined,
+        port: smtp.port,
+        secure: smtp.secure === 1,
+        auth: { user: smtp.user!, pass: smtp.password! },
+        connectionTimeout: 10000,
+        socketTimeout: 10000,
+      } as any);
+      await transporter.sendMail({
+        from: `"${smtp.from_name ?? cName}" <${smtp.from_email ?? smtp.user}>`,
+        to: company.email,
+        subject,
+        html,
+      });
+    }
   } catch (e) {
     console.error("[email:alert] Error:", (e as Error).message);
   }
