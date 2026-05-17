@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente DMC — Portafolio Comercial 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:#111827;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* ── PORTADA ── */
+  .cover{min-height:100vh;background:linear-gradient(135deg,#064e3b 0%,#065f46 40%,#047857 70%,#059669 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:60px 40px;text-align:center;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+  .cover-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:6px 20px;border-radius:100px;margin-bottom:32px;backdrop-filter:blur(8px)}
+  .cover h1{font-size:64px;font-weight:900;color:#fff;line-height:1.05;margin-bottom:16px;letter-spacing:-2px}
+  .cover h1 span{color:#6ee7b7}
+  .cover-sub{font-size:22px;color:rgba(255,255,255,.8);font-weight:400;max-width:600px;line-height:1.5;margin-bottom:48px}
+  .cover-stats{display:flex;gap:48px;margin-bottom:56px}
+  .stat{text-align:center}
+  .stat-n{font-size:48px;font-weight:900;color:#6ee7b7;line-height:1}
+  .stat-l{font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;font-weight:500}
+  .cover-wa{background:#25D366;color:#fff;padding:14px 36px;border-radius:100px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:16px}
+  .cover-footer{position:absolute;bottom:32px;font-size:12px;color:rgba(255,255,255,.4)}
+
+  /* ── PÁGINAS ── */
+  .page{padding:60px 64px;max-width:900px;margin:0 auto}
+  @media print{.page{padding:40px 48px}.cover{min-height:100vh;page-break-after:always}.section{page-break-inside:avoid}}
+  .section{margin-bottom:64px}
+  .section-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#059669;margin-bottom:8px}
+  .section-title{font-size:36px;font-weight:800;color:#111827;line-height:1.1;margin-bottom:16px;letter-spacing:-1px}
+  .section-sub{font-size:17px;color:#6b7280;line-height:1.6;max-width:640px;margin-bottom:40px}
+
+  /* ── PROBLEMA ── */
+  .pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .pain-card{background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:24px}
+  .pain-card h4{font-size:15px;font-weight:700;color:#dc2626;margin-bottom:8px}
+  .pain-card p{font-size:13px;color:#6b7280;line-height:1.6}
+
+  /* ── SOLUCIÓN ── */
+  .solution-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #86efac;border-radius:20px;padding:32px;margin-bottom:20px;display:flex;align-items:flex-start;gap:20px}
+  .sol-icon{font-size:36px;line-height:1;flex-shrink:0}
+  .sol-title{font-size:18px;font-weight:700;color:#065f46;margin-bottom:6px}
+  .sol-text{font-size:14px;color:#374151;line-height:1.6}
+
+  /* ── MÓDULOS ── */
+  .module-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .module-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:20px}
+  .module-icon{font-size:28px;margin-bottom:10px;display:block}
+  .module-name{font-size:14px;font-weight:700;color:#111827;margin-bottom:6px}
+  .module-desc{font-size:12px;color:#6b7280;line-height:1.5}
+  .module-new{display:inline-block;background:#059669;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px;margin-left:4px;vertical-align:middle}
+
+  /* ── FLUJO ── */
+  .flow-steps{display:flex;flex-direction:column;gap:0}
+  .flow-step{display:flex;gap:24px;align-items:flex-start;padding:20px 0;border-bottom:1px dashed #e5e7eb}
+  .flow-step:last-child{border-bottom:none}
+  .flow-num{width:40px;height:40px;background:#059669;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;margin-top:4px}
+  .flow-content h4{font-size:16px;font-weight:700;color:#111827;margin-bottom:4px}
+  .flow-content p{font-size:13px;color:#6b7280;line-height:1.6}
+
+  /* ── PLANES ── */
+  .plans-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:8px}
+  .plan-card{border:2px solid #e5e7eb;border-radius:20px;padding:28px;position:relative}
+  .plan-card.featured{border-color:#059669;background:linear-gradient(135deg,#f0fdf4,#fff)}
+  .plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#059669;color:#fff;font-size:11px;font-weight:700;padding:4px 16px;border-radius:100px;white-space:nowrap}
+  .plan-name{font-size:20px;font-weight:800;color:#111827;margin-bottom:4px}
+  .plan-price{font-size:36px;font-weight:900;color:#059669;margin-bottom:4px}
+  .plan-cycle{font-size:13px;color:#9ca3af;margin-bottom:16px}
+  .plan-features{list-style:none;space-y:6px}
+  .plan-features li{font-size:13px;color:#374151;padding:4px 0;display:flex;align-items:flex-start;gap:8px}
+  .plan-features li::before{content:'✓';color:#059669;font-weight:700;flex-shrink:0}
+
+  /* ── DIFERENCIADORES ── */
+  .diff-table{width:100%;border-collapse:collapse;margin-top:24px}
+  .diff-table th{background:#111827;color:#fff;padding:12px 16px;text-align:left;font-size:13px;font-weight:600}
+  .diff-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid #f3f4f6}
+  .diff-table tr:nth-child(even) td{background:#f9fafb}
+  .check{color:#059669;font-weight:700}
+  .cross{color:#dc2626}
+
+  /* ── CONTACTO ── */
+  .contact-section{background:linear-gradient(135deg,#064e3b,#065f46);border-radius:24px;padding:48px;text-align:center;color:#fff;margin-top:48px}
+  .contact-section h2{font-size:32px;font-weight:800;margin-bottom:12px}
+  .contact-section p{font-size:16px;color:rgba(255,255,255,.8);margin-bottom:32px}
+  .contact-btn{background:#25D366;color:#fff;padding:16px 40px;border-radius:100px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin:8px}
+  .contact-info{margin-top:24px;font-size:14px;color:rgba(255,255,255,.6)}
+
+  .divider{height:1px;background:linear-gradient(90deg,transparent,#e5e7eb,transparent);margin:48px 0}
+  .tag{display:inline-block;background:#f0fdf4;border:1px solid #86efac;color:#065f46;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;margin:3px}
+</style>
+</head>
+<body>
+
+<!-- ── PORTADA ── -->
+<div class="cover">
+  <div class="cover-badge">Plataforma SaaS · Hecho en Colombia 🇨🇴</div>
+  <h1>Agente <span>DMC</span></h1>
+  <p class="cover-sub">El sistema de automatización de ventas por WhatsApp más completo de Colombia. Tu IA atiende, califica, cotiza y cobra — mientras tú duermes.</p>
+  <div class="cover-stats">
+    <div class="stat"><div class="stat-n">24/7</div><div class="stat-l">Atención continua</div></div>
+    <div class="stat"><div class="stat-n">0s</div><div class="stat-l">Tiempo de respuesta</div></div>
+    <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Nube · Sin instalación</div></div>
+  </div>
+  <a class="cover-wa" href="https://wa.me/573006259725">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    WhatsApp: +57 300 6259725
+  </a>
+  <div class="cover-footer">Agente DMC © 2026 · Bogotá, Colombia</div>
+</div>
+
+<!-- ── EL PROBLEMA ── -->
+<div class="page">
+  <div class="section">
+    <p class="section-label">El problema</p>
+    <h2 class="section-title">¿Cuánto dinero estás perdiendo hoy?</h2>
+    <p class="section-sub">Las empresas en Colombia pierden entre el 30% y el 60% de sus clientes potenciales por no responder a tiempo por WhatsApp.</p>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <h4>⏳ Respuesta lenta</h4>
+        <p>El 78% de los clientes compra con el primero que responde. Si tardas más de 5 minutos, ya perdiste la venta.</p>
+      </div>
+      <div class="pain-card">
+        <h4>😴 Fuera de horario</h4>
+        <p>Clientes escriben a las 11pm, los fines de semana, en festivos. Sin atención = sin ventas.</p>
+      </div>
+      <div class="pain-card">
+        <h4>📊 Sin seguimiento</h4>
+        <p>Los leads quedan en el chat sin registro. No sabes cuántos perdiste, en qué etapa están ni por qué se fueron.</p>
+      </div>
+      <div class="pain-card">
+        <h4>💸 Costo de personal</h4>
+        <p>Contratar un asesor 24/7 cuesta $3–8M al mes. Y no puede responder 50 chats simultáneos.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── LA SOLUCIÓN ── -->
+  <div class="section">
+    <p class="section-label">La solución</p>
+    <h2 class="section-title">Agente DMC: tu equipo de ventas digital</h2>
+    <p class="section-sub">Una plataforma completa que convierte tu WhatsApp en una máquina de ventas automatizada, con IA que atiende, califica y cierra negocios.</p>
+
+    <div class="solution-card">
+      <div class="sol-icon">🤖</div>
+      <div>
+        <div class="sol-title">IA que vende como tu mejor asesor</div>
+        <div class="sol-text">Julieta, tu asistente virtual, aprende el lenguaje de tu empresa, conoce tu catálogo y atiende a cientos de clientes simultáneos con respuestas naturales y personalizadas. Se adapta automáticamente de las conversaciones.</div>
+      </div>
+    </div>
+    <div class="solution-card">
+      <div class="sol-icon">📱</div>
+      <div>
+        <div class="sol-title">Funciona con tu WhatsApp actual</div>
+        <div class="sol-text">Sin costos de API oficial. Conectas tu número existente en 2 minutos escaneando un QR. Todo queda en tu mismo número de WhatsApp Business.</div>
+      </div>
+    </div>
+    <div class="solution-card">
+      <div class="sol-icon">⚡</div>
+      <div>
+        <div class="sol-title">Control total cuando lo necesitas</div>
+        <div class="sol-text">Si quieres atender personalmente, el sistema detecta que respondiste desde tu celular y para la IA automáticamente. Si en 5 minutos no sigues, la IA retoma sola leyendo toda la conversación.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MÓDULOS ── -->
+<div class="page">
+  <div class="section">
+    <p class="section-label">Plataforma completa</p>
+    <h2 class="section-title">Todo lo que necesitas en un solo lugar</h2>
+    <div class="module-grid">
+      <div class="module-card">
+        <span class="module-icon">💬</span>
+        <div class="module-name">Chat WhatsApp IA</div>
+        <div class="module-desc">Respuesta automática 24/7. Toma el control cuando quieras. Historial completo de conversaciones.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">👥</span>
+        <div class="module-name">CRM Visual</div>
+        <div class="module-desc">Pipeline Kanban: Nuevo → Calificado → Propuesta → Negociación → Ganado. Cada lead con nombre, email y deal.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📅</span>
+        <div class="module-name">Calendario & Reservas</div>
+        <div class="module-desc">Gestión de reservas con recordatorio automático 24h antes por WhatsApp y seguimiento post-servicio.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🛍️</span>
+        <div class="module-name">Catálogo de Productos</div>
+        <div class="module-desc">Con fotos. Importa desde CSV, Excel o fotos con IA. La IA muestra el catálogo y cotiza automáticamente. <span class="module-new">Nuevo</span></div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">💰</span>
+        <div class="module-name">Contabilidad</div>
+        <div class="module-desc">Ingresos y egresos. Se registra automáticamente al aprobar pagos. Reportes con filtros por período.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📊</span>
+        <div class="module-name">Analytics</div>
+        <div class="module-desc">Tasa de conversión, ingresos, horas pico de WhatsApp, próximas reservas, rentabilidad por producto.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🤝</span>
+        <div class="module-name">Proveedores</div>
+        <div class="module-desc">Base de datos de proveedores con documentos, cuentas bancarias y vinculación a productos.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📧</span>
+        <div class="module-name">Campañas Email</div>
+        <div class="module-desc">Email marketing masivo segmentado por etapa del CRM con tu SMTP o Resend.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🧠</span>
+        <div class="module-name">IA que Aprende <span class="module-new">Nuevo</span></div>
+        <div class="module-desc">Julieta aprende automáticamente de cada conversación y mejora sus respuestas con el tiempo.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🔔</span>
+        <div class="module-name">Alertas por Email <span class="module-new">Nuevo</span></div>
+        <div class="module-desc">Notificaciones automáticas cuando llega un nuevo cliente, se aprueba un pago o se crea una reserva.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📄</span>
+        <div class="module-name">Documentos Legales</div>
+        <div class="module-desc">Política de tratamiento de datos (Ley 1581). El bot solicita autorización y registra el consentimiento.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">⚙️</span>
+        <div class="module-name">Configuración Total</div>
+        <div class="module-desc">Cada empresa configura su IA, horarios, cuentas bancarias, usuarios, permisos y más.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FLUJO ── -->
+<div class="page">
+  <div class="section">
+    <p class="section-label">Así funciona</p>
+    <h2 class="section-title">El viaje del cliente: de WhatsApp al pago</h2>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h4>Cliente escribe por WhatsApp</h4>
+          <p>Julieta responde en segundos, a cualquier hora. Saluda, solicita nombre y email, acepta la política de datos.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h4>Califica y cotiza automáticamente</h4>
+          <p>La IA detecta el interés, presenta el catálogo con fotos, genera la cotización y la envía por WhatsApp. El lead queda registrado en el CRM.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h4>Cliente envía el comprobante de pago</h4>
+          <p>La IA lee el comprobante con visión artificial: extrae monto, banco y referencia. Crea una alerta para el administrador.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h4>Admin aprueba el pago (pago completo o abono)</h4>
+          <p>Con un clic: se crea la reserva, se registra el ingreso en contabilidad y el cliente recibe la confirmación por WhatsApp con su código de reserva.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <h4>Recordatorio y seguimiento automático</h4>
+          <p>24h antes del servicio: recordatorio automático por WhatsApp. 2h después del servicio: mensaje de seguimiento y solicitud de feedback.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── VS COMPETENCIA ── -->
+  <div class="section">
+    <p class="section-label">¿Por qué elegirnos?</p>
+    <h2 class="section-title">Agente DMC vs la competencia</h2>
+    <table class="diff-table">
+      <thead>
+        <tr>
+          <th>Característica</th>
+          <th>Agente DMC</th>
+          <th>Respond.io</th>
+          <th>WhatsApp Business API</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>CRM integrado</td><td class="check">✓ Incluido</td><td class="check">✓ Básico</td><td class="cross">✗ No incluye</td></tr>
+        <tr><td>Contabilidad automática</td><td class="check">✓ Incluido</td><td class="cross">✗ No tiene</td><td class="cross">✗ No tiene</td></tr>
+        <tr><td>Reservas y calendario</td><td class="check">✓ Incluido</td><td class="cross">✗ No tiene</td><td class="cross">✗ No tiene</td></tr>
+        <tr><td>IA aprende sola</td><td class="check">✓ Automático</td><td class="cross">✗ No tiene</td><td class="cross">✗ No tiene</td></tr>
+        <tr><td>Detecta takeover humano</td><td class="check">✓ Automático</td><td class="cross">✗ Manual</td><td class="cross">✗ Manual</td></tr>
+        <tr><td>Sin costo por mensaje</td><td class="check">✓ Gratis</td><td class="check">✓ Gratis</td><td class="cross">✗ $0.005 USD c/u</td></tr>
+        <tr><td>Precio mensual</td><td class="check">Desde $49.900 COP</td><td class="cross">Desde $79 USD</td><td class="cross">Desde $50 USD + mensajes</td></tr>
+        <tr><td>Configuración</td><td class="check">24 horas</td><td>1-2 semanas</td><td class="cross">2-4 semanas + aprobación</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── PLANES ── -->
+<div class="page">
+  <div class="section">
+    <p class="section-label">Planes y precios</p>
+    <h2 class="section-title">Inversión que se paga sola</h2>
+    <p class="section-sub">Con un solo cliente adicional al mes que consiga Julieta, el sistema ya se paga. El resto es ganancia pura.</p>
+    <div class="plans-grid">
+      <div class="plan-card">
+        <div class="plan-name">🟢 Starter</div>
+        <div class="plan-price">$49.900</div>
+        <div class="plan-cycle">COP / mes</div>
+        <ul class="plan-features">
+          <li>Chat IA WhatsApp 24/7</li>
+          <li>CRM básico (pipeline)</li>
+          <li>Calendario de reservas</li>
+          <li>Catálogo de productos</li>
+          <li>Hasta 3 usuarios</li>
+          <li>Soporte por WhatsApp</li>
+        </ul>
+      </div>
+      <div class="plan-card featured">
+        <div class="plan-badge">⭐ Más popular</div>
+        <div class="plan-name">🔵 Profesional</div>
+        <div class="plan-price">$99.900</div>
+        <div class="plan-cycle">COP / mes</div>
+        <ul class="plan-features">
+          <li>Todo lo de Starter</li>
+          <li>Contabilidad automática</li>
+          <li>Analytics avanzado</li>
+          <li>Campañas de email</li>
+          <li>Documentos legales</li>
+          <li>Alertas por email</li>
+          <li>Hasta 8 usuarios</li>
+        </ul>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">🏆 Business</div>
+        <div class="plan-price">$199.900</div>
+        <div class="plan-cycle">COP / mes</div>
+        <ul class="plan-features">
+          <li>Todo lo de Profesional</li>
+          <li>Proveedores y documentos</li>
+          <li>Google Drive en tiempo real</li>
+          <li>IA aprende sola</li>
+          <li>Usuarios ilimitados</li>
+          <li>Soporte prioritario</li>
+          <li>Configuración asistida</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:16px;padding:24px;margin-top:24px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#065f46;margin-bottom:4px">🔐 Plan Permanente — $2.000.000 COP pago único</div>
+      <div style="font-size:14px;color:#6b7280">Acceso de por vida a todos los módulos. Equivale a 10 meses del plan Business. Ideal si vas a usar el sistema por más de un año.</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── SECTORES ── -->
+  <div class="section">
+    <p class="section-label">¿Para quién es?</p>
+    <h2 class="section-title">Cualquier empresa que venda por WhatsApp</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">
+      <span class="tag">🏨 Hoteles y hospedajes</span>
+      <span class="tag">🗺️ Agencias de viajes y DMC</span>
+      <span class="tag">🍽️ Restaurantes y catering</span>
+      <span class="tag">💆 Spas y bienestar</span>
+      <span class="tag">🏋️ Gimnasios y deportes</span>
+      <span class="tag">📸 Fotografía y eventos</span>
+      <span class="tag">🏡 Inmobiliarias</span>
+      <span class="tag">⚖️ Consultorios y clínicas</span>
+      <span class="tag">🎓 Academias y cursos</span>
+      <span class="tag">🚗 Talleres y servicios</span>
+      <span class="tag">🛒 E-commerce y tiendas</span>
+      <span class="tag">🏗️ Constructoras y proyectos</span>
+    </div>
+  </div>
+
+  <!-- ── CONTACTO ── -->
+  <div class="contact-section">
+    <h2>¿Listo para automatizar tus ventas?</h2>
+    <p>Configura tu empresa en menos de 24 horas. Sin contratos a largo plazo. Sin instalación. Solo resultados.</p>
+    <a class="contact-btn" href="https://wa.me/573006259725?text=Hola,%20quiero%20información%20sobre%20Agente%20DMC">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Escribir por WhatsApp
+    </a>
+    <div class="contact-info">
+      +57 300 6259725 · agentedmc@gmail.com · Colombia 🇨🇴<br>
+      Respuesta garantizada en menos de 2 horas en horario laboral
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
