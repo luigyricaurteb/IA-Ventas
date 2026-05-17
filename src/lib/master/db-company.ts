@@ -417,6 +417,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE accounting_income ADD COLUMN balance_remaining REAL DEFAULT 0",
     "ALTER TABLE accounting_income ADD COLUMN reservation_code TEXT",
     "ALTER TABLE accounting_income ADD COLUMN paid_total REAL",
+    // Notificaciones por email (1=activo por defecto)
+    "ALTER TABLE company_config ADD COLUMN notify_new_conversation INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE company_config ADD COLUMN notify_new_payment INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE company_config ADD COLUMN notify_new_reservation INTEGER NOT NULL DEFAULT 1",
   ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores

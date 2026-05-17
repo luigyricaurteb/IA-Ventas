@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
+import { sendAlert } from "@/lib/email";
 
 interface Ctx { params: Promise<{ id: string }> }
 
@@ -200,6 +201,35 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
 
     console.log(`[approve] Mensaje encolado para ${conversation.phone}: ${confirmMsg.slice(0,60)}...`);
+  }
+
+  // ── Alertas por email (fire-and-forget) ──────────────────────────────────
+  const serviceDate = reservation
+    ? new Date((reservation as { service_date?: number }).service_date! * 1000).toLocaleDateString("es-CO", { timeZone: "America/Bogota" })
+    : null;
+
+  sendAlert(db, "new_payment", {
+    client: clientName,
+    service: serviceName,
+    amount: approvedAmount,
+    paid_total: newPaidTotal,
+    saldo,
+    type: body.type ?? "full",
+    reference: proof.ai_reference,
+    bank: proof.ai_bank,
+    reservation_code: reservationCode,
+  }).catch(() => {});
+
+  if (reservation) {
+    sendAlert(db, "new_reservation", {
+      reservation_code: reservationCode,
+      client: clientName,
+      service: serviceName,
+      date: serviceDate,
+      people: deal?.people_count ?? null,
+      total: totalExpected > 0 ? totalExpected : (approvedAmount > 0 ? approvedAmount : null),
+      status: isFullyPaid ? "confirmed" : "pending",
+    }).catch(() => {});
   }
 
   return NextResponse.json({

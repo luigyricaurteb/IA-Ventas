@@ -18,7 +18,7 @@ const MODULE_LIST: { id: string; label: string; icon: string }[] = [
 ];
 
 interface BankAccount { id: number; bank_name: string; account_type: string; account_number: string; account_holder: string | null }
-interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null }
+interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null; notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number }
 interface SystemUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null }
 interface AiLearning { id: number; topic: string; content: string; created_at: number }
@@ -44,7 +44,7 @@ function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; labe
 
 export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean } | null }) {
   const [tab, setTab] = useState<Tab>("company");
-  const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "" });
+  const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "", notify_new_conversation: 1, notify_new_payment: 1, notify_new_reservation: 1 });
 
   // WhatsApp state
   const [waStatus, setWaStatus] = useState<"disconnected"|"qr"|"connecting"|"connected">("disconnected");
@@ -333,6 +333,25 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           {company.logo_filename && (
             <img src={`/uploads/logos/${company.logo_filename}`} className="h-16 object-contain rounded border" alt="Logo" />
           )}
+
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium text-gray-700 mb-1">Notificaciones por email</p>
+            <p className="text-xs text-gray-400 mb-3">
+              Se envían al correo de contacto configurado arriba. Requiere SMTP configurado en la pestaña <strong>Email SMTP</strong>.
+            </p>
+            <div className="space-y-2">
+              {([
+                { key: "notify_new_conversation" as const, icon: "💬", label: "Nueva conversación de WhatsApp" },
+                { key: "notify_new_payment"      as const, icon: "💰", label: "Pago aprobado" },
+                { key: "notify_new_reservation"  as const, icon: "📅", label: "Nueva reserva creada" },
+              ] as const).map(({ key, icon, label }) => (
+                <ModuleToggle key={key} id={key} icon={icon} label={label}
+                  checked={company[key] === 1}
+                  onChange={v => setCompany({ ...company, [key]: v ? 1 : 0 })} />
+              ))}
+            </div>
+          </div>
+
           <button onClick={saveCompany} disabled={saving} className="bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
             {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar empresa"}
           </button>

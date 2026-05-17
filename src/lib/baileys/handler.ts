@@ -5,6 +5,7 @@ import path from "node:path";
 import { getCompanyDb } from "../master/db-company";
 import { processBotMessage } from "../bot/state-machine";
 import { sendWithAntiBlock } from "../bot/anti-block";
+import { sendAlert } from "../email";
 
 // Guardar en DATA_DIR (volumen Railway) para persistencia entre deployments
 const DATA_DIR   = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
@@ -62,6 +63,7 @@ export async function handleIncomingMessage(
 
     // Crear / actualizar conversación
     let conv = db.prepare("SELECT id, phone, mode FROM conversations WHERE phone=?").get(phone) as { id: number; phone: string; mode: string } | null;
+    const isNewConv = !conv;
     if (!conv) {
       conv = db.prepare("INSERT INTO conversations (phone, name) VALUES (?,?) RETURNING id, phone, mode")
         .get(phone, pushName ?? null) as { id: number; phone: string; mode: string };
@@ -244,6 +246,16 @@ export async function handleIncomingMessage(
     // Guardar mensaje del usuario
     db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
       .run(conv.id, "user", text);
+
+    // Si es conversación nueva, reenviar alerta con el primer mensaje
+    if (isNewConv) {
+      sendAlert(db, "new_conversation", {
+        phone: `+${phone}`,
+        name: pushName ?? null,
+        time: new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" }),
+        preview: text.slice(0, 120),
+      }).catch(() => {});
+    }
     db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
 
     // Solo procesar con IA si está en modo AI
