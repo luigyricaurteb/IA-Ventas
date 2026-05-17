@@ -116,7 +116,8 @@ export default function ConnectionGate() {
   const selectedConv  = conversations.find(c => c.id === selectedId) ?? null;
   const perms         = currentUser?.permissions ?? {};
   const isMaster      = currentUser?.isMaster ?? false;
-  const allowedMods   = getAllowedModules(perms, isMaster);
+  const isAdmin       = currentUser?.is_admin ?? false;
+  const allowedMods   = getAllowedModules(perms, isMaster, isAdmin);
 
   // En móvil, cuando hay una conversación seleccionada mostramos el panel, no la lista
   const showChatPanel  = selectedConv !== null;
@@ -211,15 +212,15 @@ export default function ConnectionGate() {
             )
           )}
 
-          {activeModule === "crm"        && canAccess(perms,"crm",isMaster)        && <KanbanBoard />}
-          {activeModule === "calendar"   && canAccess(perms,"calendar",isMaster)   && <CalendarModule />}
-          {activeModule === "analytics"  && canAccess(perms,"analytics",isMaster)  && <AnalyticsModule />}
-          {activeModule === "accounting" && canAccess(perms,"accounting",isMaster) && <AccountingModule />}
-          {activeModule === "suppliers"  && canAccess(perms,"suppliers",isMaster)  && <SuppliersModule />}
-          {activeModule === "products"   && canAccess(perms,"products",isMaster)   && <ProductsModule />}
-          {activeModule === "campaigns"  && canAccess(perms,"campaigns",isMaster)  && <CampaignsModule />}
-          {activeModule === "documents"  && canAccess(perms,"documents",isMaster)  && <DocumentsModule />}
-          {activeModule === "settings"   && canAccess(perms,"settings",isMaster)   && <SettingsModule currentUser={currentUser} />}
+          {activeModule === "crm"        && canAccess(perms,"crm",isMaster,isAdmin)        && <KanbanBoard />}
+          {activeModule === "calendar"   && canAccess(perms,"calendar",isMaster,isAdmin)   && <CalendarModule />}
+          {activeModule === "analytics"  && canAccess(perms,"analytics",isMaster,isAdmin)  && <AnalyticsModule />}
+          {activeModule === "accounting" && canAccess(perms,"accounting",isMaster,isAdmin) && <AccountingModule />}
+          {activeModule === "suppliers"  && canAccess(perms,"suppliers",isMaster,isAdmin)  && <SuppliersModule />}
+          {activeModule === "products"   && canAccess(perms,"products",isMaster,isAdmin)   && <ProductsModule />}
+          {activeModule === "campaigns"  && canAccess(perms,"campaigns",isMaster,isAdmin)  && <CampaignsModule />}
+          {activeModule === "documents"  && canAccess(perms,"documents",isMaster,isAdmin)  && <DocumentsModule />}
+          {activeModule === "settings"   && canAccess(perms,"settings",isMaster,isAdmin)   && <SettingsModule currentUser={currentUser} />}
           {activeModule === "flows"        && <FlowBuilder />}
           {activeModule === "subscription" && <SubscriptionModule />}
           {activeModule === "help"         && <HelpModule />}
