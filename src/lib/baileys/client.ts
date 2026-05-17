@@ -75,10 +75,11 @@ export async function startCompany(slug: string): Promise<void> {
     logger,
     browser: Browsers.macOS("Desktop"),
     markOnlineOnConnect: false,
-    // true = carga TODAS las conversaciones históricas (hasta 90 días).
-    // El QR sigue apareciendo, solo que WhatsApp tarda un poco más en enviar
-    // el histórico completo. Es necesario para mostrar las 60+ conversaciones.
-    syncFullHistory: true,
+    // syncFullHistory: true hace que WhatsApp tarde más en emitir el QR porque
+    // prepara el historial completo antes de la autenticación.
+    // Lo dejamos en false para que el QR aparezca rápido (<30s).
+    // El historial llega igual vía messaging-history.set después de conectar.
+    syncFullHistory: false,
     getMessage: async () => ({ conversation: "" }),
   });
 
