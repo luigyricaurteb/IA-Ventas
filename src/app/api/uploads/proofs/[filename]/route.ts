@@ -22,13 +22,21 @@ const CONTENT_TYPES: Record<string, string> = {
 interface Ctx { params: Promise<{ filename: string }> }
 
 export async function GET(req: NextRequest, { params }: Ctx) {
-  // Requiere autenticación para ver comprobantes
   const me = getUserFromToken(req.cookies.get("session_token")?.value ?? "");
   if (!me) return new NextResponse("No autorizado", { status: 401 });
 
   const { filename } = await params;
-  // Sanitizar: solo el nombre del archivo, sin rutas relativas
   const safe = path.basename(filename);
+
+  // Verificar que el archivo pertenece a la empresa del usuario.
+  // Formato del nombre: proof_{slug}_{conversationId}_{timestamp}.{ext}
+  // El master puede ver cualquier comprobante.
+  const fileSlug = safe.startsWith("proof_") ? safe.split("_")[1] : null;
+  const userSlug = (me.company as string) ?? "platform";
+  const isMaster = me.role === "master";
+  if (!isMaster && fileSlug && fileSlug !== userSlug) {
+    return new NextResponse("Sin acceso", { status: 403 });
+  }
 
   // Buscar en DATA_DIR primero (Railway volume), luego en public/
   const candidates = [
