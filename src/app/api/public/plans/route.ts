@@ -9,7 +9,7 @@ export async function GET() {
     name: p.name,
     description: p.description,
     price_cop: p.price_monthly,
-    price_usd: (p as unknown as { price_usd?: number }).price_usd ?? 0,
+    price_usd: p.price_usd ?? 0,
     billing_cycle: p.billing_cycle,
     max_users: p.max_users,
   }))});

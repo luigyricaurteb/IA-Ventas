@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 interface Company { id: number; slug: string; name: string; nit: string | null; email: string | null; phone: string | null; address: string | null; logo_filename: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null }
-interface Plan { id: number; name: string; description: string | null; price_monthly: number; billing_cycle: string; modules: string; max_users: number; max_wa_numbers: number; active: number }
+interface Plan { id: number; name: string; description: string | null; price_monthly: number; price_usd: number; billing_cycle: string; modules: string; max_users: number; max_wa_numbers: number; active: number }
 interface Subscription { id: number; company_id: number; plan_id: number; billing_cycle: string; status: string; payment_amount: number | null; payment_proof_file: string | null; notes: string | null; created_at: number }
 interface CompanyUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 
@@ -121,7 +121,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
   function openNewPlan() { setPlanForm(EMPTY_PLAN); setEditingPlan(null); setShowPlanForm(true); }
   function openEditPlan(p: Plan) {
     const mods = JSON.parse(p.modules||"{}");
-    const priceUsd = (p as unknown as { price_usd?: number }).price_usd ?? 0;
+    const priceUsd = p.price_usd ?? 0;
     setPlanForm({ name:p.name, description:p.description||"", price_monthly:p.price_monthly, price_usd:priceUsd, billing_cycle:p.billing_cycle, max_users:p.max_users, max_wa_numbers:p.max_wa_numbers, modules:Object.fromEntries(MODULES.map(m=>[m,!!mods[m]])) });
     setEditingPlan(p); setShowPlanForm(true);
   }
@@ -636,9 +636,9 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                 </div>
                 <div>
                   <label className="text-gray-400 text-xs">Precio (USD)</label>
-                  <input type="number" value={(planForm as {price_usd?:number}).price_usd ?? 0} onChange={e=>setPlanForm({...planForm,price_usd:Number(e.target.value)} as typeof planForm)}
+                  <input type="number" value={planForm.price_usd ?? 0} onChange={e=>setPlanForm({...planForm, price_usd:Number(e.target.value)})}
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-blue-500" />
-                  {((planForm as {price_usd?:number}).price_usd ?? 0)>0 && <p className="text-blue-400 text-xs mt-0.5">${((planForm as {price_usd?:number}).price_usd ?? 0).toLocaleString('en-US')} USD</p>}
+                  {(planForm.price_usd ?? 0) > 0 && <p className="text-blue-400 text-xs mt-0.5">${(planForm.price_usd ?? 0).toLocaleString('en-US')} USD</p>}
                 </div>
                 <div>
                   <label className="text-gray-400 text-xs">Ciclo</label>

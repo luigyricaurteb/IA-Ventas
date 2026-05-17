@@ -376,7 +376,7 @@ const FEATURED = 1;
 
 async function loadPlans() {
   try {
-    const res = await fetch('/api/public/plans');
+    const res = await fetch('/api/public/plans?v=' + Date.now(), { cache: 'no-store' });
     const { plans } = await res.json();
     const monthly = plans.filter(p => p.billing_cycle === 'monthly');
     const permanent = plans.find(p => p.billing_cycle === 'permanent');

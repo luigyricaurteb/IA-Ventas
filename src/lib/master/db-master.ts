@@ -136,7 +136,7 @@ if (planCount === 0) {
 
 export interface Plan {
   id: number; name: string; description: string | null;
-  price_monthly: number; price_yearly: number | null;
+  price_monthly: number; price_usd: number; price_yearly: number | null;
   billing_cycle: string; modules: string;
   max_users: number; max_wa_numbers: number;
   active: number; created_at: number;
