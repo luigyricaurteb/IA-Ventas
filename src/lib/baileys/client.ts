@@ -120,23 +120,20 @@ export async function startCompany(slug: string): Promise<void> {
       db.prepare("UPDATE connection_state SET status='connected', qr_string=NULL, phone=?, updated_at=unixepoch() WHERE id=1").run(phone);
       console.log(`[bot:${slug}] Conectado como ${phone}`);
 
-      // Limpiar automáticamente conversaciones con LIDs (identificadores internos de WA)
+      // Corregir conversaciones LID sin historial (eliminarlas si están vacías)
       try {
         const lidRows = db.prepare(
-          "SELECT id FROM conversations WHERE LENGTH(phone) >= 14 AND phone GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*'"
+          "SELECT c.id FROM conversations c WHERE LENGTH(c.phone) >= 14 AND NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id=c.id)"
         ).all() as { id: number }[];
         let cleaned = 0;
         for (const row of lidRows) {
-          db.prepare("DELETE FROM messages WHERE conversation_id=?").run(row.id);
           db.prepare("DELETE FROM bot_conversation_state WHERE conversation_id=?").run(row.id);
           db.prepare("DELETE FROM contacts WHERE conversation_id=?").run(row.id);
-          db.prepare("DELETE FROM payment_proofs WHERE conversation_id=?").run(row.id);
-          db.prepare("DELETE FROM outbox WHERE conversation_id=?").run(row.id);
           db.prepare("DELETE FROM crm_deals WHERE conversation_id=?").run(row.id);
           db.prepare("DELETE FROM conversations WHERE id=?").run(row.id);
           cleaned++;
         }
-        if (cleaned > 0) console.log(`[bot:${slug}] 🧹 ${cleaned} conversaciones LID eliminadas`);
+        if (cleaned > 0) console.log(`[bot:${slug}] 🧹 ${cleaned} conversaciones LID vacías eliminadas (historial preservado)`);
       } catch (e) {
         console.warn(`[bot:${slug}] Error limpiando LIDs:`, e);
       }
@@ -227,22 +224,86 @@ function importHistory(
   db: import("better-sqlite3").Database,
   slug: string,
   chats: { id: string; name?: string | null; conversationTimestamp?: unknown }[],
-  contacts: { id: string; name?: string | null; notify?: string | null }[],
+  contacts: { id: string; name?: string | null; notify?: string | null; lid?: string | null; jid?: string | null }[],
   messages: import("@whiskeysockets/baileys").proto.IWebMessageInfo[]
 ) {
-  // Mapa de contactos para obtener nombres
-  const contactNames = new Map<string, string>();
+  // ── Construir mapa LID → teléfono real ─────────────────────────────────
+  // Contact.jid = teléfono real (@s.whatsapp.net)
+  // Contact.lid = identificador interno (@lid)
+  // Contact.id  = cualquiera de los dos (el que WhatsApp usa en este sync)
+  const lidToPhone = new Map<string, string>(); // "261224222691346" → "57300123456"
+  const contactNames = new Map<string, string>(); // JID → nombre
+
   for (const c of contacts) {
-    if (c.name || c.notify) contactNames.set(c.id, c.name || c.notify || "");
+    const name = c.name || c.notify || null;
+    // Caso 1: id es @s.whatsapp.net y tiene lid → mapeamos lid → phone
+    if (c.id.endsWith("@s.whatsapp.net") && c.lid) {
+      const phone = c.id.split("@")[0];
+      const lid   = c.lid.split("@")[0];
+      lidToPhone.set(lid, phone);
+      if (name) contactNames.set(phone, name);
+    }
+    // Caso 2: id es @lid y tiene jid → mapeamos lid → phone
+    if (c.id.endsWith("@lid") && c.jid) {
+      const lid   = c.id.split("@")[0];
+      const phone = c.jid.split("@")[0];
+      lidToPhone.set(lid, phone);
+      if (name) contactNames.set(phone, name);
+    }
+    // Caso 3: id es @s.whatsapp.net sin lid → solo guardar nombre
+    if (c.id.endsWith("@s.whatsapp.net")) {
+      const phone = c.id.split("@")[0];
+      if (name) contactNames.set(phone, name);
+    }
   }
 
-  // 1. Crear/actualizar conversaciones para todos los chats individuales
+  // Resolver teléfono real desde un JID (puede ser @s.whatsapp.net o @lid)
+  function resolvePhone(jid: string): string | null {
+    if (jid.endsWith("@s.whatsapp.net")) return jid.split("@")[0];
+    if (jid.endsWith("@lid")) {
+      const lid = jid.split("@")[0];
+      return lidToPhone.get(lid) ?? null; // null si no tenemos el mapeo
+    }
+    return null;
+  }
+
+  // ── Actualizar conversaciones LID existentes con el teléfono real ───────
+  // Esto corrige conversaciones que ya estaban en la DB con número LID
+  let fixed = 0;
+  for (const [lid, phone] of lidToPhone) {
+    try {
+      const rows = db.prepare("SELECT id FROM conversations WHERE phone=?").all(lid) as { id: number }[];
+      for (const row of rows) {
+        // Verificar que no existe ya una conversación con el teléfono real
+        const existing = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
+        if (existing && existing.id !== row.id) {
+          // Mover mensajes y datos al conversation real, luego borrar el LID
+          db.prepare("UPDATE messages SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("UPDATE bot_conversation_state SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("UPDATE contacts SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("UPDATE crm_deals SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("UPDATE payment_proofs SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("UPDATE outbox SET conversation_id=? WHERE conversation_id=?").run(existing.id, row.id);
+          db.prepare("DELETE FROM conversations WHERE id=?").run(row.id);
+        } else {
+          // Solo actualizar el teléfono en la conversación LID
+          const name = contactNames.get(phone);
+          db.prepare("UPDATE conversations SET phone=?, name=COALESCE(?,name) WHERE id=?").run(phone, name ?? null, row.id);
+        }
+        fixed++;
+      }
+    } catch {}
+  }
+  if (fixed > 0) console.log(`[bot:${slug}] 🔧 ${fixed} conversaciones LID corregidas con número real`);
+
+  // 1. Crear/actualizar conversaciones — ahora aceptamos TAMBIÉN @lid si podemos resolverlos
   let convsCreated = 0;
   for (const chat of chats) {
-    if (!chat.id.endsWith("@s.whatsapp.net")) continue;
-    const phone = chat.id.split("@")[0];
-    const name  = chat.name || contactNames.get(chat.id) || null;
-    const ts    = toLong(chat.conversationTimestamp);
+    const phone = resolvePhone(chat.id);
+    if (!phone) continue; // LID sin mapeo → omitir
+
+    const name = chat.name || contactNames.get(phone) || null;
+    const ts   = toLong(chat.conversationTimestamp);
     try {
       db.prepare(`
         INSERT INTO conversations (phone, name, last_message_at)
@@ -261,14 +322,14 @@ function importHistory(
 
   // 2. Insertar mensajes del historial (TODOS los tipos, no solo texto)
   let msgsImported = 0;
-  // Agrupar por conversación para actualizar last_message_at con el mensaje más reciente
   const convLatestTs = new Map<number, number>();
 
   for (const msg of messages) {
     try {
       const jid = msg.key.remoteJid ?? "";
-      if (!jid.endsWith("@s.whatsapp.net")) continue;
-      const phone = jid.split("@")[0];
+      // Resolver tanto @s.whatsapp.net como @lid
+      const phone = resolvePhone(jid);
+      if (!phone) continue;
 
       const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;
       if (!conv) continue;
@@ -315,6 +376,7 @@ function importHistoricalMessages(
   for (const msg of messages) {
     try {
       const jid = msg.key.remoteJid ?? "";
+      // Solo @s.whatsapp.net en tiempo real (LIDs se resuelven en importHistory)
       if (!jid.endsWith("@s.whatsapp.net")) continue;
       const phone = jid.split("@")[0];
       const conv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(phone) as { id: number } | null;

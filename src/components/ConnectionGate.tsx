@@ -120,8 +120,8 @@ export default function ConnectionGate() {
   async function handleCleanupLids() {
     setScanning(true); setScanResult(null);
     const res = await fetch("/api/conversations/cleanup-lids", { method: "POST" });
-    const d   = await res.json() as { deleted?: number; found?: number };
-    setScanResult(`✓ ${d.deleted ?? 0} identificadores internos eliminados`);
+    const d   = await res.json() as { removed_empty?: number; lids_found?: number };
+    setScanResult(`✓ ${d.removed_empty ?? 0} chats vacíos corregidos (historial preservado)`);
     setScanning(false);
     fetchConversations();
     setTimeout(() => setScanResult(null), 5000);
