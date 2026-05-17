@@ -107,12 +107,24 @@ export default function ConnectionGate() {
   }
   async function handleSyncNames() {
     setScanning(true); setScanResult(null);
+    // Primero limpiar LIDs, luego sincronizar nombres
+    await fetch("/api/conversations/cleanup-lids", { method: "POST" });
     const res = await fetch("/api/conversations/sync-names", { method: "POST" });
     const d   = await res.json() as { conversations_updated?: number; contacts_created?: number };
     setScanResult(`✓ ${d.conversations_updated ?? 0} nombres actualizados, ${d.contacts_created ?? 0} contactos creados`);
     setScanning(false);
     fetchConversations();
     setTimeout(() => setScanResult(null), 6000);
+  }
+
+  async function handleCleanupLids() {
+    setScanning(true); setScanResult(null);
+    const res = await fetch("/api/conversations/cleanup-lids", { method: "POST" });
+    const d   = await res.json() as { deleted?: number; found?: number };
+    setScanResult(`✓ ${d.deleted ?? 0} identificadores internos eliminados`);
+    setScanning(false);
+    fetchConversations();
+    setTimeout(() => setScanResult(null), 5000);
   }
 
   if (!initialChecked) {
@@ -181,6 +193,9 @@ export default function ConnectionGate() {
                       )}
                     </h2>
                     <div className="flex gap-2">
+                      <button onClick={handleCleanupLids} disabled={scanning} className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50" title="Eliminar identificadores internos (LIDs) de WhatsApp">
+                        {scanning ? "⏳" : "🧹"}
+                      </button>
                       <button onClick={handleSyncNames} disabled={scanning} className="text-xs text-emerald-600 hover:text-emerald-800 disabled:opacity-50" title="Actualizar nombres desde contactos">
                         {scanning ? "⏳" : "👤"}
                       </button>

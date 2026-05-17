@@ -119,6 +119,27 @@ export async function startCompany(slug: string): Promise<void> {
       const phone = rawId.split(":")[0];
       db.prepare("UPDATE connection_state SET status='connected', qr_string=NULL, phone=?, updated_at=unixepoch() WHERE id=1").run(phone);
       console.log(`[bot:${slug}] Conectado como ${phone}`);
+
+      // Limpiar automáticamente conversaciones con LIDs (identificadores internos de WA)
+      try {
+        const lidRows = db.prepare(
+          "SELECT id FROM conversations WHERE LENGTH(phone) >= 14 AND phone GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*'"
+        ).all() as { id: number }[];
+        let cleaned = 0;
+        for (const row of lidRows) {
+          db.prepare("DELETE FROM messages WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM bot_conversation_state WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM contacts WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM payment_proofs WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM outbox WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM crm_deals WHERE conversation_id=?").run(row.id);
+          db.prepare("DELETE FROM conversations WHERE id=?").run(row.id);
+          cleaned++;
+        }
+        if (cleaned > 0) console.log(`[bot:${slug}] 🧹 ${cleaned} conversaciones LID eliminadas`);
+      } catch (e) {
+        console.warn(`[bot:${slug}] Error limpiando LIDs:`, e);
+      }
     }
 
     if (connection === "close") {

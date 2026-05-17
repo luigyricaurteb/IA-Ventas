@@ -97,8 +97,7 @@ export async function handleIncomingMessage(
     }
 
     const remoteJid = msg.key.remoteJid ?? "";
-    if (remoteJid.endsWith("@g.us")) return;
-    if (!remoteJid.endsWith("@s.whatsapp.net") && !remoteJid.endsWith("@lid")) return;
+    if (!remoteJid.endsWith("@s.whatsapp.net")) return; // ignorar grupos, LIDs y otros
 
     const phone    = remoteJid.split("@")[0];
     const pushName = msg.pushName ?? undefined;
