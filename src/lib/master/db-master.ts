@@ -95,6 +95,7 @@ masterDb.exec(`
 for (const sql of [
   "ALTER TABLE companies ADD COLUMN nit TEXT",
   "ALTER TABLE companies ADD COLUMN address TEXT",
+  "ALTER TABLE plans ADD COLUMN price_usd REAL DEFAULT 0",
 ]) { try { masterDb.exec(sql); } catch {} }
 
 // Planes por defecto
@@ -171,14 +172,15 @@ export function listPlans(): Plan[] {
 export function getPlanById(id: number): Plan | null {
   return masterDb.prepare<[number], Plan>("SELECT * FROM plans WHERE id = ?").get(id) ?? null;
 }
-export function upsertPlan(data: Partial<Plan> & { name: string }): Plan {
+export function upsertPlan(data: Partial<Plan> & { name: string; price_usd?: number }): Plan {
+  const priceUsd = data.price_usd ?? 0;
   if (data.id) {
-    masterDb.prepare("UPDATE plans SET name=?,description=?,price_monthly=?,billing_cycle=?,modules=?,max_users=?,max_wa_numbers=?,active=? WHERE id=?")
-      .run(data.name, data.description??null, data.price_monthly??0, data.billing_cycle??'monthly', data.modules??'{}', data.max_users??3, data.max_wa_numbers??1, data.active??1, data.id);
+    masterDb.prepare("UPDATE plans SET name=?,description=?,price_monthly=?,price_usd=?,billing_cycle=?,modules=?,max_users=?,max_wa_numbers=?,active=? WHERE id=?")
+      .run(data.name, data.description??null, data.price_monthly??0, priceUsd, data.billing_cycle??'monthly', data.modules??'{}', data.max_users??3, data.max_wa_numbers??1, data.active??1, data.id);
     return getPlanById(data.id)!;
   }
-  return masterDb.prepare<unknown[], Plan>("INSERT INTO plans (name,description,price_monthly,billing_cycle,modules,max_users,max_wa_numbers) VALUES (?,?,?,?,?,?,?) RETURNING *")
-    .get(data.name, data.description??null, data.price_monthly??0, data.billing_cycle??'monthly', data.modules??'{}', data.max_users??3, data.max_wa_numbers??1)!;
+  return masterDb.prepare<unknown[], Plan>("INSERT INTO plans (name,description,price_monthly,price_usd,billing_cycle,modules,max_users,max_wa_numbers) VALUES (?,?,?,?,?,?,?,?) RETURNING *")
+    .get(data.name, data.description??null, data.price_monthly??0, priceUsd, data.billing_cycle??'monthly', data.modules??'{}', data.max_users??3, data.max_wa_numbers??1)!;
 }
 
 export function listCompanies(): CompanyWithPlan[] {

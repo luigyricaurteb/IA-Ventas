@@ -25,7 +25,8 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   );
 }
 
-const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, billing_cycle:"monthly", max_users:3, max_wa_numbers:1, modules: Object.fromEntries(MODULES.map(m=>[m,false])) };
+const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0, billing_cycle:"monthly", max_users:3, max_wa_numbers:1, modules: Object.fromEntries(MODULES.map(m=>[m,false])) };
+const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<"companies"|"plans"|"subscriptions">("companies");
@@ -120,7 +121,8 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
   function openNewPlan() { setPlanForm(EMPTY_PLAN); setEditingPlan(null); setShowPlanForm(true); }
   function openEditPlan(p: Plan) {
     const mods = JSON.parse(p.modules||"{}");
-    setPlanForm({ name:p.name, description:p.description||"", price_monthly:p.price_monthly, billing_cycle:p.billing_cycle, max_users:p.max_users, max_wa_numbers:p.max_wa_numbers, modules:Object.fromEntries(MODULES.map(m=>[m,!!mods[m]])) });
+    const priceUsd = (p as unknown as { price_usd?: number }).price_usd ?? 0;
+    setPlanForm({ name:p.name, description:p.description||"", price_monthly:p.price_monthly, price_usd:priceUsd, billing_cycle:p.billing_cycle, max_users:p.max_users, max_wa_numbers:p.max_wa_numbers, modules:Object.fromEntries(MODULES.map(m=>[m,!!mods[m]])) });
     setEditingPlan(p); setShowPlanForm(true);
   }
   async function savePlan() {
@@ -376,6 +378,54 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         {/* ── PLANES ── */}
         {tab==="plans" && (
           <div>
+            {/* ── Portafolios ── */}
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-6">
+              <h3 className="text-white font-semibold mb-3">📄 Portafolios comerciales</h3>
+              <p className="text-gray-400 text-xs mb-4">Los precios se actualizan automáticamente cuando cambias los planes. Para guardar como PDF: abre el link → Imprimir → Guardar como PDF → activar "Gráficos de fondo".</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="bg-gray-700 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🇨🇴</span>
+                    <div>
+                      <p className="text-white text-sm font-semibold">Portafolio Colombia (COP)</p>
+                      <p className="text-gray-400 text-xs">Español · Precios en pesos</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <a href="/portafolio.html" target="_blank" rel="noopener noreferrer"
+                      className="flex-1 text-center bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-2 rounded-lg font-medium">
+                      Ver portafolio
+                    </a>
+                    <button onClick={() => navigator.clipboard.writeText(`${BASE_URL}/portafolio.html`)}
+                      className="text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 px-3 py-2 rounded-lg">
+                      Copiar link
+                    </button>
+                  </div>
+                  <p className="text-gray-500 text-[10px] mt-2 font-mono break-all">{BASE_URL}/portafolio.html</p>
+                </div>
+                <div className="bg-gray-700 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🇺🇸</span>
+                    <div>
+                      <p className="text-white text-sm font-semibold">Portfolio USA (USD)</p>
+                      <p className="text-gray-400 text-xs">English + Español · Precios en dólares</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <a href="/portafolio-us.html" target="_blank" rel="noopener noreferrer"
+                      className="flex-1 text-center bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-2 rounded-lg font-medium">
+                      Ver portafolio
+                    </a>
+                    <button onClick={() => navigator.clipboard.writeText(`${BASE_URL}/portafolio-us.html`)}
+                      className="text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 px-3 py-2 rounded-lg">
+                      Copiar link
+                    </button>
+                  </div>
+                  <p className="text-gray-500 text-[10px] mt-2 font-mono break-all">{BASE_URL}/portafolio-us.html</p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-white font-semibold">Planes de suscripción</h2>
               <button onClick={openNewPlan} className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-600">+ Nuevo plan</button>
@@ -583,6 +633,12 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                   <input type="number" value={planForm.price_monthly} onChange={e=>setPlanForm({...planForm,price_monthly:Number(e.target.value)})}
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-emerald-500" />
                   {planForm.price_monthly>0 && <p className="text-emerald-400 text-xs mt-0.5">${fmt(planForm.price_monthly)} COP</p>}
+                </div>
+                <div>
+                  <label className="text-gray-400 text-xs">Precio (USD)</label>
+                  <input type="number" value={(planForm as {price_usd?:number}).price_usd ?? 0} onChange={e=>setPlanForm({...planForm,price_usd:Number(e.target.value)} as typeof planForm)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm mt-1 focus:outline-none focus:border-blue-500" />
+                  {((planForm as {price_usd?:number}).price_usd ?? 0)>0 && <p className="text-blue-400 text-xs mt-0.5">${((planForm as {price_usd?:number}).price_usd ?? 0).toLocaleString('en-US')} USD</p>}
                 </div>
                 <div>
                   <label className="text-gray-400 text-xs">Ciclo</label>

@@ -316,54 +316,15 @@
     <p class="section-label">Planes y precios</p>
     <h2 class="section-title">Inversión que se paga sola</h2>
     <p class="section-sub">Con un solo cliente adicional al mes que consiga Julieta, el sistema ya se paga. El resto es ganancia pura.</p>
-    <div class="plans-grid">
-      <div class="plan-card">
-        <div class="plan-name">🟢 Starter</div>
-        <div class="plan-price">$100.000</div>
-        <div class="plan-cycle">COP / mes</div>
-        <ul class="plan-features">
-          <li>Chat IA WhatsApp 24/7</li>
-          <li>CRM básico (pipeline)</li>
-          <li>Calendario de reservas</li>
-          <li>Catálogo de productos</li>
-          <li>Hasta 3 usuarios</li>
-          <li>Soporte por WhatsApp</li>
-        </ul>
-      </div>
-      <div class="plan-card featured">
-        <div class="plan-badge">⭐ Más popular</div>
-        <div class="plan-name">🔵 Profesional</div>
-        <div class="plan-price">$200.000</div>
-        <div class="plan-cycle">COP / mes</div>
-        <ul class="plan-features">
-          <li>Todo lo de Starter</li>
-          <li>Contabilidad automática</li>
-          <li>Analytics avanzado</li>
-          <li>Campañas de email</li>
-          <li>Documentos legales</li>
-          <li>Alertas por email</li>
-          <li>Hasta 8 usuarios</li>
-        </ul>
-      </div>
-      <div class="plan-card">
-        <div class="plan-name">🏆 Business</div>
-        <div class="plan-price">$350.000</div>
-        <div class="plan-cycle">COP / mes</div>
-        <ul class="plan-features">
-          <li>Todo lo de Profesional</li>
-          <li>Proveedores y documentos</li>
-          <li>Google Drive en tiempo real</li>
-          <li>IA aprende sola</li>
-          <li>Usuarios ilimitados</li>
-          <li>Soporte prioritario</li>
-          <li>Configuración asistida</li>
-        </ul>
-      </div>
+
+    <div id="plans-container" class="plans-grid">
+      <!-- Cargado dinámicamente desde API -->
+      <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9ca3af">Cargando planes...</div>
     </div>
 
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:16px;padding:24px;margin-top:24px;text-align:center">
-      <div style="font-size:20px;font-weight:800;color:#065f46;margin-bottom:4px">🔐 Plan Permanente — $3.500.000 COP pago único</div>
-      <div style="font-size:14px;color:#6b7280">Acceso de por vida a todos los módulos. El valor incluye la plataforma completa. Las suscripciones a las APIs de IA (OpenRouter) y email son asumidas directamente por el cliente y dependen del consumo; se estima un máximo de $50 USD al mes.</div>
+      <div id="perm-cop" style="font-size:20px;font-weight:800;color:#065f46;margin-bottom:4px">🔐 Plan Permanente — $3.500.000 COP pago único</div>
+      <div style="font-size:14px;color:#6b7280">Acceso de por vida a todos los módulos. Las suscripciones a las APIs de IA (OpenRouter) y email son asumidas directamente por el cliente y dependen del consumo; se estima un máximo de <strong>$50 USD al mes</strong>.</div>
     </div>
   </div>
 
@@ -404,5 +365,45 @@
   </div>
 </div>
 
+<script>
+const PLAN_FEATURES = {
+  starter:     ['Chat IA WhatsApp 24/7','CRM básico (pipeline)','Calendario de reservas','Catálogo de productos','Hasta 3 usuarios','Soporte por WhatsApp'],
+  pro:         ['Todo lo de Starter','Contabilidad automática','Analytics avanzado','Campañas de email','Documentos legales','Alertas por email','Hasta 8 usuarios'],
+  business:    ['Todo lo de Profesional','Proveedores y documentos','Google Drive en tiempo real','IA aprende sola','Usuarios ilimitados','Soporte prioritario','Configuración asistida'],
+};
+const PLAN_ICONS = ['🟢','🔵','🏆'];
+const FEATURED = 1;
+
+async function loadPlans() {
+  try {
+    const res = await fetch('/api/public/plans');
+    const { plans } = await res.json();
+    const monthly = plans.filter(p => p.billing_cycle === 'monthly');
+    const permanent = plans.find(p => p.billing_cycle === 'permanent');
+    const container = document.getElementById('plans-container');
+    if (!container) return;
+    container.innerHTML = monthly.map((p, i) => {
+      const cop = Number(p.price_cop).toLocaleString('es-CO');
+      const usd = Number(p.price_usd) > 0 ? ` · USD $${Number(p.price_usd).toLocaleString('en-US')}` : '';
+      const key = i === 0 ? 'starter' : i === 1 ? 'pro' : 'business';
+      const features = PLAN_FEATURES[key] || [];
+      return `<div class="plan-card${i === FEATURED ? ' featured' : ''}">
+        ${i === FEATURED ? '<div class="plan-badge">⭐ Más popular</div>' : ''}
+        <div class="plan-name">${PLAN_ICONS[i] || '⚙️'} ${p.name}</div>
+        <div class="plan-price">$${cop}</div>
+        <div class="plan-cycle">COP / mes${usd}</div>
+        <ul class="plan-features">${features.map(f=>`<li>${f}</li>`).join('')}</ul>
+      </div>`;
+    }).join('');
+    if (permanent) {
+      const cop = Number(permanent.price_cop).toLocaleString('es-CO');
+      const usd = Number(permanent.price_usd) > 0 ? ` · $${Number(permanent.price_usd).toLocaleString('en-US')} USD` : '';
+      const el = document.getElementById('perm-cop');
+      if (el) el.textContent = `🔐 Plan Permanente — $${cop} COP pago único${usd}`;
+    }
+  } catch(e) { console.warn('No se pudo cargar planes desde API, mostrando valores por defecto'); }
+}
+loadPlans();
+</script>
 </body>
 </html>

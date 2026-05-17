@@ -364,53 +364,12 @@
     <h2 class="section-title-es">Una inversión que se paga sola</h2>
     <p class="section-sub">With just one additional client per month that Julieta converts, the system pays for itself. The rest is pure profit.</p>
     <p class="section-sub-es">Con un solo cliente adicional al mes que consiga Julieta, el sistema ya se paga. El resto es ganancia pura.</p>
-    <div class="plans-grid">
-      <div class="plan-card">
-        <div class="plan-name">🟢 Starter</div>
-        <div class="plan-price">$150</div>
-        <div class="plan-cycle">USD / month · mes</div>
-        <ul class="plan-features">
-          <li>WhatsApp AI Chat 24/7</li>
-          <li>CRM pipeline</li>
-          <li>Booking calendar / Calendario</li>
-          <li>Product catalog / Catálogo</li>
-          <li>Up to 3 users / Hasta 3 usuarios</li>
-          <li>WhatsApp support / Soporte</li>
-        </ul>
-      </div>
-      <div class="plan-card featured">
-        <div class="plan-badge">⭐ Most Popular / Más popular</div>
-        <div class="plan-name">🔵 Professional</div>
-        <div class="plan-price">$250</div>
-        <div class="plan-cycle">USD / month · mes</div>
-        <ul class="plan-features">
-          <li>Everything in Starter / Todo Starter</li>
-          <li>Auto accounting / Contabilidad auto</li>
-          <li>Advanced analytics</li>
-          <li>Email campaigns / Campañas</li>
-          <li>Legal documents / Documentos</li>
-          <li>Email alerts / Alertas email</li>
-          <li>Up to 8 users / Hasta 8 usuarios</li>
-        </ul>
-      </div>
-      <div class="plan-card">
-        <div class="plan-name">🏆 Business</div>
-        <div class="plan-price">$350</div>
-        <div class="plan-cycle">USD / month · mes</div>
-        <ul class="plan-features">
-          <li>Everything in Professional</li>
-          <li>Suppliers / Proveedores</li>
-          <li>Google Drive real-time</li>
-          <li>Self-learning AI / IA aprende</li>
-          <li>Unlimited users / Ilimitados</li>
-          <li>Priority support / Soporte prioritario</li>
-          <li>Assisted setup / Config. asistida</li>
-        </ul>
-      </div>
+    <div id="plans-container-us" class="plans-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9ca3af">Loading plans...</div>
     </div>
 
     <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:16px;padding:24px;margin-top:24px">
-      <div style="font-size:18px;font-weight:800;color:#1e40af;margin-bottom:4px">🔐 Lifetime Plan — $1,800 USD one-time payment · Pago único de por vida</div>
+      <div id="perm-usd" style="font-size:18px;font-weight:800;color:#1e40af;margin-bottom:4px">🔐 Lifetime Plan — $1,800 USD one-time payment · Pago único de por vida</div>
       <div style="font-size:14px;color:#374151;margin-bottom:10px">Full lifetime access to all modules. Includes the complete platform — no recurring fees for the software.</div>
       <div style="font-size:13px;color:#6b7280;font-style:italic">Acceso de por vida a todos los módulos. Incluye la plataforma completa — sin cuotas recurrentes por el software.</div>
       <div class="api-note" style="margin-top:12px">
@@ -460,5 +419,43 @@
   </div>
 </div>
 
+<script>
+const US_FEATURES = {
+  0: ['WhatsApp AI Chat 24/7','CRM pipeline','Booking calendar / Calendario','Product catalog / Catálogo','Up to 3 users / Hasta 3 usuarios','WhatsApp support'],
+  1: ['Everything in Starter','Auto accounting / Contabilidad','Advanced analytics','Email campaigns','Legal documents','Email alerts','Up to 8 users / Hasta 8'],
+  2: ['Everything in Professional','Suppliers / Proveedores','Google Drive real-time','Self-learning AI / IA aprende','Unlimited users / Ilimitados','Priority support','Assisted setup'],
+};
+const US_ICONS = ['🟢','🔵','🏆'];
+
+async function loadPlansUS() {
+  try {
+    const res = await fetch('/api/public/plans');
+    const { plans } = await res.json();
+    const monthly = plans.filter(p => p.billing_cycle === 'monthly');
+    const permanent = plans.find(p => p.billing_cycle === 'permanent');
+    const container = document.getElementById('plans-container-us');
+    if (!container) return;
+    container.innerHTML = monthly.map((p, i) => {
+      const usd = Number(p.price_usd) > 0 ? `$${Number(p.price_usd).toLocaleString('en-US')}` : '—';
+      const cop = Number(p.price_cop).toLocaleString('es-CO');
+      const features = US_FEATURES[i] || [];
+      return `<div class="plan-card${i === 1 ? ' featured' : ''}">
+        ${i === 1 ? '<div class="plan-badge">⭐ Most Popular / Más popular</div>' : ''}
+        <div class="plan-name">${US_ICONS[i] || '⚙️'} ${p.name}</div>
+        <div class="plan-price">${usd}</div>
+        <div class="plan-cycle">USD / month · mes · $${cop} COP</div>
+        <ul class="plan-features">${features.map(f=>`<li>${f}</li>`).join('')}</ul>
+      </div>`;
+    }).join('');
+    if (permanent) {
+      const usd = Number(permanent.price_usd) > 0 ? `$${Number(permanent.price_usd).toLocaleString('en-US')} USD` : '$1,800 USD';
+      const cop = `$${Number(permanent.price_cop).toLocaleString('es-CO')} COP`;
+      const el = document.getElementById('perm-usd');
+      if (el) el.textContent = `🔐 Lifetime Plan — ${usd} one-time · ${cop} pago único`;
+    }
+  } catch(e) { console.warn('Could not load plans from API'); }
+}
+loadPlansUS();
+</script>
 </body>
 </html>
