@@ -54,18 +54,18 @@ function MessageBubble({ role, content, createdAt }: { role: Message["role"]; co
               <p className="text-xs font-semibold text-amber-700">Comprobante de pago</p>
             </div>
             {isImage ? (
-              <a href={`/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer">
+              <a href={`/api/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer">
                 <img
-                  src={`/uploads/proofs/${filename}`}
+                  src={`/api/uploads/proofs/${filename}`}
                   alt="Comprobante"
                   className="rounded-xl max-w-[200px] max-h-[200px] object-contain border border-amber-200 hover:opacity-90 transition-opacity cursor-pointer"
                   onError={e => { (e.target as HTMLImageElement).style.display="none"; }}
                 />
               </a>
             ) : (
-              <a href={`/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer"
+              <a href={`/api/uploads/proofs/${filename}`} target="_blank" rel="noopener noreferrer"
                 className="text-xs text-blue-600 underline break-all">
-                {filename}
+                📎 Descargar {filename.split(".").pop()?.toUpperCase()}
               </a>
             )}
             <p className="text-xs text-amber-500 mt-1">{formatTime(createdAt)}</p>
@@ -117,6 +117,7 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   const [resetting, setResetting]     = useState(false);
   const [learning, setLearning]       = useState(false);
   const [learnResult, setLearnResult] = useState<string | null>(null);
+  const [proofModal, setProofModal]   = useState<PaymentProof | null>(null);
   const bottomRef    = useRef<HTMLDivElement>(null);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);  // ¿el usuario está cerca del fondo?
@@ -368,72 +369,36 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
             <div ref={bottomRef} />
           </div>
 
-          {/* Alerta de pago pendiente — prominente */}
+          {/* Botón compacto de pago pendiente */}
           {proofs.some(p => !p.reviewed) && (
-            <div className="mx-4 mt-2 bg-amber-500 text-white rounded-xl px-4 py-2.5 flex items-center gap-2 shrink-0 animate-pulse">
-              <span className="text-xl">⚠️</span>
-              <div>
-                <p className="text-sm font-bold">Comprobante de pago recibido</p>
-                <p className="text-xs opacity-90">Revisa y aprueba o registra como abono</p>
-              </div>
+            <div className="px-4 pt-2 shrink-0">
+              <button
+                onClick={() => setProofModal(proofs.find(p => !p.reviewed) ?? null)}
+                className="w-full flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-4 py-2.5 transition-colors"
+              >
+                <span className="text-lg animate-bounce">💳</span>
+                <div className="text-left flex-1">
+                  <p className="text-sm font-bold leading-tight">
+                    {proofs.filter(p => !p.reviewed).length === 1
+                      ? "Comprobante de pago pendiente"
+                      : `${proofs.filter(p => !p.reviewed).length} comprobantes pendientes`}
+                  </p>
+                  <p className="text-xs opacity-90">Clic para revisar y aprobar</p>
+                </div>
+                <span className="text-xl">→</span>
+              </button>
             </div>
           )}
 
-          {/* Comprobantes de pago */}
-          {proofs.length > 0 && (
-            <div className="px-4 py-3 border-t bg-amber-50 shrink-0">
-              <p className="text-xs font-semibold text-amber-700 mb-2">📎 Comprobantes de pago</p>
-              <div className="space-y-2">
-                {proofs.map(p => (
-                  <div key={p.id} className={`rounded-xl border text-xs ${p.reviewed ? "bg-gray-50 border-gray-200" : "bg-white border-amber-300"}`}>
-                    {/* Info extraída por IA */}
-                    <div className="px-3 py-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <a href={`/uploads/proofs/${p.filename}`} target="_blank" rel="noopener noreferrer"
-                          className="underline text-blue-600 font-medium">
-                          Ver {p.filename.split(".").pop()?.toUpperCase()}
-                        </a>
-                        <span className="text-gray-400">{formatTime(p.created_at)}</span>
-                        {p.reviewed && <span className="text-emerald-600 font-medium">✓ Aprobado</span>}
-                      </div>
-
-                      {/* Datos extraídos por IA */}
-                      {(p.ai_amount || p.ai_payer || p.ai_reference || p.ai_bank) && (
-                        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-gray-600">
-                          {p.ai_amount && (
-                            <span className="col-span-2 font-bold text-emerald-700 text-sm">
-                              💵 ${p.ai_amount.toLocaleString("es-CO")} COP
-                            </span>
-                          )}
-                          {p.ai_payer    && <span>👤 {p.ai_payer}</span>}
-                          {p.ai_bank     && <span>🏦 {p.ai_bank}</span>}
-                          {p.ai_date     && <span>📅 {p.ai_date}</span>}
-                          {p.ai_reference && <span>🔖 Ref: {p.ai_reference}</span>}
-                        </div>
-                      )}
-                      {!p.ai_amount && !p.reviewed && (
-                        <p className="text-gray-400 mt-1">⏳ Leyendo comprobante...</p>
-                      )}
-                    </div>
-
-                    {/* Botones de aprobación */}
-                    {!p.reviewed && (
-                      <div className="px-3 pb-2 flex gap-2 flex-wrap border-t border-amber-100 pt-2">
-                        <button
-                          onClick={() => approveProof(p.id, "full", p.ai_amount ?? undefined)}
-                          className="bg-emerald-500 text-white px-3 py-1 rounded-lg font-medium hover:bg-emerald-600">
-                          ✓ Aprobar pago completo
-                        </button>
-                        <button
-                          onClick={() => approveProof(p.id, "partial", p.ai_amount ?? undefined)}
-                          className="bg-amber-500 text-white px-3 py-1 rounded-lg font-medium hover:bg-amber-600">
-                          📊 Registrar como abono
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {/* Historial de comprobantes aprobados (compacto) */}
+          {proofs.some(p => p.reviewed) && (
+            <div className="px-4 pt-1 shrink-0">
+              {proofs.filter(p => p.reviewed).map(p => (
+                <button key={p.id} onClick={() => setProofModal(p)}
+                  className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full mr-1 mb-1 transition-colors">
+                  ✓ Ver comprobante {p.ai_amount ? `$${p.ai_amount.toLocaleString("es-CO")}` : ""} — {formatTime(p.created_at)}
+                </button>
+              ))}
             </div>
           )}
 
@@ -614,6 +579,96 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
                 {summaryLoading ? "Generando..." : "🤖 Generar resumen"}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de comprobante ────────────────────────────────────────── */}
+      {proofModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <div>
+                <h3 className="font-bold text-gray-800">
+                  {proofModal.reviewed ? "✓ Comprobante aprobado" : "📋 Revisar comprobante"}
+                </h3>
+                <p className="text-xs text-gray-400">{formatTime(proofModal.created_at)}</p>
+              </div>
+              <button onClick={() => setProofModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Imagen del comprobante */}
+              {/\.(jpg|jpeg|png|webp|heic)$/i.test(proofModal.filename) ? (
+                <div className="flex justify-center">
+                  <a href={`/api/uploads/proofs/${proofModal.filename}`} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={`/api/uploads/proofs/${proofModal.filename}`}
+                      alt="Comprobante"
+                      className="max-w-full max-h-72 object-contain rounded-xl border border-gray-200 hover:opacity-90 cursor-pointer shadow-sm"
+                    />
+                  </a>
+                  <p className="text-xs text-gray-400 text-center mt-1">Clic para ver en pantalla completa</p>
+                </div>
+              ) : (
+                <a href={`/api/uploads/proofs/${proofModal.filename}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-3 bg-gray-50 rounded-xl p-4 hover:bg-gray-100 transition-colors">
+                  <span className="text-3xl">📄</span>
+                  <div>
+                    <p className="font-medium text-gray-800 text-sm">Ver documento</p>
+                    <p className="text-xs text-gray-400">{proofModal.filename.split(".").pop()?.toUpperCase()}</p>
+                  </div>
+                </a>
+              )}
+
+              {/* Información extraída por IA */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Información detectada por IA</p>
+                {proofModal.ai_amount ? (
+                  <p className="text-xl font-black text-emerald-600">
+                    ${proofModal.ai_amount.toLocaleString("es-CO")} COP
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Monto no detectado automáticamente</p>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {proofModal.ai_payer     && <div><span className="text-gray-400 text-xs">Pagador</span><p className="font-medium">{proofModal.ai_payer}</p></div>}
+                  {proofModal.ai_bank      && <div><span className="text-gray-400 text-xs">Banco</span><p className="font-medium">{proofModal.ai_bank}</p></div>}
+                  {proofModal.ai_date      && <div><span className="text-gray-400 text-xs">Fecha</span><p className="font-medium">{proofModal.ai_date}</p></div>}
+                  {proofModal.ai_reference && <div><span className="text-gray-400 text-xs">Referencia</span><p className="font-medium text-xs break-all">{proofModal.ai_reference}</p></div>}
+                </div>
+                {!proofModal.ai_amount && !proofModal.ai_payer && (
+                  <p className="text-xs text-amber-600">⚠️ La IA no pudo extraer información. Revisa la imagen manualmente.</p>
+                )}
+              </div>
+
+              {/* Botones de acción */}
+              {!proofModal.reviewed && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => { approveProof(proofModal.id, "full", proofModal.ai_amount ?? undefined); setProofModal(null); }}
+                    className="w-full bg-emerald-500 text-white rounded-xl py-3 font-semibold hover:bg-emerald-600 transition-colors"
+                  >
+                    ✓ Aprobar — Pago completo
+                  </button>
+                  <button
+                    onClick={() => { approveProof(proofModal.id, "partial", proofModal.ai_amount ?? undefined); setProofModal(null); }}
+                    className="w-full bg-amber-500 text-white rounded-xl py-3 font-semibold hover:bg-amber-600 transition-colors"
+                  >
+                    📊 Registrar como abono parcial
+                  </button>
+                  <p className="text-xs text-gray-400 text-center">
+                    El cliente recibirá confirmación automática con el detalle del pago
+                  </p>
+                </div>
+              )}
+              {proofModal.reviewed && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+                  <p className="text-emerald-700 font-medium text-sm">✓ Este comprobante ya fue revisado y aprobado</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

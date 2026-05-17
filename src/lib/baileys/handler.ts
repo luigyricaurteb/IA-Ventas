@@ -6,7 +6,9 @@ import { getCompanyDb } from "../master/db-company";
 import { processBotMessage } from "../bot/state-machine";
 import { sendWithAntiBlock } from "../bot/anti-block";
 
-const PROOFS_DIR = path.resolve(process.cwd(), "public", "uploads", "proofs");
+// Guardar en DATA_DIR (volumen Railway) para persistencia entre deployments
+const DATA_DIR   = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
+const PROOFS_DIR = path.join(DATA_DIR, "uploads", "proofs");
 
 const ALLOWED_MIMETYPES: Record<string, string> = {
   "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
