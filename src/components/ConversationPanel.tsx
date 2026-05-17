@@ -117,7 +117,8 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   const [resetting, setResetting]     = useState(false);
   const [learning, setLearning]       = useState(false);
   const [learnResult, setLearnResult] = useState<string | null>(null);
-  const [proofModal, setProofModal]   = useState<PaymentProof | null>(null);
+  const [proofModal, setProofModal]     = useState<PaymentProof | null>(null);
+  const [totalExpected, setTotalExpected] = useState<string>("");
   const bottomRef    = useRef<HTMLDivElement>(null);
   const scrollRef    = useRef<HTMLDivElement>(null);
   const isNearBottom = useRef(true);  // ¿el usuario está cerca del fondo?
@@ -176,17 +177,21 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
   }
 
   async function approveProof(id: number, type: "full" | "partial" = "full", amount?: number) {
+    const total = totalExpected ? Number(totalExpected.replace(/\D/g, "")) : undefined;
     const res = await fetch(`/api/alerts/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, amount }),
+      body: JSON.stringify({ type, amount, totalExpected: total }),
     });
     if (!res.ok) { const d = await res.json() as { error: string }; alert(d.error ?? "Error al aprobar"); return; }
-    const d = await res.json() as { isFullyPaid?: boolean; saldo?: number; newPaidTotal?: number; totalValue?: number };
+    const d = await res.json() as { isFullyPaid?: boolean; saldo?: number; newPaidTotal?: number; approvedAmount?: number };
     setProofs(prev => prev.map(p => p.id === id ? { ...p, reviewed: 1 } : p));
+    setProofModal(null);
+    setTotalExpected("");
     await fetchMessages();
-    if (d.isFullyPaid === false && d.saldo) {
-      alert(`Abono registrado. Saldo pendiente: $${d.saldo.toLocaleString("es-CO")} COP`);
+    if (!d.isFullyPaid && d.saldo && d.saldo > 0) {
+      // mensaje informativo para el agente
+      console.log(`Abono registrado. Saldo pendiente: $${d.saldo.toLocaleString("es-CO")} COP`);
     }
   }
 
@@ -636,21 +641,42 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
 
               {/* Botones de acción */}
               {!proofModal.reviewed && (
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  {/* Campo total esperado */}
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <label className="text-xs font-semibold text-gray-600 block mb-1">
+                      💰 Valor total del servicio (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={totalExpected}
+                      onChange={e => setTotalExpected(e.target.value)}
+                      placeholder="Ej: 240000"
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-400"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Si el cliente hizo un abono, indica el total para calcular el saldo pendiente.
+                    </p>
+                  </div>
+
                   <button
-                    onClick={() => { approveProof(proofModal.id, "full", proofModal.ai_amount ?? undefined); setProofModal(null); }}
+                    onClick={() => approveProof(proofModal.id, "full", proofModal.ai_amount ?? undefined)}
                     className="w-full bg-emerald-500 text-white rounded-xl py-3 font-semibold hover:bg-emerald-600 transition-colors"
                   >
-                    ✓ Aprobar — Pago completo
+                    ✅ Aprobar — Pago completo
+                    {proofModal.ai_amount ? ` ($${proofModal.ai_amount.toLocaleString("es-CO")})` : ""}
                   </button>
                   <button
-                    onClick={() => { approveProof(proofModal.id, "partial", proofModal.ai_amount ?? undefined); setProofModal(null); }}
+                    onClick={() => approveProof(proofModal.id, "partial", proofModal.ai_amount ?? undefined)}
                     className="w-full bg-amber-500 text-white rounded-xl py-3 font-semibold hover:bg-amber-600 transition-colors"
                   >
-                    📊 Registrar como abono parcial
+                    📊 Registrar como abono
+                    {proofModal.ai_amount && totalExpected
+                      ? ` (saldo: $${Math.max(0, Number(totalExpected.replace(/\D/g,"")) - (proofModal.ai_amount ?? 0)).toLocaleString("es-CO")})`
+                      : ""}
                   </button>
                   <p className="text-xs text-gray-400 text-center">
-                    El cliente recibirá confirmación automática con el detalle del pago
+                    El cliente recibirá confirmación por WhatsApp automáticamente
                   </p>
                 </div>
               )}
