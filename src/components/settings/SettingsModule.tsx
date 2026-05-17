@@ -42,8 +42,9 @@ function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; labe
   );
 }
 
-export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean } | null }) {
+export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean; company?: string } | null }) {
   const [tab, setTab] = useState<Tab>("company");
+  const companySlug = (currentUser as { company?: string } | null | undefined)?.company ?? "";
   const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "", notify_new_conversation: 1, notify_new_payment: 1, notify_new_reservation: 1 });
 
   // WhatsApp state
@@ -677,15 +678,21 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
             <p className="text-xs text-gray-400 mt-2">Recomendado: 30 minutos para atención de calidad.</p>
           </div>
-          <div className="bg-white border rounded-xl p-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Link para formulario web de captación</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-gray-100 rounded-lg px-3 py-2 text-gray-600 font-mono break-all">
-                {typeof window !== "undefined" ? `${window.location.origin}/form/[slug-de-empresa]` : "/form/[slug]"}
-              </code>
+          {companySlug && (
+            <div className="bg-white border rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Formulario web de captación de leads</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs bg-gray-100 rounded-lg px-3 py-2 text-gray-600 font-mono break-all">
+                  {typeof window !== "undefined" ? `${window.location.origin}/form/${companySlug}` : `/form/${companySlug}`}
+                </code>
+                <button onClick={() => typeof window !== "undefined" && navigator.clipboard.writeText(`${window.location.origin}/form/${companySlug}`)}
+                  className="text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-2 rounded-lg shrink-0">
+                  Copiar
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Comparte este enlace para captar leads. Cada formulario enviado crea una conversación en el sistema automáticamente.</p>
             </div>
-            <p className="text-xs text-gray-400 mt-1">Comparte este enlace para captar leads que se crean como conversaciones en el sistema.</p>
-          </div>
+          )}
         </div>
       )}
 

@@ -119,13 +119,10 @@ export async function startCompany(slug: string): Promise<void> {
       const phone = rawId.split(":")[0];
       db.prepare("UPDATE connection_state SET status='connected', qr_string=NULL, phone=?, updated_at=unixepoch() WHERE id=1").run(phone);
       console.log(`[bot:${slug}] Conectado como ${phone}`);
-      startOutboxPoller(slug, sock, db);
     }
 
     if (connection === "close") {
       handles.delete(slug);
-      const poller = outboxPollers.get(slug);
-      if (poller) { clearInterval(poller); outboxPollers.delete(slug); }
       const code = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode;
       console.log(`[bot:${slug}] Conexión cerrada. Código: ${code}`);
 
@@ -256,41 +253,6 @@ function importHistoricalMessages(
   }
 }
 
-const outboxPollers = new Map<string, ReturnType<typeof setInterval>>();
-
-function startOutboxPoller(
-  slug: string,
-  sock: WASocket,
-  db: import("better-sqlite3").Database
-) {
-  if (outboxPollers.has(slug)) return; // ya corriendo
-
-  const interval = setInterval(async () => {
-    if (!handles.has(slug)) {
-      clearInterval(interval);
-      outboxPollers.delete(slug);
-      return;
-    }
-
-    const pending = db.prepare(
-      "SELECT * FROM outbox WHERE sent=0 ORDER BY created_at ASC LIMIT 10"
-    ).all() as { id: number; conversation_id: number; phone: string; content: string }[];
-
-    for (const row of pending) {
-      try {
-        const jid = `${row.phone}@s.whatsapp.net`;
-        await sock.sendMessage(jid, { text: row.content });
-        db.prepare("UPDATE outbox SET sent=1 WHERE id=?").run(row.id);
-        console.log(`[bot:${slug}] outbox → ${row.phone}: ${row.content.slice(0, 60)}...`);
-      } catch (e) {
-        console.error(`[bot:${slug}] outbox error sending to ${row.phone}:`, e);
-      }
-    }
-  }, 2000);
-
-  outboxPollers.set(slug, interval);
-  console.log(`[bot:${slug}] Outbox poller iniciado`);
-}
 
 function scheduleReconnect(slug: string, code?: number) {
   if (reconnectTimers.has(slug)) return;
