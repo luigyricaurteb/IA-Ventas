@@ -369,7 +369,7 @@
     </div>
 
     <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:16px;padding:24px;margin-top:24px">
-      <div id="perm-usd" style="font-size:18px;font-weight:800;color:#1e40af;margin-bottom:4px">🔐 Lifetime Plan — $1,800 USD one-time payment · Pago único de por vida</div>
+      <div id="perm-usd" style="font-size:18px;font-weight:800;color:#1e40af;margin-bottom:4px">🔐 Lifetime Plan — $1,800 USD one-time payment</div>
       <div style="font-size:14px;color:#374151;margin-bottom:10px">Full lifetime access to all modules. Includes the complete platform — no recurring fees for the software.</div>
       <div style="font-size:13px;color:#6b7280;font-style:italic">Acceso de por vida a todos los módulos. Incluye la plataforma completa — sin cuotas recurrentes por el software.</div>
       <div class="api-note" style="margin-top:12px">
@@ -436,22 +436,20 @@ async function loadPlansUS() {
     const container = document.getElementById('plans-container-us');
     if (!container) return;
     container.innerHTML = monthly.map((p, i) => {
-      const usd = Number(p.price_usd) > 0 ? `$${Number(p.price_usd).toLocaleString('en-US')}` : '—';
-      const cop = Number(p.price_cop).toLocaleString('es-CO');
+      const usd = Number(p.price_usd) > 0 ? `$${Number(p.price_usd).toLocaleString('en-US')}` : 'Contact us';
       const features = US_FEATURES[i] || [];
       return `<div class="plan-card${i === 1 ? ' featured' : ''}">
         ${i === 1 ? '<div class="plan-badge">⭐ Most Popular / Más popular</div>' : ''}
         <div class="plan-name">${US_ICONS[i] || '⚙️'} ${p.name}</div>
         <div class="plan-price">${usd}</div>
-        <div class="plan-cycle">USD / month · mes · $${cop} COP</div>
+        <div class="plan-cycle">USD / month</div>
         <ul class="plan-features">${features.map(f=>`<li>${f}</li>`).join('')}</ul>
       </div>`;
     }).join('');
     if (permanent) {
       const usd = Number(permanent.price_usd) > 0 ? `$${Number(permanent.price_usd).toLocaleString('en-US')} USD` : '$1,800 USD';
-      const cop = `$${Number(permanent.price_cop).toLocaleString('es-CO')} COP`;
       const el = document.getElementById('perm-usd');
-      if (el) el.textContent = `🔐 Lifetime Plan — ${usd} one-time · ${cop} pago único`;
+      if (el) el.textContent = `🔐 Lifetime Plan — ${usd} one-time payment`;
     }
   } catch(e) { console.warn('Could not load plans from API'); }
 }
