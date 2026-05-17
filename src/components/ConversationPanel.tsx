@@ -369,34 +369,25 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
             <div ref={bottomRef} />
           </div>
 
-          {/* Botón compacto de pago pendiente */}
-          {proofs.some(p => !p.reviewed) && (
-            <div className="px-4 pt-2 shrink-0">
-              <button
-                onClick={() => setProofModal(proofs.find(p => !p.reviewed) ?? null)}
-                className="w-full flex items-center gap-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-4 py-2.5 transition-colors"
-              >
-                <span className="text-lg animate-bounce">💳</span>
-                <div className="text-left flex-1">
-                  <p className="text-sm font-bold leading-tight">
-                    {proofs.filter(p => !p.reviewed).length === 1
-                      ? "Comprobante de pago pendiente"
-                      : `${proofs.filter(p => !p.reviewed).length} comprobantes pendientes`}
-                  </p>
-                  <p className="text-xs opacity-90">Clic para revisar y aprobar</p>
-                </div>
-                <span className="text-xl">→</span>
-              </button>
-            </div>
-          )}
-
-          {/* Historial de comprobantes aprobados (compacto) */}
-          {proofs.some(p => p.reviewed) && (
-            <div className="px-4 pt-1 shrink-0">
-              {proofs.filter(p => p.reviewed).map(p => (
-                <button key={p.id} onClick={() => setProofModal(p)}
-                  className="text-xs text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-full mr-1 mb-1 transition-colors">
-                  ✓ Ver comprobante {p.ai_amount ? `$${p.ai_amount.toLocaleString("es-CO")}` : ""} — {formatTime(p.created_at)}
+          {/* Notificación de pago — UNA sola línea, no ocupa espacio */}
+          {(proofs.some(p => !p.reviewed) || proofs.some(p => p.reviewed === 1)) && (
+            <div className="px-4 pt-2 pb-1 shrink-0 flex gap-2 flex-wrap">
+              {proofs.filter(p => !p.reviewed).map(p => (
+                <button key={p.id}
+                  onClick={() => setProofModal(p)}
+                  className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                >
+                  <span>💳</span>
+                  <span>Pago recibido{p.ai_amount ? ` · $${p.ai_amount.toLocaleString("es-CO")}` : ""} — Ver y aprobar</span>
+                </button>
+              ))}
+              {proofs.filter(p => p.reviewed === 1).map(p => (
+                <button key={p.id}
+                  onClick={() => setProofModal(p)}
+                  className="flex items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+                >
+                  <span>✓</span>
+                  <span>Aprobado{p.ai_amount ? ` $${p.ai_amount.toLocaleString("es-CO")}` : ""}</span>
                 </button>
               ))}
             </div>
