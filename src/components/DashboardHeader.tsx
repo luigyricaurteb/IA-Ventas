@@ -17,6 +17,7 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
   const [showSla, setShowSla]         = useState(false);
   const [slaList, setSlaList]         = useState<SlaBreachItem[]>([]);
   const [subDays, setSubDays]         = useState<number | null>(null);
+  const [companyName, setCompanyName] = useState("Agente DMC");
 
   useEffect(() => {
     async function checkSla() {
@@ -37,7 +38,14 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
         if (!d.isPermanent) setSubDays(d.daysLeft);
       } catch {}
     }
-    checkSla(); checkSub();
+    async function fetchCompanyName() {
+      if (currentUser?.isMaster) return;
+      try {
+        const d = await fetch("/api/settings/company").then(r => r.json()) as { config?: { name?: string | null } };
+        if (d.config?.name) setCompanyName(d.config.name);
+      } catch {}
+    }
+    checkSla(); checkSub(); fetchCompanyName();
     const iv = setInterval(() => { checkSla(); checkSub(); }, 60000);
     return () => clearInterval(iv);
   }, [currentUser]);
@@ -58,7 +66,7 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
           </svg>
         </button>
         <div className="w-2 h-2 rounded-full bg-emerald-500 hidden md:block" />
-        <span className="font-semibold text-gray-800 text-sm md:text-base">Agente DMC</span>
+        <span className="font-semibold text-gray-800 text-sm md:text-base">{companyName}</span>
         {phone && <span className="text-xs md:text-sm text-gray-400">+{phone}</span>}
       </div>
       <div className="flex items-center gap-4">

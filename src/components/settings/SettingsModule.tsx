@@ -55,6 +55,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [newUser, setNewUser] = useState({ username: "", name: "", password: "", permissions: {} as Record<string, boolean>, is_admin: false });
   const [editingUser, setEditingUser] = useState<number | null>(null);
+  const [editUserModal, setEditUserModal] = useState<{ id: number; name: string; password: string; is_admin: boolean } | null>(null);
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [smtp, setSmtp] = useState<SmtpConfig>({ host: "", port: 587, secure: 0, user: "", from_name: "", from_email: "" });
   const [learnings, setLearnings] = useState<AiLearning[]>([]);
@@ -191,8 +192,18 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
   async function removeUser(id: number) {
     if (!confirm("¿Eliminar este usuario?")) return;
-    await fetch(`/api/users/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+    if (!res.ok) { const d = await res.json() as { error?: string }; alert(d.error ?? "Error al eliminar"); return; }
     setUsers(users.filter((u) => u.id !== id));
+  }
+
+  async function saveEditUser() {
+    if (!editUserModal) return;
+    const body: Record<string, unknown> = { name: editUserModal.name, is_admin: editUserModal.is_admin };
+    if (editUserModal.password) body.password = editUserModal.password;
+    await fetch(`/api/users/${editUserModal.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    setUsers(users.map(u => u.id === editUserModal.id ? { ...u, name: editUserModal.name, is_admin: editUserModal.is_admin ? 1 : 0 } : u));
+    setEditUserModal(null);
   }
 
   function setUserPerm(userId: number, mod: string, value: boolean) {
@@ -703,11 +714,40 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             Activa o desactiva módulos por usuario. Los módulos desactivados se ocultan del menú lateral cuando el usuario inicia sesión.
           </div>
 
+          {/* Modal editar usuario */}
+          {editUserModal && (
+            <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                <h3 className="font-semibold text-gray-800">Editar usuario</h3>
+                <div>
+                  <label className="text-xs text-gray-500">Nombre completo</label>
+                  <input value={editUserModal.name} onChange={e => setEditUserModal({...editUserModal, name: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Nueva contraseña (dejar vacío para no cambiar)</label>
+                  <input type="password" value={editUserModal.password} onChange={e => setEditUserModal({...editUserModal, password: e.target.value})}
+                    placeholder="••••••••" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="editIsAdmin" checked={editUserModal.is_admin}
+                    onChange={e => setEditUserModal({...editUserModal, is_admin: e.target.checked})} />
+                  <label htmlFor="editIsAdmin" className="text-sm text-gray-700">Administrador</label>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setEditUserModal(null)} className="flex-1 border rounded-lg py-2 text-sm text-gray-600">Cancelar</button>
+                  <button onClick={saveEditUser} className="flex-1 bg-emerald-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-emerald-600">Guardar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Lista de usuarios */}
           <div className="space-y-3">
             {users.map((u) => {
               const perms = parsePermissions(u.permissions);
               const isEditing = editingUser === u.id;
+              const isSelf = currentUser && String((currentUser as { id?: number | string }).id) === String(u.id);
               return (
                 <div key={u.id} className={`bg-white border rounded-xl p-4 ${!u.active ? "opacity-60" : ""}`}>
                   <div className="flex items-center justify-between gap-3">
@@ -719,29 +759,32 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-gray-800 text-sm">{u.name}</p>
                           {u.is_admin === 1 && <span className="text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded">Admin</span>}
+                          {isSelf && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Tú</span>}
                         </div>
                         <p className="text-xs text-gray-400">@{u.username}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${u.active ? "bg-emerald-100 text-emerald-600" : "bg-gray-100 text-gray-400"}`}>
                         {u.active ? "Activo" : "Inactivo"}
                       </span>
+                      <button onClick={() => setEditUserModal({ id: u.id, name: u.name, password: "", is_admin: u.is_admin === 1 })}
+                        className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50">✏️ Editar</button>
                       {u.is_admin === 0 && (
-                        <>
-                          <button onClick={() => setEditingUser(isEditing ? null : u.id)} className="text-xs text-blue-500 hover:text-blue-700">
-                            {isEditing ? "Cerrar" : "Permisos"}
-                          </button>
-                          <button onClick={() => toggleUserActive(u.id, u.active)} className="text-xs text-gray-400 hover:text-gray-600">
-                            {u.active ? "Desactivar" : "Activar"}
-                          </button>
-                          <button onClick={() => removeUser(u.id)} className="text-xs text-red-400 hover:text-red-600">Eliminar</button>
-                        </>
+                        <button onClick={() => setEditingUser(isEditing ? null : u.id)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded border hover:bg-gray-50">
+                          {isEditing ? "Cerrar" : "Permisos"}
+                        </button>
+                      )}
+                      <button onClick={() => toggleUserActive(u.id, u.active)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded border hover:bg-gray-50">
+                        {u.active ? "Desactivar" : "Activar"}
+                      </button>
+                      {!isSelf && (
+                        <button onClick={() => removeUser(u.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded border border-red-200 hover:bg-red-50">🗑 Eliminar</button>
                       )}
                     </div>
                   </div>
 
-                  {/* Módulos que tiene activos (resumen) */}
+                  {/* Módulos activos (resumen, solo no-admins) */}
                   {!isEditing && u.is_admin === 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {MODULE_LIST.filter(m => perms[m.id]).map(m => (
@@ -753,7 +796,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                     </div>
                   )}
 
-                  {/* Panel de edición de permisos */}
+                  {/* Panel de permisos (solo no-admins) */}
                   {isEditing && u.is_admin === 0 && (
                     <div className="mt-3 border-t pt-3">
                       <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Módulos visibles para este usuario</p>

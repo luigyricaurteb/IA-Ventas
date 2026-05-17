@@ -47,6 +47,12 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (id === me.sub) return NextResponse.json({ error: "No puedes eliminarte a ti mismo" }, { status: 400 });
 
   const db = getCompanyDb(me.company ?? "platform");
-  db.prepare("DELETE FROM users WHERE id=? AND is_admin=0").run(Number(id));
+  // Proteger: no dejar la empresa sin al menos un admin
+  const target = db.prepare("SELECT is_admin FROM users WHERE id=?").get(Number(id)) as { is_admin: number } | null;
+  if (target?.is_admin) {
+    const adminCount = (db.prepare("SELECT COUNT(*) as c FROM users WHERE is_admin=1 AND active=1").get() as { c: number }).c;
+    if (adminCount <= 1) return NextResponse.json({ error: "Debe quedar al menos un administrador" }, { status: 400 });
+  }
+  db.prepare("DELETE FROM users WHERE id=?").run(Number(id));
   return NextResponse.json({ ok: true });
 }

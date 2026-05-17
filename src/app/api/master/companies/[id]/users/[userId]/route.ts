@@ -40,6 +40,12 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   const company = getCompanyById(Number(id));
   if (!company) return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 });
   const db = getCompanyDb(company.slug);
-  db.prepare("DELETE FROM users WHERE id=? AND is_admin=0").run(Number(userId));
+  // Proteger: no dejar la empresa sin al menos un admin
+  const target = db.prepare("SELECT is_admin FROM users WHERE id=?").get(Number(userId)) as { is_admin: number } | null;
+  if (target?.is_admin) {
+    const adminCount = (db.prepare("SELECT COUNT(*) as c FROM users WHERE is_admin=1 AND active=1").get() as { c: number }).c;
+    if (adminCount <= 1) return NextResponse.json({ error: "Debe quedar al menos un administrador" }, { status: 400 });
+  }
+  db.prepare("DELETE FROM users WHERE id=?").run(Number(userId));
   return NextResponse.json({ ok: true });
 }

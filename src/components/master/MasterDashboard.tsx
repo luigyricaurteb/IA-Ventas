@@ -335,7 +335,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1.5 shrink-0">
+                      <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                         {u.is_admin===0 && (
                           <button onClick={()=>setEditingUser(isEditing?null:u.id)}
                             className={`text-xs px-3 py-1.5 rounded-lg ${isEditing?"bg-gray-700 text-gray-300":"bg-blue-900 text-blue-300 hover:bg-blue-800"}`}>
@@ -346,9 +346,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                           className="text-xs bg-amber-900 text-amber-300 hover:bg-amber-800 px-3 py-1.5 rounded-lg">
                           {u.active?"⏸":"▶"}
                         </button>
-                        {u.is_admin===0 && (
-                          <button onClick={()=>deleteUser(u)} className="text-xs bg-red-900 text-red-300 hover:bg-red-800 px-3 py-1.5 rounded-lg">🗑</button>
-                        )}
+                        <button onClick={()=>deleteUser(u)} className="text-xs bg-red-900 text-red-300 hover:bg-red-800 px-3 py-1.5 rounded-lg">🗑</button>
                       </div>
                     </div>
 
