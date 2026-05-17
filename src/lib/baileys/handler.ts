@@ -7,6 +7,21 @@ import { processBotMessage } from "../bot/state-machine";
 import { sendWithAntiBlock } from "../bot/anti-block";
 import { sendAlert } from "../email";
 
+// Detecta si el mensaje contiene el nombre del cliente
+function extractNameFromText(text: string): string | null {
+  const t = text.trim();
+  // Frases explícitas
+  const patterns = [
+    /(?:me llamo|mi nombre es|soy|habla|te escribe|le escribe)\s+([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+(?:\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+){0,3})/i,
+    /^([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+){1,3})$/,  // Solo un nombre completo (2-4 palabras)
+  ];
+  for (const p of patterns) {
+    const m = t.match(p);
+    if (m?.[1] && m[1].length >= 3 && m[1].length <= 60) return m[1].trim();
+  }
+  return null;
+}
+
 // Guardar en DATA_DIR (volumen Railway) para persistencia entre deployments
 const DATA_DIR   = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
 const PROOFS_DIR = path.join(DATA_DIR, "uploads", "proofs");
@@ -62,11 +77,11 @@ export async function handleIncomingMessage(
     const db       = getCompanyDb(slug);
 
     // Crear / actualizar conversación
-    let conv = db.prepare("SELECT id, phone, mode FROM conversations WHERE phone=?").get(phone) as { id: number; phone: string; mode: string } | null;
+    let conv = db.prepare("SELECT id, phone, mode, name FROM conversations WHERE phone=?").get(phone) as { id: number; phone: string; mode: string; name: string | null } | null;
     const isNewConv = !conv;
     if (!conv) {
-      conv = db.prepare("INSERT INTO conversations (phone, name) VALUES (?,?) RETURNING id, phone, mode")
-        .get(phone, pushName ?? null) as { id: number; phone: string; mode: string };
+      conv = db.prepare("INSERT INTO conversations (phone, name) VALUES (?,?) RETURNING id, phone, mode, name")
+        .get(phone, pushName ?? null) as { id: number; phone: string; mode: string; name: string | null };
     } else {
       db.prepare("UPDATE conversations SET last_message_at=unixepoch()" + (pushName ? ", name=COALESCE(name,?)" : "") + " WHERE id=?")
         .run(...(pushName ? [pushName, conv.id] : [conv.id]));
@@ -294,6 +309,22 @@ export async function handleIncomingMessage(
     // Guardar mensaje del usuario
     db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
       .run(conv.id, "user", text);
+
+    // Auto-detectar nombre del cliente si aún no lo tenemos
+    if (!conv.name && !pushName) {
+      const detectedName = extractNameFromText(text);
+      if (detectedName) {
+        db.prepare("UPDATE conversations SET name=? WHERE id=?").run(detectedName, conv.id);
+        conv = { ...conv, name: detectedName };
+        const existingC = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conv.id) as { id: number } | null;
+        if (existingC) {
+          db.prepare("UPDATE contacts SET full_name=COALESCE(full_name,?) WHERE id=?").run(detectedName, existingC.id);
+        } else {
+          db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?)").run(conv.id, detectedName);
+        }
+        console.log(`[bot:${slug}] 👤 Nombre detectado: ${detectedName}`);
+      }
+    }
 
     // Si es conversación nueva, reenviar alerta con el primer mensaje
     if (isNewConv) {

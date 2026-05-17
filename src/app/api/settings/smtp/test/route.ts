@@ -29,7 +29,13 @@ export async function POST(req: NextRequest) {
       port: smtp.port,
       secure: smtp.secure === 1,
       auth: { user: smtp.user, pass: smtp.password },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
     });
+
+    // Verificar la conexión primero (más rápido que enviar)
+    await transporter.verify();
 
     await transporter.sendMail({
       from: `"${smtp.from_name ?? company.name ?? "Agente DMC"}" <${smtp.from_email ?? smtp.user}>`,

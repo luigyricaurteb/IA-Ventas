@@ -100,13 +100,19 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
   async function testSmtp() {
     setSmtpTesting(true); setSmtpTestResult(null);
-    const res = await fetch("/api/settings/smtp/test", { method: "POST" });
-    const d = await res.json() as { ok: boolean; sentTo?: string; error?: string };
-    setSmtpTestResult({
-      ok: d.ok,
-      msg: d.ok ? `✅ Email enviado a ${d.sentTo}` : `❌ ${d.error}`,
-    });
-    setSmtpTesting(false);
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 15000);
+    try {
+      const res = await fetch("/api/settings/smtp/test", { method: "POST", signal: abort.signal });
+      const d = await res.json() as { ok: boolean; sentTo?: string; error?: string };
+      setSmtpTestResult({ ok: d.ok, msg: d.ok ? `✅ Email enviado a ${d.sentTo}` : `❌ ${d.error}` });
+    } catch (e: unknown) {
+      const isAbort = (e as {name?: string}).name === "AbortError";
+      setSmtpTestResult({ ok: false, msg: isAbort ? "❌ Tiempo agotado (15s). Verifica que el host y puerto sean correctos." : `❌ Error de conexión` });
+    } finally {
+      clearTimeout(timeout);
+      setSmtpTesting(false);
+    }
   }
 
   async function disconnectWa() {
