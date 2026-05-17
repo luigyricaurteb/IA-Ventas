@@ -24,18 +24,28 @@ export default function AccountingModule() {
   const [expForm, setExpForm] = useState({ supplier_id: "", reservation_id: "", category: "general", description: "", amount: "", expense_date: new Date().toISOString().slice(0, 10) });
 
   async function fetchAll() {
-    const [i, e, s, r, sum] = await Promise.all([
-      fetch("/api/accounting/income").then(r => r.json()),
-      fetch("/api/accounting/expenses").then(r => r.json()),
-      fetch("/api/suppliers").then(r => r.json()),
-      fetch("/api/calendar?view=list&page=0").then(r => r.json()),
-      fetch("/api/accounting/summary").then(r => r.json()),
-    ]);
-    setIncome(i.income ?? []);
-    setExpenses(e.expenses ?? []);
-    setSuppliers(s.suppliers ?? []);
-    setReservations(r.rows ?? []);
-    setSummary(sum.summary ?? { total_income: 0, total_expense: 0, margin: 0 });
+    try {
+      const [i, e, s, r, sum] = await Promise.all([
+        fetch("/api/accounting/income").then(r => r.json()).catch(() => ({})),
+        fetch("/api/accounting/expenses").then(r => r.json()).catch(() => ({})),
+        fetch("/api/suppliers").then(r => r.json()).catch(() => ({})),
+        fetch("/api/calendar?view=list&page=0").then(r => r.json()).catch(() => ({})),
+        fetch("/api/accounting/summary").then(r => r.json()).catch(() => ({})),
+      ]);
+      setIncome(i.income ?? []);
+      setExpenses(e.expenses ?? []);
+      setSuppliers(s.suppliers ?? []);
+      setReservations(r.rows ?? []);
+      // Aceptar tanto snake_case como camelCase por compatibilidad
+      const s2 = sum.summary ?? {};
+      setSummary({
+        total_income:  s2.total_income  ?? s2.totalIncome  ?? 0,
+        total_expense: s2.total_expense ?? s2.totalExpenses ?? 0,
+        margin:        s2.margin        ?? s2.netProfit     ?? 0,
+      });
+    } catch (err) {
+      console.error("AccountingModule fetchAll error:", err);
+    }
   }
   useEffect(() => { fetchAll(); }, []);
 

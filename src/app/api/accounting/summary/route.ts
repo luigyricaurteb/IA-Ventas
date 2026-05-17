@@ -35,9 +35,14 @@ export async function GET(req: NextRequest) {
   `).all(start, end) as { category: string; total: number }[];
 
   const summary = {
+    // snake_case para compatibilidad con el componente AccountingModule
+    total_income:  totalIncome,
+    total_expense: totalExpenses,
+    margin:        totalIncome - totalExpenses,
+    // camelCase adicional para otros consumidores
     totalIncome,
     totalExpenses,
-    netProfit: totalIncome - totalExpenses,
+    netProfit:     totalIncome - totalExpenses,
     incomeByMonth,
     expenseByCategory,
   };
