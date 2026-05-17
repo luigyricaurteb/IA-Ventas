@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agente DMC — Commercial Portfolio 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:#111827;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  .cover{min-height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#1a4a8f 40%,#1d5fbd 70%,#2563eb 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:60px 40px;text-align:center;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")}
+  .cover-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:6px 20px;border-radius:100px;margin-bottom:32px;backdrop-filter:blur(8px)}
+  .cover h1{font-size:64px;font-weight:900;color:#fff;line-height:1.05;margin-bottom:16px;letter-spacing:-2px}
+  .cover h1 span{color:#93c5fd}
+  .cover-sub{font-size:22px;color:rgba(255,255,255,.8);font-weight:400;max-width:640px;line-height:1.5;margin-bottom:12px}
+  .cover-sub2{font-size:16px;color:rgba(255,255,255,.6);max-width:580px;line-height:1.5;margin-bottom:48px;font-style:italic}
+  .cover-stats{display:flex;gap:48px;margin-bottom:56px}
+  .stat{text-align:center}
+  .stat-n{font-size:48px;font-weight:900;color:#93c5fd;line-height:1}
+  .stat-l{font-size:13px;color:rgba(255,255,255,.7);margin-top:4px;font-weight:500}
+  .cover-wa{background:#25D366;color:#fff;padding:14px 36px;border-radius:100px;font-size:16px;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:16px}
+  .cover-footer{position:absolute;bottom:32px;font-size:12px;color:rgba(255,255,255,.4)}
+  .flag{font-size:20px}
+
+  .page{padding:60px 64px;max-width:900px;margin:0 auto}
+  @media print{.page{padding:40px 48px}.cover{min-height:100vh;page-break-after:always}.section{page-break-inside:avoid}}
+  .section{margin-bottom:64px}
+  .section-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#2563eb;margin-bottom:8px}
+  .section-label-es{font-size:10px;color:#93c5fd;letter-spacing:2px;font-style:italic;margin-bottom:2px}
+  .section-title{font-size:36px;font-weight:800;color:#111827;line-height:1.1;margin-bottom:8px;letter-spacing:-1px}
+  .section-title-es{font-size:22px;font-weight:600;color:#6b7280;margin-bottom:16px;font-style:italic}
+  .section-sub{font-size:17px;color:#6b7280;line-height:1.6;max-width:640px;margin-bottom:8px}
+  .section-sub-es{font-size:14px;color:#9ca3af;line-height:1.6;max-width:640px;margin-bottom:32px;font-style:italic}
+
+  .bilingual{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  .lang-en{border-left:3px solid #2563eb;padding-left:16px}
+  .lang-es{border-left:3px solid #059669;padding-left:16px}
+  .lang-badge{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+  .lang-badge.en{color:#2563eb}
+  .lang-badge.es{color:#059669}
+
+  .pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .pain-card{background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:24px}
+  .pain-card h4{font-size:15px;font-weight:700;color:#dc2626;margin-bottom:6px}
+  .pain-card .bi{font-size:12px;color:#ef4444;font-style:italic;margin-bottom:8px}
+  .pain-card p{font-size:13px;color:#6b7280;line-height:1.6}
+  .pain-card .pi{font-size:12px;color:#9ca3af;font-style:italic;margin-top:4px}
+
+  .solution-card{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #93c5fd;border-radius:20px;padding:28px;margin-bottom:20px;display:flex;align-items:flex-start;gap:20px}
+  .sol-icon{font-size:36px;line-height:1;flex-shrink:0}
+  .sol-title{font-size:16px;font-weight:700;color:#1e40af;margin-bottom:2px}
+  .sol-title-es{font-size:13px;color:#3b82f6;font-style:italic;margin-bottom:6px}
+  .sol-text{font-size:14px;color:#374151;line-height:1.6;margin-bottom:4px}
+  .sol-text-es{font-size:12px;color:#6b7280;font-style:italic;line-height:1.5}
+
+  .module-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .module-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:16px;padding:20px}
+  .module-icon{font-size:28px;margin-bottom:10px;display:block}
+  .module-name{font-size:13px;font-weight:700;color:#111827;margin-bottom:2px}
+  .module-name-es{font-size:11px;color:#6b7280;font-style:italic;margin-bottom:6px}
+  .module-desc{font-size:12px;color:#6b7280;line-height:1.5}
+  .module-new{display:inline-block;background:#2563eb;color:#fff;font-size:9px;font-weight:700;padding:1px 7px;border-radius:100px;margin-left:4px;vertical-align:middle}
+
+  .flow-steps{display:flex;flex-direction:column;gap:0}
+  .flow-step{display:flex;gap:24px;align-items:flex-start;padding:20px 0;border-bottom:1px dashed #e5e7eb}
+  .flow-step:last-child{border-bottom:none}
+  .flow-num{width:40px;height:40px;background:#2563eb;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0;margin-top:4px}
+  .flow-content h4{font-size:15px;font-weight:700;color:#111827;margin-bottom:2px}
+  .flow-content .fi{font-size:12px;color:#6b7280;font-style:italic;margin-bottom:3px}
+  .flow-content p{font-size:13px;color:#6b7280;line-height:1.6}
+
+  .plans-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:8px}
+  .plan-card{border:2px solid #e5e7eb;border-radius:20px;padding:28px;position:relative}
+  .plan-card.featured{border-color:#2563eb;background:linear-gradient(135deg,#eff6ff,#fff)}
+  .plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;font-size:11px;font-weight:700;padding:4px 16px;border-radius:100px;white-space:nowrap}
+  .plan-name{font-size:20px;font-weight:800;color:#111827;margin-bottom:2px}
+  .plan-price{font-size:36px;font-weight:900;color:#2563eb;margin-bottom:4px}
+  .plan-cycle{font-size:13px;color:#9ca3af;margin-bottom:16px}
+  .plan-features{list-style:none}
+  .plan-features li{font-size:13px;color:#374151;padding:4px 0;display:flex;align-items:flex-start;gap:8px}
+  .plan-features li::before{content:'✓';color:#2563eb;font-weight:700;flex-shrink:0}
+
+  .diff-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:12px}
+  .diff-table th{background:#111827;color:#fff;padding:10px 14px;text-align:left;font-size:12px;font-weight:600}
+  .diff-table td{padding:10px 14px;border-bottom:1px solid #f3f4f6}
+  .diff-table tr:nth-child(even) td{background:#f9fafb}
+  .check{color:#059669;font-weight:700}
+  .cross{color:#dc2626}
+
+  .contact-section{background:linear-gradient(135deg,#1e3a5f,#1a4a8f);border-radius:24px;padding:48px;text-align:center;color:#fff;margin-top:48px}
+  .contact-section h2{font-size:28px;font-weight:800;margin-bottom:6px}
+  .contact-section .h2es{font-size:18px;color:rgba(255,255,255,.7);font-style:italic;margin-bottom:16px}
+  .contact-section p{font-size:15px;color:rgba(255,255,255,.8);margin-bottom:8px}
+  .contact-section .pes{font-size:13px;color:rgba(255,255,255,.6);font-style:italic;margin-bottom:28px}
+  .contact-btn{background:#25D366;color:#fff;padding:14px 36px;border-radius:100px;font-size:15px;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;margin:6px}
+  .contact-info{margin-top:20px;font-size:13px;color:rgba(255,255,255,.6)}
+
+  .divider{height:1px;background:linear-gradient(90deg,transparent,#e5e7eb,transparent);margin:48px 0}
+  .tag{display:inline-block;background:#eff6ff;border:1px solid #93c5fd;color:#1e40af;font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px;margin:3px}
+  .api-note{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px 20px;margin-top:16px;font-size:13px;color:#92400e}
+  .api-note strong{color:#b45309}
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-badge"><span class="flag">🇺🇸</span> Made in the United States · WhatsApp AI Sales Platform</div>
+  <h1>Agente <span>DMC</span></h1>
+  <p class="cover-sub">The most complete WhatsApp sales automation platform for Latin businesses in the US and Latin America.</p>
+  <p class="cover-sub2">La plataforma de automatización de ventas por WhatsApp más completa para negocios latinos en EE.UU. y Latinoamérica.</p>
+  <div class="cover-stats">
+    <div class="stat"><div class="stat-n">24/7</div><div class="stat-l">Always-on AI / IA siempre activa</div></div>
+    <div class="stat"><div class="stat-n">0s</div><div class="stat-l">Response time / Tiempo de respuesta</div></div>
+    <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Cloud · No install / En la nube</div></div>
+  </div>
+  <a class="cover-wa" href="https://wa.me/13122969147">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    +1 (312) 296-9147
+  </a>
+  <div class="cover-footer">Agente DMC © 2026 · United States 🇺🇸 · propertymanagerctg@gmail.com</div>
+</div>
+
+<!-- THE PROBLEM -->
+<div class="page">
+  <div class="section">
+    <p class="section-label-es">El problema / </p>
+    <p class="section-label">The Problem</p>
+    <h2 class="section-title">How much revenue are you losing today?</h2>
+    <h2 class="section-title-es">¿Cuántos clientes pierdes por no responder a tiempo?</h2>
+    <p class="section-sub">Businesses lose 30–60% of potential customers by not responding fast enough on WhatsApp.</p>
+    <p class="section-sub-es">Los negocios pierden entre el 30% y el 60% de sus clientes potenciales por no responder a tiempo por WhatsApp.</p>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <h4>⏳ Slow Response / Respuesta lenta</h4>
+        <p>78% of customers buy from the first business that responds. After 5 minutes, the sale is gone.</p>
+        <p class="pi">El 78% de los clientes compra con el primero que responde. Después de 5 minutos, perdiste la venta.</p>
+      </div>
+      <div class="pain-card">
+        <h4>😴 After Hours / Fuera de horario</h4>
+        <p>Customers message at 11 PM, weekends, holidays. No response = no sale.</p>
+        <p class="pi">Los clientes escriben a las 11pm, fines de semana, festivos. Sin atención = sin ventas.</p>
+      </div>
+      <div class="pain-card">
+        <h4>📊 No Follow-up / Sin seguimiento</h4>
+        <p>Leads get lost in the chat. No CRM, no record, no visibility on conversion.</p>
+        <p class="pi">Los leads quedan en el chat sin registro. No sabes cuántos perdiste ni por qué se fueron.</p>
+      </div>
+      <div class="pain-card">
+        <h4>💸 Staff Cost / Costo de personal</h4>
+        <p>Hiring 24/7 staff costs $3,000–8,000/month. And they can't handle 50 simultaneous chats.</p>
+        <p class="pi">Contratar un asesor 24/7 cuesta millones. Y no puede responder 50 chats al mismo tiempo.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- THE SOLUTION -->
+  <div class="section">
+    <p class="section-label-es">La solución / </p>
+    <p class="section-label">The Solution</p>
+    <h2 class="section-title">Agente DMC: Your Digital Sales Team</h2>
+    <h2 class="section-title-es">Tu equipo de ventas digital, disponible 24/7</h2>
+
+    <div class="solution-card">
+      <div class="sol-icon">🤖</div>
+      <div>
+        <div class="sol-title">AI That Sells Like Your Best Salesperson</div>
+        <div class="sol-title-es">IA que vende como tu mejor asesor</div>
+        <div class="sol-text">Julieta, your AI assistant, learns your company's language, knows your catalog, and handles hundreds of simultaneous clients with natural, personalized responses. She improves automatically from every conversation.</div>
+        <div class="sol-text-es">Julieta aprende el lenguaje de tu empresa, conoce tu catálogo y atiende cientos de clientes simultáneos. Mejora automáticamente con cada conversación.</div>
+      </div>
+    </div>
+    <div class="solution-card">
+      <div class="sol-icon">📱</div>
+      <div>
+        <div class="sol-title">Works With Your Existing WhatsApp Number</div>
+        <div class="sol-title-es">Funciona con tu número de WhatsApp actual</div>
+        <div class="sol-text">No official API fees. Connect your existing number in 2 minutes by scanning a QR code. Everything stays on your same WhatsApp Business number.</div>
+        <div class="sol-text-es">Sin costos de API oficial. Conectas tu número existente en 2 minutos escaneando un QR.</div>
+      </div>
+    </div>
+    <div class="solution-card">
+      <div class="sol-icon">⚡</div>
+      <div>
+        <div class="sol-title">Full Control When You Need It</div>
+        <div class="sol-title-es">Control total cuando lo necesitas</div>
+        <div class="sol-text">Reply from your phone anytime — the system detects it and pauses the AI automatically. If you don't respond within 5 minutes, the AI resumes, reads the full conversation, and continues intelligently.</div>
+        <div class="sol-text-es">Si respondes desde tu celular, el sistema para la IA automáticamente. Si en 5 minutos no sigues, la IA retoma sola leyendo toda la conversación.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODULES -->
+<div class="page">
+  <div class="section">
+    <p class="section-label-es">Plataforma completa / </p>
+    <p class="section-label">Complete Platform</p>
+    <h2 class="section-title">Everything You Need in One Place</h2>
+    <h2 class="section-title-es">Todo lo que necesitas en un solo lugar</h2>
+    <div class="module-grid">
+      <div class="module-card">
+        <span class="module-icon">💬</span>
+        <div class="module-name">WhatsApp AI Chat</div>
+        <div class="module-name-es">Chat WhatsApp IA</div>
+        <div class="module-desc">24/7 automated responses. Full conversation history. Take control anytime.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">👥</span>
+        <div class="module-name">Visual CRM</div>
+        <div class="module-name-es">CRM Visual</div>
+        <div class="module-desc">Sales pipeline: New → Qualified → Proposal → Negotiation → Won/Lost. Every lead with name, email and deal value.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📅</span>
+        <div class="module-name">Calendar & Bookings</div>
+        <div class="module-name-es">Calendario y Reservas</div>
+        <div class="module-desc">Booking management with automatic 24h WhatsApp reminder and post-service follow-up.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🛍️</span>
+        <div class="module-name">Product Catalog <span class="module-new">New</span></div>
+        <div class="module-name-es">Catálogo de Productos</div>
+        <div class="module-desc">With photos. Import from CSV, Excel or photos using AI. The AI shows catalog and quotes automatically.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">💰</span>
+        <div class="module-name">Accounting</div>
+        <div class="module-name-es">Contabilidad</div>
+        <div class="module-desc">Income and expenses. Auto-recorded when you approve payments. Reports with date filters.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📊</span>
+        <div class="module-name">Analytics <span class="module-new">New</span></div>
+        <div class="module-name-es">Analytics</div>
+        <div class="module-desc">Conversion rates, revenue, WhatsApp peak hours, upcoming bookings, product profitability.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🤝</span>
+        <div class="module-name">Suppliers</div>
+        <div class="module-name-es">Proveedores</div>
+        <div class="module-desc">Supplier database with documents, bank accounts and product linking.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📧</span>
+        <div class="module-name">Email Campaigns</div>
+        <div class="module-name-es">Campañas de Email</div>
+        <div class="module-desc">Mass email marketing segmented by CRM stage. Works with Gmail, Outlook or Resend.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🧠</span>
+        <div class="module-name">Self-Learning AI <span class="module-new">New</span></div>
+        <div class="module-name-es">IA que Aprende Sola</div>
+        <div class="module-desc">Julieta automatically learns from every conversation and improves her responses over time.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">🔔</span>
+        <div class="module-name">Email Alerts <span class="module-new">New</span></div>
+        <div class="module-name-es">Alertas por Email</div>
+        <div class="module-desc">Instant notifications when a new client writes, a payment is approved, or a booking is created.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">📄</span>
+        <div class="module-name">Legal Documents</div>
+        <div class="module-name-es">Documentos Legales</div>
+        <div class="module-desc">Data privacy policy (GDPR/CCPA). The AI presents it and records client acceptance automatically.</div>
+      </div>
+      <div class="module-card">
+        <span class="module-icon">⚙️</span>
+        <div class="module-name">Full Configuration</div>
+        <div class="module-name-es">Configuración Total</div>
+        <div class="module-desc">Each company configures AI, schedules, bank accounts, users, permissions and more independently.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW + COMPARISON -->
+<div class="page">
+  <div class="section">
+    <p class="section-label-es">Así funciona / </p>
+    <p class="section-label">How It Works</p>
+    <h2 class="section-title">From WhatsApp Message to Payment — Automated</h2>
+    <h2 class="section-title-es">Del mensaje de WhatsApp al pago — automatizado</h2>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-content">
+          <h4>Client messages on WhatsApp</h4>
+          <div class="fi">El cliente escribe por WhatsApp</div>
+          <p>Julieta responds in seconds, any hour. Greets, asks for name and email, accepts privacy policy.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-content">
+          <h4>Qualifies and quotes automatically</h4>
+          <div class="fi">Califica y cotiza automáticamente</div>
+          <p>AI detects interest, presents catalog with photos, generates and sends the quote. Lead recorded in CRM.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-content">
+          <h4>Client sends payment proof</h4>
+          <div class="fi">El cliente envía el comprobante de pago</div>
+          <p>AI reads the receipt with computer vision: extracts amount, bank, and reference. Creates admin alert.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-content">
+          <h4>Admin approves with one click</h4>
+          <div class="fi">El admin aprueba con un clic</div>
+          <p>Booking created, income recorded in accounting, client receives WhatsApp confirmation with booking code.</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-content">
+          <h4>Automatic reminders and follow-up</h4>
+          <div class="fi">Recordatorios y seguimiento automáticos</div>
+          <p>24h before service: automatic WhatsApp reminder. 2h after: follow-up and feedback request.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <p class="section-label-es">¿Por qué elegirnos? / </p>
+    <p class="section-label">Why Choose Us?</p>
+    <h2 class="section-title">Agente DMC vs Competition</h2>
+    <table class="diff-table">
+      <thead>
+        <tr><th>Feature / Característica</th><th>Agente DMC</th><th>Respond.io</th><th>WA Business API</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Integrated CRM / CRM integrado</td><td class="check">✓ Included</td><td class="check">✓ Basic</td><td class="cross">✗ None</td></tr>
+        <tr><td>Auto Accounting / Contabilidad auto</td><td class="check">✓ Included</td><td class="cross">✗ None</td><td class="cross">✗ None</td></tr>
+        <tr><td>Booking Calendar / Calendario</td><td class="check">✓ Included</td><td class="cross">✗ None</td><td class="cross">✗ None</td></tr>
+        <tr><td>Self-Learning AI / IA aprende sola</td><td class="check">✓ Automatic</td><td class="cross">✗ None</td><td class="cross">✗ None</td></tr>
+        <tr><td>Human takeover detect / Detecta humano</td><td class="check">✓ Automatic</td><td class="cross">✗ Manual</td><td class="cross">✗ Manual</td></tr>
+        <tr><td>No per-message fee / Sin costo por msg</td><td class="check">✓ Free</td><td class="check">✓ Free</td><td class="cross">✗ $0.005 each</td></tr>
+        <tr><td>Monthly price / Precio mensual</td><td class="check">From $150 USD</td><td class="cross">From $79 USD*</td><td class="cross">From $50 + messages</td></tr>
+        <tr><td>Setup time / Tiempo de configuración</td><td class="check">24 hours</td><td>1-2 weeks</td><td class="cross">2-4 weeks + approval</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:11px;color:#9ca3af;margin-top:8px">*Respond.io at $79 USD/month does not include CRM, accounting, bookings or AI self-learning. / *Respond.io a $79 USD/mes no incluye CRM, contabilidad, reservas ni IA que aprende sola.</p>
+  </div>
+</div>
+
+<!-- PLANS -->
+<div class="page">
+  <div class="section">
+    <p class="section-label-es">Planes y precios / </p>
+    <p class="section-label">Plans & Pricing</p>
+    <h2 class="section-title">Investment That Pays for Itself</h2>
+    <h2 class="section-title-es">Una inversión que se paga sola</h2>
+    <p class="section-sub">With just one additional client per month that Julieta converts, the system pays for itself. The rest is pure profit.</p>
+    <p class="section-sub-es">Con un solo cliente adicional al mes que consiga Julieta, el sistema ya se paga. El resto es ganancia pura.</p>
+    <div class="plans-grid">
+      <div class="plan-card">
+        <div class="plan-name">🟢 Starter</div>
+        <div class="plan-price">$150</div>
+        <div class="plan-cycle">USD / month · mes</div>
+        <ul class="plan-features">
+          <li>WhatsApp AI Chat 24/7</li>
+          <li>CRM pipeline</li>
+          <li>Booking calendar / Calendario</li>
+          <li>Product catalog / Catálogo</li>
+          <li>Up to 3 users / Hasta 3 usuarios</li>
+          <li>WhatsApp support / Soporte</li>
+        </ul>
+      </div>
+      <div class="plan-card featured">
+        <div class="plan-badge">⭐ Most Popular / Más popular</div>
+        <div class="plan-name">🔵 Professional</div>
+        <div class="plan-price">$250</div>
+        <div class="plan-cycle">USD / month · mes</div>
+        <ul class="plan-features">
+          <li>Everything in Starter / Todo Starter</li>
+          <li>Auto accounting / Contabilidad auto</li>
+          <li>Advanced analytics</li>
+          <li>Email campaigns / Campañas</li>
+          <li>Legal documents / Documentos</li>
+          <li>Email alerts / Alertas email</li>
+          <li>Up to 8 users / Hasta 8 usuarios</li>
+        </ul>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">🏆 Business</div>
+        <div class="plan-price">$350</div>
+        <div class="plan-cycle">USD / month · mes</div>
+        <ul class="plan-features">
+          <li>Everything in Professional</li>
+          <li>Suppliers / Proveedores</li>
+          <li>Google Drive real-time</li>
+          <li>Self-learning AI / IA aprende</li>
+          <li>Unlimited users / Ilimitados</li>
+          <li>Priority support / Soporte prioritario</li>
+          <li>Assisted setup / Config. asistida</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:#eff6ff;border:2px solid #93c5fd;border-radius:16px;padding:24px;margin-top:24px">
+      <div style="font-size:18px;font-weight:800;color:#1e40af;margin-bottom:4px">🔐 Lifetime Plan — $1,800 USD one-time payment · Pago único de por vida</div>
+      <div style="font-size:14px;color:#374151;margin-bottom:10px">Full lifetime access to all modules. Includes the complete platform — no recurring fees for the software.</div>
+      <div style="font-size:13px;color:#6b7280;font-style:italic">Acceso de por vida a todos los módulos. Incluye la plataforma completa — sin cuotas recurrentes por el software.</div>
+      <div class="api-note" style="margin-top:12px">
+        <strong>⚠️ API costs / Costos de APIs:</strong> AI and email API subscriptions (OpenRouter, Resend) are paid directly by the client and depend on usage. Estimated maximum: <strong>$50 USD/month</strong>.<br>
+        <em>Las suscripciones a APIs de IA y email las asume el cliente directamente. Estimado máximo: $50 USD/mes.</em>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <p class="section-label-es">¿Para quién es? / </p>
+    <p class="section-label">Who Is It For?</p>
+    <h2 class="section-title">Any Business That Sells via WhatsApp</h2>
+    <h2 class="section-title-es">Cualquier empresa que venda por WhatsApp</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px">
+      <span class="tag">🏨 Hotels & Lodging / Hoteles</span>
+      <span class="tag">🗺️ Travel Agencies / Agencias de viajes</span>
+      <span class="tag">🍽️ Restaurants / Restaurantes</span>
+      <span class="tag">💆 Wellness & Spas</span>
+      <span class="tag">🏋️ Gyms / Gimnasios</span>
+      <span class="tag">📸 Photography & Events / Fotografía</span>
+      <span class="tag">🏡 Real Estate / Inmobiliarias</span>
+      <span class="tag">⚖️ Clinics / Consultorios</span>
+      <span class="tag">🎓 Academies / Academias</span>
+      <span class="tag">🛒 E-commerce & Retail</span>
+      <span class="tag">🏗️ Construction / Constructoras</span>
+      <span class="tag">🚗 Services / Servicios</span>
+    </div>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="contact-section">
+    <h2>Ready to automate your sales?</h2>
+    <div class="h2es">¿Listo para automatizar tus ventas?</div>
+    <p>Set up your company in less than 24 hours. No long-term contracts. No installation. Just results.</p>
+    <div class="pes">Configura tu empresa en menos de 24 horas. Sin contratos largos. Sin instalación. Solo resultados.</div>
+    <a class="contact-btn" href="https://wa.me/13122969147?text=Hello,%20I%20want%20information%20about%20Agente%20DMC">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      WhatsApp · +1 (312) 296-9147
+    </a>
+    <div class="contact-info">
+      propertymanagerctg@gmail.com · United States 🇺🇸<br>
+      Response guaranteed within 2 business hours · Respuesta garantizada en menos de 2 horas hábiles
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

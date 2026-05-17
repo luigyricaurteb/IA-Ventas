@@ -378,13 +378,24 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
           {(proofs.some(p => !p.reviewed) || proofs.some(p => p.reviewed === 1)) && (
             <div className="px-4 pt-2 pb-1 shrink-0 flex gap-2 flex-wrap">
               {proofs.filter(p => !p.reviewed).map(p => (
-                <button key={p.id}
-                  onClick={() => setProofModal(p)}
-                  className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
-                >
-                  <span>💳</span>
-                  <span>Pago recibido{p.ai_amount ? ` · $${p.ai_amount.toLocaleString("es-CO")}` : ""} — Ver y aprobar</span>
-                </button>
+                <div key={p.id} className="flex items-center gap-1">
+                  <button
+                    onClick={() => setProofModal(p)}
+                    className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                  >
+                    <span>💳</span>
+                    <span>Pago recibido{p.ai_amount ? ` · $${p.ai_amount.toLocaleString("es-CO")}` : ""} — Ver y aprobar</span>
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("¿Eliminar este comprobante? Se borrará el archivo y la alerta permanentemente.")) return;
+                      await fetch(`/api/alerts/${p.id}`, { method: "DELETE" });
+                      setProofs(prev => prev.filter(x => x.id !== p.id));
+                    }}
+                    title="Eliminar comprobante"
+                    className="text-amber-400 hover:text-red-500 hover:bg-red-50 w-6 h-6 rounded-full flex items-center justify-center text-sm transition-colors"
+                  >✕</button>
+                </div>
               ))}
               {proofs.filter(p => p.reviewed === 1).map(p => (
                 <button key={p.id}
@@ -589,6 +600,19 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
                 <h3 className="font-bold text-gray-800">
                   {proofModal.reviewed ? "✓ Comprobante aprobado" : "📋 Revisar comprobante"}
                 </h3>
+                {!proofModal.reviewed && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm("¿Eliminar este comprobante? Se borrará el archivo y la alerta permanentemente.")) return;
+                      await fetch(`/api/alerts/${proofModal.id}`, { method: "DELETE" });
+                      setProofs(prev => prev.filter(x => x.id !== proofModal.id));
+                      setProofModal(null);
+                    }}
+                    className="text-xs text-red-400 hover:text-red-600 mt-1"
+                  >
+                    🗑 Eliminar comprobante
+                  </button>
+                )}
                 <p className="text-xs text-gray-400">{formatTime(proofModal.created_at)}</p>
               </div>
               <button onClick={() => setProofModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
