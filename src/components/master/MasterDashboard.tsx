@@ -6,8 +6,9 @@ interface Plan { id: number; name: string; description: string | null; price_mon
 interface Subscription { id: number; company_id: number; plan_id: number; billing_cycle: string; status: string; payment_amount: number | null; payment_proof_file: string | null; notes: string | null; created_at: number }
 interface CompanyUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 
-const MODULES = ["chat","crm","calendar","accounting","suppliers","products","campaigns","documents","analytics","settings"];
-const ML: Record<string,string> = { chat:"💬 Chat", crm:"👥 CRM", calendar:"📅 Calendario", accounting:"💰 Contabilidad", suppliers:"🤝 Proveedores", products:"🛍️ Productos", campaigns:"📧 Campañas", documents:"📄 Documentos", analytics:"📊 Analytics", settings:"⚙️ Ajustes" };
+// settings y subscription NO son módulos de plan — siempre están disponibles para admins
+const MODULES = ["chat","crm","calendar","accounting","suppliers","products","campaigns","documents","analytics"];
+const ML: Record<string,string> = { chat:"💬 Chat", crm:"👥 CRM", calendar:"📅 Calendario", accounting:"💰 Contabilidad", suppliers:"🤝 Proveedores", products:"🛍️ Productos", campaigns:"📧 Campañas", documents:"📄 Documentos", analytics:"📊 Analytics" };
 const SC: Record<string,string> = { active:"text-emerald-400 bg-emerald-900/50", suspended:"text-red-400 bg-red-900/50", trial:"text-blue-400 bg-blue-900/50", pending:"text-amber-400 bg-amber-900/50" };
 const BL: Record<string,string> = { monthly:"Mensual", yearly:"Anual", permanent:"Pago único" };
 
@@ -406,6 +407,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                           {ML[m]}
                         </div>
                       ))}
+                      <div className="text-xs flex items-center gap-1.5 text-gray-500 mt-1 border-t border-gray-700 pt-1">
+                        <span className="w-3 h-3 rounded-full flex items-center justify-center text-[9px] flex-shrink-0 bg-gray-700">✓</span>
+                        ⚙️ Ajustes (siempre incluido)
+                      </div>
                     </div>
                   </div>
                 );

@@ -119,6 +119,9 @@ export async function loginCompanyUser(companySlug: string, username: string, pa
     for (const [mod, allowed] of Object.entries(planPermissions)) {
       if (allowed) effectivePermissions[mod] = true;
     }
+    // Ajustes y suscripción son siempre accesibles para el admin — no dependen del plan
+    effectivePermissions['settings']     = true;
+    effectivePermissions['subscription'] = true;
   }
 
   const token = createJWT({

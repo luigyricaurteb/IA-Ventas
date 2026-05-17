@@ -103,10 +103,10 @@ if (planCount === 0) {
   masterDb.prepare(`
     INSERT INTO plans (name, description, price_monthly, billing_cycle, modules, max_users, max_wa_numbers)
     VALUES
-      ('Starter', 'Ideal para pequeñas empresas', 29, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true}', 3, 1),
-      ('Pro', 'Para equipos en crecimiento', 59, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":false,"accounting":false}', 8, 1),
-      ('Business', 'Acceso completo a todos los módulos', 99, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":true,"accounting":true}', 999, 3),
-      ('Permanente', 'Pago único, acceso de por vida', 499, 'permanent', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":true,"accounting":true}', 999, 5)
+      ('Starter', 'Ideal para pequeñas empresas', 29, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true,"settings":true}', 3, 1),
+      ('Pro', 'Para equipos en crecimiento', 59, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":false,"accounting":false,"settings":true}', 8, 1),
+      ('Business', 'Acceso completo a todos los módulos', 99, 'monthly', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":true,"accounting":true,"settings":true}', 999, 3),
+      ('Permanente', 'Pago único, acceso de por vida', 499, 'permanent', '{"chat":true,"crm":true,"calendar":true,"products":true,"campaigns":true,"documents":true,"analytics":true,"suppliers":true,"accounting":true,"settings":true}', 999, 5)
   `).run();
 }
 

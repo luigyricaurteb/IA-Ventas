@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
-type Tab = "company" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla";
+type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla";
 
 const MODULE_LIST: { id: string; label: string; icon: string }[] = [
   { id: "chat",       label: "Chat",         icon: "💬" },
@@ -45,6 +45,13 @@ function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; labe
 export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean } | null }) {
   const [tab, setTab] = useState<Tab>("company");
   const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "" });
+
+  // WhatsApp state
+  const [waStatus, setWaStatus] = useState<"disconnected"|"qr"|"connecting"|"connected">("disconnected");
+  const [waPhone, setWaPhone] = useState<string | null>(null);
+  const [waQr, setWaQr] = useState<string | null>(null);
+  const [waDisconnecting, setWaDisconnecting] = useState(false);
+  const waPollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [newUser, setNewUser] = useState({ username: "", name: "", password: "", permissions: {} as Record<string, boolean>, is_admin: false });
   const [editingUser, setEditingUser] = useState<number | null>(null);
@@ -65,6 +72,34 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [saved, setSaved] = useState(false);
 
   const isAdmin = currentUser?.is_admin || currentUser?.role === "master";
+
+  // ── WhatsApp polling (solo cuando el tab está activo) ─────────────────────
+  useEffect(() => {
+    if (tab !== "whatsapp") {
+      if (waPollerRef.current) { clearInterval(waPollerRef.current); waPollerRef.current = null; }
+      return;
+    }
+    async function fetchWa() {
+      try {
+        const d = await fetch("/api/connection/status").then(r => r.json()) as { status: string; phone?: string; qrPng?: string };
+        setWaStatus(d.status as typeof waStatus);
+        setWaPhone(d.phone ?? null);
+        setWaQr(d.qrPng ?? null);
+      } catch {}
+    }
+    fetchWa();
+    waPollerRef.current = setInterval(fetchWa, 2000);
+    return () => { if (waPollerRef.current) clearInterval(waPollerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  async function disconnectWa() {
+    if (!confirm("¿Desconectar WhatsApp? El bot dejará de funcionar hasta que escanees el QR nuevamente.")) return;
+    setWaDisconnecting(true);
+    await fetch("/api/connection/disconnect", { method: "POST" });
+    setWaStatus("disconnected"); setWaPhone(null); setWaQr(null);
+    setWaDisconnecting(false);
+  }
 
   useEffect(() => {
     fetch("/api/settings/company").then((r) => r.json()).then((d) => setCompany(d.config));
@@ -213,6 +248,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
   const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "company",   label: "Empresa" },
+    { id: "whatsapp",  label: "WhatsApp" },
     { id: "banks",     label: "Cuentas bancarias" },
     { id: "smtp",      label: "Email SMTP" },
     { id: "learning",  label: `${aiName} IA` },
@@ -289,6 +325,69 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           <button onClick={saveCompany} disabled={saving} className="bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
             {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar empresa"}
           </button>
+        </div>
+      )}
+
+      {/* ── WHATSAPP ── */}
+      {tab === "whatsapp" && (
+        <div className="space-y-4">
+          {/* Estado de conexión */}
+          <div className={`rounded-xl p-5 border flex items-center gap-4 ${
+            waStatus === "connected" ? "bg-emerald-50 border-emerald-200" :
+            waStatus === "qr" || waStatus === "connecting" ? "bg-blue-50 border-blue-200" :
+            "bg-gray-50 border-gray-200"
+          }`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0 ${
+              waStatus === "connected" ? "bg-emerald-100" :
+              waStatus === "qr" || waStatus === "connecting" ? "bg-blue-100" : "bg-gray-200"
+            }`}>
+              {waStatus === "connected" ? "✅" : waStatus === "qr" ? "📱" : waStatus === "connecting" ? "⏳" : "📵"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold ${
+                waStatus === "connected" ? "text-emerald-800" :
+                waStatus === "qr" || waStatus === "connecting" ? "text-blue-800" : "text-gray-700"
+              }`}>
+                {waStatus === "connected" ? "WhatsApp conectado" :
+                 waStatus === "qr" ? "Listo para escanear QR" :
+                 waStatus === "connecting" ? "Conectando..." : "WhatsApp desconectado"}
+              </p>
+              {waPhone && <p className="text-sm text-gray-500 mt-0.5">Número: +{waPhone}</p>}
+              {(waStatus === "qr" || waStatus === "connecting") && !waPhone && (
+                <p className="text-sm text-blue-600 mt-0.5">Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
+              )}
+            </div>
+            {waStatus === "connected" && (
+              <button onClick={disconnectWa} disabled={waDisconnecting}
+                className="shrink-0 bg-red-100 text-red-600 hover:bg-red-200 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                {waDisconnecting ? "Desconectando..." : "Desconectar"}
+              </button>
+            )}
+          </div>
+
+          {/* QR Code */}
+          {waQr && waStatus === "qr" && (
+            <div className="bg-white border rounded-xl p-6 flex flex-col items-center gap-3">
+              <p className="text-sm font-medium text-gray-700">Escanea con tu celular</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={waQr} alt="QR WhatsApp" className="w-56 h-56 rounded-xl" />
+              <p className="text-xs text-gray-400 text-center">El QR se actualiza automáticamente cada 30 segundos</p>
+            </div>
+          )}
+
+          {/* Desconectado — instrucciones */}
+          {waStatus === "disconnected" && !waQr && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+              <p className="font-medium mb-1">Bot desconectado</p>
+              <p>Para conectar WhatsApp al bot, reinicia el bot desde el servidor o espera a que se reconecte automáticamente. El QR aparecerá aquí en unos segundos.</p>
+            </div>
+          )}
+
+          <div className="bg-gray-50 border rounded-xl p-4 text-xs text-gray-500 space-y-1">
+            <p>• El bot solo funciona cuando WhatsApp está conectado</p>
+            <p>• Si cambias de teléfono debes volver a escanear el QR</p>
+            <p>• La sesión se mantiene activa mientras el servidor esté corriendo</p>
+          </div>
         </div>
       )}
 
