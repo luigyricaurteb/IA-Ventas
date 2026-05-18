@@ -25,7 +25,7 @@ function triggerRestart() {
 function botIsAlive(): boolean {
   try {
     const ts = parseInt(fs.readFileSync(HEARTBEAT_PATH, "utf8"), 10);
-    return (Math.floor(Date.now() / 1000) - ts) < 60; // vivo si heartbeat < 60s
+    return (Math.floor(Date.now() / 1000) - ts) < 60;
   } catch {
     return false;
   }
@@ -36,6 +36,31 @@ export async function GET(req: NextRequest) {
   if (!ctx) return unauthorized();
   const { db } = ctx;
 
+  // ── Meta Cloud API: si tiene credenciales guardadas → siempre "connected" ──
+  // Con Meta no hay WebSocket — la conexión es por HTTP/webhook, siempre activa
+  const waConfig = db.prepare(
+    "SELECT provider, wa_access_token, wa_phone_number_id, wa_phone_display FROM whatsapp_config WHERE id=1"
+  ).get() as {
+    provider: string;
+    wa_access_token: string | null;
+    wa_phone_number_id: string | null;
+    wa_phone_display: string | null;
+  } | null;
+
+  if (waConfig?.provider === "meta" && waConfig.wa_access_token && waConfig.wa_phone_number_id) {
+    // Actualizar connection_state para que el dashboard muestre el estado correcto
+    db.prepare(
+      "UPDATE connection_state SET status='connected', phone=?, qr_string=NULL, updated_at=unixepoch() WHERE id=1"
+    ).run(waConfig.wa_phone_display ?? waConfig.wa_phone_number_id);
+
+    return NextResponse.json({
+      status: "connected",
+      phone: waConfig.wa_phone_display ?? waConfig.wa_phone_number_id,
+      provider: "meta",
+    });
+  }
+
+  // ── Baileys (WebSocket): leer estado de la DB ──────────────────────────────
   const state = db.prepare("SELECT * FROM connection_state WHERE id = 1").get() as {
     status: "disconnected" | "qr" | "connecting" | "connected";
     qr_string: string | null; phone: string | null; updated_at: number;
@@ -44,8 +69,7 @@ export async function GET(req: NextRequest) {
   const alive = botIsAlive();
   const staleSecs = Math.floor(Date.now() / 1000) - (state.updated_at || 0);
 
-  // Auto-sanación: si el bot no está respondiendo o lleva mucho tiempo sin QR,
-  // disparar el flag de reinicio automáticamente
+  // Auto-sanación: si el bot no responde, disparar reinicio
   const isStuck = !state.qr_string
     && state.status !== "connected"
     && (staleSecs > 60 || !alive);
@@ -54,17 +78,13 @@ export async function GET(req: NextRequest) {
     triggerRestart();
   }
 
-  const shouldShowQr =
-    !!state.qr_string &&
-    (state.status === "qr" || state.status === "connecting" || state.status === "connected");
+  const shouldShowQr = !!state.qr_string && state.status === "qr";
 
   if (shouldShowQr && state.qr_string) {
     try {
       const qrPng = await QRCode.toDataURL(state.qr_string, { width: 320, margin: 2 });
       return NextResponse.json({ status: "qr", qrPng, updatedAt: state.updated_at, botAlive: alive });
-    } catch {
-      // Si falla generar PNG, continuar y retornar estado
-    }
+    } catch {}
   }
 
   return NextResponse.json({
