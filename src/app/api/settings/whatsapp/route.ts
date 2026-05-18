@@ -78,35 +78,19 @@ export async function POST(req: NextRequest) {
     let pageName: string | null = null;
 
     try {
-      // Intentar primero con /me — funciona si es un Page Token directo
-      const r1 = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name,category&access_token=${fb_page_token}`, { signal: AbortSignal.timeout(8000) });
-      const d1 = await r1.json() as { id?: string; name?: string; category?: string; error?: { message?: string } };
+      // Con un Page Token, /me retorna la info de la página directamente
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${encodeURIComponent(fb_page_token)}`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      const d = await r.json() as { id?: string; name?: string; error?: { message?: string } };
 
-      if (!d1.error && d1.category) {
-        // Es un Page Token — tiene categoría
-        realPageId = d1.id ?? null;
-        pageName   = d1.name ?? null;
-      } else {
-        // Es un User Token — buscar las páginas del usuario
-        const r2 = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${fb_page_token}`, { signal: AbortSignal.timeout(8000) });
-        const d2 = await r2.json() as {
-          data?: Array<{ id: string; name: string; access_token: string }>;
-          error?: { message?: string };
-        };
-
-        if (d2.error) return NextResponse.json({ ok: false, error: `Error: ${d2.error.message}. Usa el token de la página desde me/accounts en Graph API Explorer.` }, { status: 400 });
-
-        if (!d2.data?.length) return NextResponse.json({ ok: false, error: "No se encontraron páginas asociadas a este token." }, { status: 400 });
-
-        // Si hay Page ID manual, usar esa página; si no, usar la primera
-        const page = fb_page_id
-          ? d2.data.find(p => p.id === fb_page_id) ?? d2.data[0]
-          : d2.data[0];
-
-        realPageId = page.id;
-        pageName   = page.name;
-        realToken  = page.access_token; // Token específico de la página
+      if (d.error) {
+        return NextResponse.json({ ok: false, error: `Token inválido: ${d.error.message}` }, { status: 400 });
       }
+
+      realPageId = d.id ?? null;
+      pageName   = d.name ?? null;
     } catch {
       return NextResponse.json({ ok: false, error: "No se pudo conectar con Facebook. Verifica el token." }, { status: 400 });
     }
