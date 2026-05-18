@@ -224,6 +224,13 @@ export default function WhatsAppConfigPanel() {
             <label className="text-xs font-medium text-gray-600 mb-1 block">Page Access Token <span className="text-red-500">*</span></label>
             <input type="password" placeholder="EAAGm..." value={fbPageToken} onChange={e => setFbPageToken(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <p className="text-xs text-gray-400 mt-1">Obtén este token desde Graph API Explorer → me/accounts</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID <span className="text-gray-400">(opcional — se detecta del token)</span></label>
+            <input type="text" placeholder="Ej: 123456789012345" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <p className="text-xs text-gray-400 mt-1">Está en la respuesta de me/accounts → campo "id"</p>
           </div>
           {result && activeTab === "facebook" && (
             <div className={`rounded-lg p-3 text-sm ${result.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{result.msg}</div>
