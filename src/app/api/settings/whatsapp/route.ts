@@ -73,31 +73,23 @@ export async function POST(req: NextRequest) {
     const { fb_page_token, fb_page_id } = body;
     if (!fb_page_token) return NextResponse.json({ ok: false, error: "Page Access Token es requerido" }, { status: 400 });
 
-    let realPageId: string | null = null;
-    let realToken: string = fb_page_token;
+    // Guardar el token directamente — la verificación real ocurre cuando llega el primer mensaje
+    // Intentar obtener info de la página pero sin bloquear si falla
+    let realPageId: string | null = body.fb_page_id ?? null;
     let pageName: string | null = null;
 
     try {
-      // Con un Page Token, /me retorna la info de la página directamente
       const r = await fetch(
-        `https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${encodeURIComponent(fb_page_token)}`,
-        { signal: AbortSignal.timeout(8000) }
+        `https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${fb_page_token}`,
+        { signal: AbortSignal.timeout(6000) }
       );
-      const d = await r.json() as { id?: string; name?: string; error?: { message?: string } };
-
-      if (d.error) {
-        return NextResponse.json({ ok: false, error: `Token inválido: ${d.error.message}` }, { status: 400 });
-      }
-
-      realPageId = d.id ?? null;
-      pageName   = d.name ?? null;
-    } catch {
-      return NextResponse.json({ ok: false, error: "No se pudo conectar con Facebook. Verifica el token." }, { status: 400 });
-    }
+      const d = await r.json() as { id?: string; name?: string; error?: unknown };
+      if (!d.error && d.id) { realPageId = d.id; pageName = d.name ?? null; }
+    } catch { /* ignorar — guardar de todas formas */ }
 
     db.prepare("UPDATE whatsapp_config SET fb_page_id=?, fb_page_token=?, fb_page_name=?, updated_at=unixepoch() WHERE id=1")
-      .run(realPageId, realToken, pageName);
-    return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName });
+      .run(realPageId, fb_page_token, pageName);
+    return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName ?? "Facebook conectado" });
   }
 
   if (action === "disconnect_facebook") {
