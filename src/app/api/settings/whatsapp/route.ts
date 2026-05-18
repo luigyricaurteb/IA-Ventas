@@ -70,23 +70,26 @@ export async function POST(req: NextRequest) {
 
   // ── Facebook Messenger ────────────────────────────────────────────────────
   if (action === "save_facebook") {
-    const { fb_page_id, fb_page_token } = body;
-    if (!fb_page_id || !fb_page_token) return NextResponse.json({ ok: false, error: "Page ID y Page Token son requeridos" }, { status: 400 });
+    const { fb_page_token } = body;
+    if (!fb_page_token) return NextResponse.json({ ok: false, error: "Page Access Token es requerido" }, { status: 400 });
 
-    // Obtener nombre de la página desde Graph API
+    // Usar /me con el Page Token para obtener el ID y nombre real de la página
+    // El token ya contiene la información de qué página es — no necesitamos el ID manual
+    let realPageId: string | null = null;
     let pageName: string | null = null;
     try {
-      const r = await fetch(`https://graph.facebook.com/v21.0/${fb_page_id}?fields=name&access_token=${fb_page_token}`, { signal: AbortSignal.timeout(8000) });
-      const d = await r.json() as { name?: string; error?: { message?: string } };
+      const r = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${fb_page_token}`, { signal: AbortSignal.timeout(8000) });
+      const d = await r.json() as { id?: string; name?: string; error?: { message?: string } };
       if (d.error) return NextResponse.json({ ok: false, error: d.error.message }, { status: 400 });
-      pageName = d.name ?? null;
-    } catch (e) {
-      return NextResponse.json({ ok: false, error: "No se pudo verificar el token de la página" }, { status: 400 });
+      realPageId = d.id ?? null;
+      pageName   = d.name ?? null;
+    } catch {
+      return NextResponse.json({ ok: false, error: "No se pudo verificar el token. ¿Es un Page Access Token válido?" }, { status: 400 });
     }
 
     db.prepare("UPDATE whatsapp_config SET fb_page_id=?, fb_page_token=?, fb_page_name=?, updated_at=unixepoch() WHERE id=1")
-      .run(fb_page_id, fb_page_token, pageName);
-    return NextResponse.json({ ok: true, page_name: pageName });
+      .run(realPageId, fb_page_token, pageName);
+    return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName });
   }
 
   if (action === "disconnect_facebook") {

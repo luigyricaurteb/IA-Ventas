@@ -82,15 +82,15 @@ export default function WhatsAppConfigPanel() {
   }
 
   async function handleSaveFb() {
-    if (!fbPageId || !fbPageToken) { setResult({ ok: false, msg: "Completa el Page ID y el Page Token" }); return; }
+    if (!fbPageToken) { setResult({ ok: false, msg: "Ingresa el Page Access Token" }); return; }
     setSaving(true); setResult(null);
     const res = await fetch("/api/settings/whatsapp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save_facebook", fb_page_id: fbPageId, fb_page_token: fbPageToken }),
+      body: JSON.stringify({ action: "save_facebook", fb_page_token: fbPageToken }),
     });
-    const d = await res.json() as { ok: boolean; error?: string };
-    setResult(d.ok ? { ok: true, msg: "✅ Facebook Messenger conectado" } : { ok: false, msg: `❌ ${d.error}` });
+    const d = await res.json() as { ok: boolean; page_name?: string; page_id?: string; error?: string };
+    setResult(d.ok ? { ok: true, msg: `✅ Facebook conectado: ${d.page_name} (ID: ${d.page_id})` } : { ok: false, msg: `❌ ${d.error}` });
     if (d.ok) fetch("/api/settings/whatsapp").then(r => r.json()).then((c: WaConfig) => setCfg(c));
     setSaving(false);
   }
@@ -219,11 +219,6 @@ export default function WhatsAppConfigPanel() {
             <p>2. Conecta tu Página de Facebook</p>
             <p>3. Copia el Page Access Token</p>
             <p>4. Configura el webhook con la URL de arriba → suscríbete a <strong>messages</strong></p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID <span className="text-red-500">*</span></label>
-            <input type="text" placeholder="61586987090721" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Page Access Token <span className="text-red-500">*</span></label>
