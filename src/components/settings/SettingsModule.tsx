@@ -632,54 +632,83 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </button>
           </div>
 
-          {/* Aprendizajes automáticos */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="font-semibold text-gray-800">🧠 Aprendizaje autónomo</h2>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{autoLearnings.length} patrones</span>
-            </div>
-            <p className="text-xs text-gray-400 mb-3">{aiName} aprende automáticamente de las conversaciones. Puedes editar o eliminar cualquier aprendizaje para afinar sus respuestas futuras.</p>
-            {autoLearnings.length === 0 ? (
-              <div className="text-center py-6 bg-gray-50 rounded-xl text-gray-400 text-sm">
-                <p className="text-2xl mb-2">🔄</p>
-                <p>Aún no hay aprendizajes automáticos.</p>
-                <p className="text-xs mt-1">{aiName} comenzará a aprender después de algunas conversaciones.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {autoLearnings.map((l) => (
-                  <div key={l.id} className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                    {editingLearning?.id === l.id ? (
-                      <div className="space-y-2">
-                        <input value={editingLearning.topic} onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-1.5 text-sm font-medium bg-white" />
-                        <textarea value={editingLearning.content} onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
-                          rows={3} className="w-full border rounded-lg px-3 py-2 text-sm resize-none bg-white" />
-                        <div className="flex gap-2">
-                          <button onClick={saveEditLearning} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700">Guardar</button>
-                          <button onClick={() => setEditingLearning(null)} className="border px-4 py-1.5 rounded-lg text-sm text-gray-600 bg-white">Cancelar</button>
-                        </div>
-                      </div>
+          {/* Aprendizajes automáticos — colapsable */}
+          {(() => {
+            const [showAuto, setShowAuto] = (useState as <T>(v: T) => [T, (v: T) => void])(false);
+            const PREVIEW = 3;
+            const visible = showAuto ? autoLearnings : autoLearnings.slice(0, PREVIEW);
+            return (
+              <div className="border border-blue-100 rounded-xl overflow-hidden">
+                {/* Header clicable */}
+                <button
+                  onClick={() => setShowAuto(!showAuto)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-800 text-sm">🧠 Aprendizaje autónomo</span>
+                    <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{autoLearnings.length} patrones</span>
+                  </div>
+                  <span className="text-gray-400 text-sm">{showAuto ? "▲" : "▼"}</span>
+                </button>
+
+                {/* Contenido colapsable */}
+                {showAuto && (
+                  <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                    <p className="text-xs text-gray-400">{aiName} aprende de conversaciones. Puedes editar o eliminar patrones.</p>
+                    {autoLearnings.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">Aún no hay patrones aprendidos.</p>
                     ) : (
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-medium">{l.topic.replace("[Auto] ","")}</span>
-                            <span className="text-[10px] text-blue-400">Auto · {new Date(l.created_at * 1000).toLocaleDateString("es-CO")}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-4">{l.content}</p>
+                      visible.map((l) => (
+                        <div key={l.id} className="bg-white border border-blue-100 rounded-lg p-3">
+                          {editingLearning?.id === l.id ? (
+                            <div className="space-y-2">
+                              <input value={editingLearning.topic} onChange={e => setEditingLearning({ ...editingLearning, topic: e.target.value })}
+                                className="w-full border rounded px-2 py-1 text-xs font-medium" />
+                              <textarea value={editingLearning.content} onChange={e => setEditingLearning({ ...editingLearning, content: e.target.value })}
+                                rows={2} className="w-full border rounded px-2 py-1 text-xs resize-none" />
+                              <div className="flex gap-1">
+                                <button onClick={saveEditLearning} className="bg-blue-600 text-white px-3 py-1 rounded text-xs">Guardar</button>
+                                <button onClick={() => setEditingLearning(null)} className="border px-3 py-1 rounded text-xs text-gray-600">Cancelar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">{l.topic.replace("[Auto] ","")}</span>
+                                  <span className="text-[10px] text-blue-300">{new Date(l.created_at * 1000).toLocaleDateString("es-CO")}</span>
+                                </div>
+                                <p className="text-xs text-gray-600 line-clamp-2">{l.content}</p>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })} className="text-blue-400 hover:text-blue-600 p-1 rounded text-xs">✏️</button>
+                                <button onClick={() => deleteLearning(l.id)} className="text-red-300 hover:text-red-500 p-1 rounded text-xs">🗑</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={() => setEditingLearning({ id: l.id, topic: l.topic, content: l.content })} className="text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded">✏️</button>
-                          <button onClick={() => deleteLearning(l.id)} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded">🗑</button>
-                        </div>
-                      </div>
+                      ))
+                    )}
+                    {!showAuto && autoLearnings.length > PREVIEW && (
+                      <button onClick={() => setShowAuto(true)} className="w-full text-xs text-blue-500 py-1">Ver {autoLearnings.length - PREVIEW} más...</button>
                     )}
                   </div>
-                ))}
+                )}
+
+                {/* Preview cerrado — resumen compacto */}
+                {!showAuto && autoLearnings.length > 0 && (
+                  <div className="px-4 py-2 flex flex-wrap gap-1.5">
+                    {autoLearnings.slice(0, 5).map(l => (
+                      <span key={l.id} className="text-[11px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">
+                        {l.topic.replace("[Auto] ","").slice(0, 25)}
+                      </span>
+                    ))}
+                    {autoLearnings.length > 5 && <span className="text-[11px] text-gray-400">+{autoLearnings.length - 5} más</span>}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Conocimiento manual */}
           <div>
