@@ -121,6 +121,11 @@ async function processFacebook(entries: FacebookEntry[]) {
           "INSERT INTO conversations (phone, name, channel, channel_user_id, channel_page_id) VALUES (?,?,?,?,?) RETURNING id, mode, name"
         ).get(`fb_${senderId}`, senderName, "facebook", senderId, pageId) as typeof conv;
       }
+
+      // Actualizar nombre si lo obtuvimos y la conversación no tiene uno
+      if (conv && senderName && !conv.name) {
+        db.prepare("UPDATE conversations SET name=? WHERE id=?").run(senderName, conv.id);
+      }
       if (!conv) continue;
 
       console.log(`[webhook:facebook] ← ${senderId} (${senderName ?? "sin nombre"}): "${text.slice(0, 80)}"`);
