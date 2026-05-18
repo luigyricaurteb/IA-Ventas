@@ -290,7 +290,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
   const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
     { id: "company",   label: "Empresa" },
-    { id: "whatsapp",  label: "WhatsApp" },
+    { id: "whatsapp",  label: "☁️ Meta" },
     { id: "banks",     label: "Cuentas bancarias" },
     { id: "smtp",      label: "Email SMTP" },
     { id: "learning",  label: `${aiName} IA` },
