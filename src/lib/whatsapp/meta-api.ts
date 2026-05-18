@@ -11,10 +11,12 @@ function getConfig(companyDb: import("better-sqlite3").Database) {
     "SELECT wa_access_token, wa_phone_number_id FROM whatsapp_config WHERE id=1"
   ).get() as { wa_access_token: string | null; wa_phone_number_id: string | null } | null;
 
-  const token   = row?.wa_access_token   ?? process.env.WHATSAPP_ACCESS_TOKEN   ?? "";
-  const phoneId = row?.wa_phone_number_id ?? process.env.WHATSAPP_PHONE_NUMBER_ID ?? "";
+  // Las variables de entorno de Railway tienen prioridad sobre la DB
+  // Así las credenciales persisten aunque la DB se resetee en un redeploy
+  const token   = process.env.WHATSAPP_ACCESS_TOKEN   || row?.wa_access_token   || "";
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || row?.wa_phone_number_id || "";
 
-  if (!token || !phoneId) throw new Error("WhatsApp Cloud API no configurado");
+  if (!token || !phoneId) throw new Error("WhatsApp Cloud API no configurado. Agrega WHATSAPP_ACCESS_TOKEN y WHATSAPP_PHONE_NUMBER_ID en Railway.");
   return { token, phoneId };
 }
 

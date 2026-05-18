@@ -36,8 +36,11 @@ export async function GET(req: NextRequest) {
   if (!ctx) return unauthorized();
   const { db } = ctx;
 
-  // ── Meta Cloud API: si tiene credenciales guardadas → siempre "connected" ──
-  // Con Meta no hay WebSocket — la conexión es por HTTP/webhook, siempre activa
+  // ── Meta Cloud API: credenciales desde Railway env vars O desde la DB ───────
+  // Las env vars tienen prioridad — persisten entre redeploys sin volumen.
+  const envToken   = process.env.WHATSAPP_ACCESS_TOKEN;
+  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
   const waConfig = db.prepare(
     "SELECT provider, wa_access_token, wa_phone_number_id, wa_phone_display FROM whatsapp_config WHERE id=1"
   ).get() as {
@@ -47,15 +50,29 @@ export async function GET(req: NextRequest) {
     wa_phone_display: string | null;
   } | null;
 
-  if (waConfig?.provider === "meta" && waConfig.wa_access_token && waConfig.wa_phone_number_id) {
-    // Actualizar connection_state para que el dashboard muestre el estado correcto
+  const metaToken   = envToken   || waConfig?.wa_access_token;
+  const metaPhoneId = envPhoneId || waConfig?.wa_phone_number_id;
+  const isMeta      = (waConfig?.provider === "meta" || (!!envToken && !!envPhoneId));
+
+  if (isMeta && metaToken && metaPhoneId) {
+    const phone = waConfig?.wa_phone_display ?? metaPhoneId;
+
+    // Sincronizar DB con env vars si están configuradas en Railway
+    if (envToken && envPhoneId && waConfig?.provider !== "meta") {
+      try {
+        db.prepare(
+          "UPDATE whatsapp_config SET provider='meta', wa_access_token=?, wa_phone_number_id=?, updated_at=unixepoch() WHERE id=1"
+        ).run(envToken, envPhoneId);
+      } catch {}
+    }
+
     db.prepare(
       "UPDATE connection_state SET status='connected', phone=?, qr_string=NULL, updated_at=unixepoch() WHERE id=1"
-    ).run(waConfig.wa_phone_display ?? waConfig.wa_phone_number_id);
+    ).run(phone);
 
     return NextResponse.json({
       status: "connected",
-      phone: waConfig.wa_phone_display ?? waConfig.wa_phone_number_id,
+      phone,
       provider: "meta",
     });
   }
