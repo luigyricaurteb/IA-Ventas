@@ -82,16 +82,22 @@ export default function WhatsAppConfigPanel() {
   }
 
   async function handleSaveFb() {
-    if (!fbPageToken) { setResult({ ok: false, msg: "Ingresa el Page Access Token" }); return; }
+    if (!fbPageToken && !cfg?.has_fb_token) { setResult({ ok: false, msg: "Ingresa el Page Access Token" }); return; }
     setSaving(true); setResult(null);
+    const body: Record<string, string> = { action: "save_facebook" };
+    if (fbPageToken) body.fb_page_token = fbPageToken;
+    if (fbPageId)    body.fb_page_id    = fbPageId;
     const res = await fetch("/api/settings/whatsapp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save_facebook", fb_page_token: fbPageToken }),
+      body: JSON.stringify(body),
     });
     const d = await res.json() as { ok: boolean; page_name?: string; page_id?: string; error?: string };
-    setResult(d.ok ? { ok: true, msg: `✅ Facebook conectado: ${d.page_name} (ID: ${d.page_id})` } : { ok: false, msg: `❌ ${d.error}` });
-    if (d.ok) fetch("/api/settings/whatsapp").then(r => r.json()).then((c: WaConfig) => setCfg(c));
+    setResult(d.ok ? { ok: true, msg: `✅ Facebook guardado: ${d.page_name ?? "Beach Land Club"} (ID: ${d.page_id ?? fbPageId})` } : { ok: false, msg: `❌ ${d.error}` });
+    if (d.ok) {
+      setFbPageToken(""); // limpiar campo de token después de guardar
+      fetch("/api/settings/whatsapp").then(r => r.json()).then((c: WaConfig) => setCfg(c));
+    }
     setSaving(false);
   }
 
@@ -213,31 +219,57 @@ export default function WhatsAppConfigPanel() {
       {activeTab === "facebook" && (
         <div className="bg-white border rounded-xl p-5 space-y-4">
           <h3 className="font-semibold text-gray-800">📘 Facebook Messenger</h3>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1">
-            <p className="font-semibold">Pasos previos en Meta:</p>
-            <p>1. Tu app → Agregar producto → <strong>Messenger</strong></p>
-            <p>2. Conecta tu Página de Facebook</p>
-            <p>3. Copia el Page Access Token</p>
-            <p>4. Configura el webhook con la URL de arriba → suscríbete a <strong>messages</strong></p>
+
+          {/* Estado actual guardado */}
+          {cfg?.has_fb_token && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-blue-800">✅ Facebook conectado</span>
+                <button onClick={() => handleDisconnect("facebook")} className="text-xs text-red-400 hover:text-red-600">Desconectar</button>
+              </div>
+              {cfg.fb_page_name && <p className="text-xs text-blue-700">Página: <strong>{cfg.fb_page_name}</strong></p>}
+              {cfg.fb_page_id   && <p className="text-xs text-blue-700">Page ID: <code className="bg-white px-1 rounded">{cfg.fb_page_id}</code></p>}
+              <p className="text-xs text-blue-600">Token: <code className="bg-white px-1 rounded">••••••••{cfg.wa_access_token_preview ? "" : " (guardado)"}</code></p>
+            </div>
+          )}
+
+          {/* Instrucciones colapsables */}
+          <details className="text-xs">
+            <summary className="cursor-pointer text-amber-700 font-semibold bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              {cfg?.has_fb_token ? "¿Cómo actualizar las credenciales?" : "📋 Pasos para obtener el token"}
+            </summary>
+            <div className="bg-amber-50 border border-amber-200 rounded-b-lg px-3 pb-3 space-y-1 text-amber-800">
+              <p className="mt-2">1. Tu app de Meta → Agregar producto → <strong>Messenger</strong></p>
+              <p>2. Conecta tu Página de Facebook</p>
+              <p>3. Ve a <strong>Graph API Explorer</strong> → llama <code>me/accounts</code></p>
+              <p>4. Copia el <code>access_token</code> y el <code>id</code> de tu página</p>
+              <p>5. Configura webhook → suscríbete a <strong>messages</strong></p>
+            </div>
+          </details>
+
+          {/* Formulario */}
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">
+              Page Access Token {!cfg?.has_fb_token && <span className="text-red-500">*</span>}
+            </label>
+            <input type="password"
+              placeholder={cfg?.has_fb_token ? "Dejar vacío para mantener el actual" : "EAAGm..."}
+              value={fbPageToken} onChange={e => setFbPageToken(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Page Access Token <span className="text-red-500">*</span></label>
-            <input type="password" placeholder="EAAGm..." value={fbPageToken} onChange={e => setFbPageToken(e.target.value)}
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID</label>
+            <input type="text" placeholder="Ej: 1017175161475090" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <p className="text-xs text-gray-400 mt-1">Obtén este token desde Graph API Explorer → me/accounts</p>
+            <p className="text-xs text-gray-400 mt-1">Desde me/accounts → campo "id" de la página</p>
           </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID <span className="text-gray-400">(opcional — se detecta del token)</span></label>
-            <input type="text" placeholder="Ej: 123456789012345" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <p className="text-xs text-gray-400 mt-1">Está en la respuesta de me/accounts → campo "id"</p>
-          </div>
+
           {result && activeTab === "facebook" && (
             <div className={`rounded-lg p-3 text-sm ${result.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{result.msg}</div>
           )}
-          <button onClick={handleSaveFb} disabled={saving || !fbPageToken}
+          <button onClick={handleSaveFb} disabled={saving || (!fbPageToken && !cfg?.has_fb_token)}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
-            {saving ? "Guardando..." : "Guardar Facebook"}
+            {saving ? "Guardando..." : cfg?.has_fb_token ? "Actualizar Facebook" : "Guardar Facebook"}
           </button>
         </div>
       )}

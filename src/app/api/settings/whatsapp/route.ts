@@ -73,23 +73,28 @@ export async function POST(req: NextRequest) {
     const { fb_page_token, fb_page_id } = body;
     if (!fb_page_token) return NextResponse.json({ ok: false, error: "Page Access Token es requerido" }, { status: 400 });
 
-    // Guardar el token directamente — la verificación real ocurre cuando llega el primer mensaje
-    // Intentar obtener info de la página pero sin bloquear si falla
-    let realPageId: string | null = body.fb_page_id ?? null;
-    let pageName: string | null = null;
+    const existingCfg = db.prepare("SELECT fb_page_id, fb_page_token, fb_page_name FROM whatsapp_config WHERE id=1")
+      .get() as { fb_page_id: string | null; fb_page_token: string | null; fb_page_name: string | null } | null;
 
-    try {
-      const r = await fetch(
-        `https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${fb_page_token}`,
-        { signal: AbortSignal.timeout(6000) }
-      );
-      const d = await r.json() as { id?: string; name?: string; error?: unknown };
-      if (!d.error && d.id) { realPageId = d.id; pageName = d.name ?? null; }
-    } catch { /* ignorar — guardar de todas formas */ }
+    // Si no hay token nuevo, mantener el existente (solo actualizar Page ID si se provee)
+    const tokenToUse   = fb_page_token || existingCfg?.fb_page_token || "";
+    let   realPageId   = body.fb_page_id || existingCfg?.fb_page_id || null;
+    let   pageName     = existingCfg?.fb_page_name ?? null;
+
+    if (!tokenToUse) return NextResponse.json({ ok: false, error: "No hay token guardado. Ingresa el Page Access Token." }, { status: 400 });
+
+    // Intentar obtener info actualizada de la página (sin bloquear si falla)
+    if (fb_page_token) {
+      try {
+        const r = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${fb_page_token}`, { signal: AbortSignal.timeout(6000) });
+        const d = await r.json() as { id?: string; name?: string; error?: unknown };
+        if (!d.error && d.id) { realPageId = d.id; pageName = d.name ?? null; }
+      } catch { /* ignorar — usar el Page ID manual si se proveyó */ }
+    }
 
     db.prepare("UPDATE whatsapp_config SET fb_page_id=?, fb_page_token=?, fb_page_name=?, updated_at=unixepoch() WHERE id=1")
-      .run(realPageId, fb_page_token, pageName);
-    return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName ?? "Facebook conectado" });
+      .run(realPageId, tokenToUse, pageName);
+    return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName ?? "Beach Land Club" });
   }
 
   if (action === "disconnect_facebook") {
