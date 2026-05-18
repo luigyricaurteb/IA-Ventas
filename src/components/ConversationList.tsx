@@ -15,6 +15,14 @@ interface ConversationListProps {
   onSelect: (id: number) => void;
 }
 
+// LIDs son identificadores internos de WhatsApp: números de 14+ dígitos
+const LID_RE = /^\d{14,}$/;
+function displayLabel(name: string | null, phone: string): string {
+  if (name) return name;
+  if (LID_RE.test(phone)) return "Contacto (pendiente)";
+  return `+${phone}`;
+}
+
 function relativeTime(ts: number | null): string {
   if (!ts) return "";
   const diff = Math.floor(Date.now() / 1000) - ts;
@@ -51,7 +59,7 @@ export default function ConversationList({
         >
           <div className="flex items-center justify-between mb-0.5">
             <span className="font-medium text-gray-800 text-sm truncate flex-1">
-              {c.name ?? c.phone}
+              {displayLabel(c.name, c.phone)}
             </span>
             <span
               className={`ml-2 text-xs px-2 py-0.5 rounded-full font-semibold ${
