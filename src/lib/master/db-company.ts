@@ -432,22 +432,43 @@ function initCompanySchema(db: Database.Database): void {
     // WhatsApp Cloud API (Meta oficial)
     "ALTER TABLE messages ADD COLUMN wa_message_id TEXT",
     "ALTER TABLE messages ADD COLUMN read_at INTEGER",
+    // Multi-canal: WhatsApp, Instagram, Facebook Messenger
+    "ALTER TABLE conversations ADD COLUMN channel TEXT NOT NULL DEFAULT 'whatsapp'",
+    "ALTER TABLE conversations ADD COLUMN channel_user_id TEXT",
+    "ALTER TABLE conversations ADD COLUMN channel_page_id TEXT",
   ]) { try { db.exec(sql); } catch {} }
 
-  // Tabla de configuración WhatsApp Cloud API (Meta)
+  // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)
   db.exec(`
     CREATE TABLE IF NOT EXISTS whatsapp_config (
       id INTEGER PRIMARY KEY CHECK(id=1),
+      provider TEXT NOT NULL DEFAULT 'baileys',
+      -- WhatsApp Cloud API
       wa_access_token TEXT,
       wa_phone_number_id TEXT,
       wa_business_account_id TEXT,
       wa_phone_display TEXT,
       wa_verified_name TEXT,
-      provider TEXT NOT NULL DEFAULT 'baileys',
+      -- Facebook Messenger
+      fb_page_id TEXT,
+      fb_page_token TEXT,
+      fb_page_name TEXT,
+      -- Instagram
+      ig_account_id TEXT,
+      ig_username TEXT,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
     INSERT OR IGNORE INTO whatsapp_config (id, provider) VALUES (1, 'baileys');
   `);
+
+  // Migraciones para columnas nuevas de canales (si la tabla ya existía)
+  for (const sql of [
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_page_id TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_page_token TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_page_name TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN ig_account_id TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN ig_username TEXT",
+  ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores
   const existing = db.prepare("SELECT ai_general_instructions FROM company_config WHERE id=1").get() as { ai_general_instructions: string | null } | null;
