@@ -429,7 +429,25 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE smtp_config ADD COLUMN provider TEXT NOT NULL DEFAULT 'smtp'",
     "ALTER TABLE smtp_config ADD COLUMN resend_api_key TEXT",
     "ALTER TABLE smtp_config ADD COLUMN resend_from TEXT",
+    // WhatsApp Cloud API (Meta oficial)
+    "ALTER TABLE messages ADD COLUMN wa_message_id TEXT",
+    "ALTER TABLE messages ADD COLUMN read_at INTEGER",
   ]) { try { db.exec(sql); } catch {} }
+
+  // Tabla de configuración WhatsApp Cloud API (Meta)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS whatsapp_config (
+      id INTEGER PRIMARY KEY CHECK(id=1),
+      wa_access_token TEXT,
+      wa_phone_number_id TEXT,
+      wa_business_account_id TEXT,
+      wa_phone_display TEXT,
+      wa_verified_name TEXT,
+      provider TEXT NOT NULL DEFAULT 'baileys',
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
+    INSERT OR IGNORE INTO whatsapp_config (id, provider) VALUES (1, 'baileys');
+  `);
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores
   const existing = db.prepare("SELECT ai_general_instructions FROM company_config WHERE id=1").get() as { ai_general_instructions: string | null } | null;

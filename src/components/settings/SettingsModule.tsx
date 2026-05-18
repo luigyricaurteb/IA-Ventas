@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import WhatsAppConfigPanel from "./WhatsAppConfigPanel";
 
 type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla";
 
@@ -393,79 +394,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
       {/* ── WHATSAPP ── */}
       {tab === "whatsapp" && (
-        <div className="space-y-4">
-          {/* Estado de conexión */}
-          <div className={`rounded-xl p-5 border flex items-center gap-4 ${
-            waStatus === "connected" ? "bg-emerald-50 border-emerald-200" :
-            waStatus === "qr" || waStatus === "connecting" ? "bg-blue-50 border-blue-200" :
-            "bg-gray-50 border-gray-200"
-          }`}>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0 ${
-              waStatus === "connected" ? "bg-emerald-100" :
-              waStatus === "qr" || waStatus === "connecting" ? "bg-blue-100" : "bg-gray-200"
-            }`}>
-              {waStatus === "connected" ? "✅" : waStatus === "qr" ? "📱" : waStatus === "connecting" ? "⏳" : "📵"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`font-semibold ${
-                waStatus === "connected" ? "text-emerald-800" :
-                waStatus === "qr" || waStatus === "connecting" ? "text-blue-800" : "text-gray-700"
-              }`}>
-                {waStatus === "connected" ? "WhatsApp conectado" :
-                 waStatus === "qr" ? "Listo para escanear QR" :
-                 waStatus === "connecting" ? "Conectando..." : "WhatsApp desconectado"}
-              </p>
-              {waPhone && <p className="text-sm text-gray-500 mt-0.5">Número: +{waPhone}</p>}
-              {(waStatus === "qr" || waStatus === "connecting") && !waPhone && (
-                <p className="text-sm text-blue-600 mt-0.5">Abre WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
-              )}
-            </div>
-            {waStatus === "connected" && (
-              <button onClick={disconnectWa} disabled={waDisconnecting}
-                className="shrink-0 bg-red-100 text-red-600 hover:bg-red-200 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
-                {waDisconnecting ? "Desconectando..." : "Desconectar"}
-              </button>
-            )}
-          </div>
-
-          {/* QR Code */}
-          {waQr && waStatus === "qr" && (
-            <div className="bg-white border rounded-xl p-6 flex flex-col items-center gap-3">
-              <p className="text-sm font-medium text-gray-700">Escanea con tu celular</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={waQr} alt="QR WhatsApp" className="w-56 h-56 rounded-xl" />
-              <p className="text-xs text-gray-400 text-center">El QR se actualiza automáticamente cada 30 segundos</p>
-            </div>
-          )}
-
-          {/* Desconectado — instrucciones + botón de reconexión */}
-          {waStatus === "disconnected" && !waQr && (
-            <div className="space-y-3">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                <p className="font-medium mb-1">WhatsApp desconectado</p>
-                <p>Haz clic en <strong>"Solicitar QR"</strong> para generar un nuevo código y volver a vincular WhatsApp.</p>
-              </div>
-              <button
-                onClick={restartWa}
-                disabled={waRestarting}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {waRestarting ? (
-                  <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Solicitando QR...</>
-                ) : (
-                  "📱 Solicitar QR para vincular WhatsApp"
-                )}
-              </button>
-              <p className="text-xs text-gray-400 text-center">El QR aparecerá en esta pantalla en los próximos 30 segundos</p>
-            </div>
-          )}
-
-          <div className="bg-gray-50 border rounded-xl p-4 text-xs text-gray-500 space-y-1">
-            <p>• El bot solo funciona cuando WhatsApp está conectado</p>
-            <p>• Si cambias de teléfono debes volver a escanear el QR</p>
-            <p>• La sesión se mantiene activa mientras el servidor esté corriendo</p>
-          </div>
-        </div>
+        <WhatsAppConfigPanel />
       )}
 
       {/* ── BANCOS ── */}
