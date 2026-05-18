@@ -127,16 +127,39 @@ export async function sendAlert(
 
     if (isResend) {
       // Resend API — usa HTTPS, nunca bloqueado por Railway
-      const fromAddr = smtp.resend_from ?? `alertas@resend.dev`;
+      // IMPORTANTE: resend_from debe ser de un dominio verificado en Resend.
+      // Si no tienes dominio verificado, usa Brevo o verifica un dominio propio.
+      const fromAddr = smtp.resend_from || `onboarding@resend.dev`;
       const fromDisplay = `"${smtp.from_name ?? cName}" <${fromAddr}>`;
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { "Authorization": `Bearer ${smtp.resend_api_key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: fromDisplay, to: [company.email], subject, html }),
+        signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { message?: string };
         console.error("[email:resend] Error:", err.message ?? res.status);
+      }
+    } else if (smtp?.provider === "brevo") {
+      // Brevo (Sendinblue) API — HTTPS, funciona en Railway sin dominio verificado
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": smtp.resend_api_key ?? "", // reutilizamos el campo resend_api_key para la Brevo API Key
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { name: smtp.from_name ?? cName, email: smtp.resend_from ?? smtp.from_email ?? smtp.user },
+          to: [{ email: company.email }],
+          subject,
+          htmlContent: html,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        console.error("[email:brevo] Error:", err.message ?? res.status);
       }
     } else {
       // SMTP tradicional
