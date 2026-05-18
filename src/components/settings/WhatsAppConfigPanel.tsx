@@ -267,6 +267,27 @@ export default function WhatsAppConfigPanel() {
           {result && activeTab === "facebook" && (
             <div className={`rounded-lg p-3 text-sm ${result.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{result.msg}</div>
           )}
+
+          {/* Botón de suscripción al webhook — necesario para recibir mensajes */}
+          {cfg?.has_fb_token && (
+            <button
+              onClick={async () => {
+                setSaving(true); setResult(null);
+                const r = await fetch("/api/settings/whatsapp", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "subscribe_facebook_page" }),
+                });
+                const d = await r.json() as { ok: boolean; message?: string; error?: string };
+                setResult(d.ok ? { ok: true, msg: `✅ ${d.message}` } : { ok: false, msg: `❌ ${d.error}` });
+                setSaving(false);
+              }}
+              disabled={saving}
+              className="w-full border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50"
+            >
+              📡 Activar recepción de mensajes (suscribir webhook)
+            </button>
+          )}
+
           <button onClick={handleSaveFb} disabled={saving || (!fbPageToken && !cfg?.has_fb_token)}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
             {saving ? "Guardando..." : cfg?.has_fb_token ? "Actualizar Facebook" : "Guardar Facebook"}

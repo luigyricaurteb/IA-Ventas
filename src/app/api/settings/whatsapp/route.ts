@@ -97,6 +97,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, page_id: realPageId, page_name: pageName ?? "Beach Land Club" });
   }
 
+  // Suscribir la página al webhook de Messenger
+  if (action === "subscribe_facebook_page") {
+    const cfg2 = db.prepare("SELECT fb_page_id, fb_page_token FROM whatsapp_config WHERE id=1")
+      .get() as { fb_page_id: string | null; fb_page_token: string | null } | null;
+    const pageId    = cfg2?.fb_page_id;
+    const pageToken = cfg2?.fb_page_token;
+    if (!pageId || !pageToken) return NextResponse.json({ ok: false, error: "Configura primero el Page Token" }, { status: 400 });
+
+    try {
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks,message_deliveries,message_reads&access_token=${pageToken}`,
+        { method: "POST", signal: AbortSignal.timeout(10000) }
+      );
+      const d = await r.json() as { success?: boolean; error?: { message?: string } };
+      if (d.error) return NextResponse.json({ ok: false, error: d.error.message }, { status: 400 });
+      return NextResponse.json({ ok: true, message: "Página suscrita al webhook exitosamente" });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: "Error al suscribir la página" }, { status: 500 });
+    }
+  }
+
   if (action === "disconnect_facebook") {
     db.prepare("UPDATE whatsapp_config SET fb_page_id=NULL, fb_page_token=NULL, fb_page_name=NULL, updated_at=unixepoch() WHERE id=1").run();
     return NextResponse.json({ ok: true });
