@@ -19,6 +19,27 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
   const [subDays, setSubDays]         = useState<number | null>(null);
   const [companyName, setCompanyName] = useState("Agente DMC");
 
+  // Cambio de contraseña propio
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwForm, setPwForm]           = useState({ current: "", next: "", confirm: "" });
+  const [pwMsg, setPwMsg]             = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwSaving, setPwSaving]       = useState(false);
+
+  async function handleChangePw() {
+    if (pwForm.next.length < 6) { setPwMsg({ ok: false, text: "Mínimo 6 caracteres" }); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwMsg({ ok: false, text: "Las contraseñas no coinciden" }); return; }
+    setPwSaving(true); setPwMsg(null);
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: pwForm.current, new_password: pwForm.next }),
+    });
+    const d = await res.json() as { ok?: boolean; error?: string };
+    setPwSaving(false);
+    if (d.ok) { setPwMsg({ ok: true, text: "✅ Contraseña actualizada" }); setPwForm({ current: "", next: "", confirm: "" }); setTimeout(() => setShowPwModal(false), 1500); }
+    else setPwMsg({ ok: false, text: d.error ?? "Error al cambiar" });
+  }
+
   useEffect(() => {
     async function checkSla() {
       try {
@@ -106,9 +127,13 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
 
         {currentUser && (
           <div className="hidden md:flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold">
+            <button
+              onClick={() => { setShowPwModal(true); setPwMsg(null); setPwForm({ current: "", next: "", confirm: "" }); }}
+              className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-bold hover:bg-emerald-700 transition-colors cursor-pointer"
+              title="Cambiar contraseña"
+            >
               {currentUser.name[0].toUpperCase()}
-            </div>
+            </button>
             <div className="text-right">
               <p className="text-sm font-medium text-gray-700 leading-none">{currentUser.name}</p>
               <p className="text-xs text-gray-400 capitalize">{currentUser.role}</p>
@@ -120,6 +145,45 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
           <button onClick={onLogout} className="text-sm text-red-500 hover:text-red-700 transition-colors font-medium">Salir</button>
         )}
       </div>
+
+      {/* Modal cambio de contraseña propio */}
+      {showPwModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-gray-800">🔑 Cambiar mi contraseña</h3>
+              <button onClick={() => setShowPwModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Contraseña actual</label>
+                <input type="password" value={pwForm.current} onChange={e => setPwForm({ ...pwForm, current: e.target.value })}
+                  placeholder="••••••••" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Nueva contraseña</label>
+                <input type="password" value={pwForm.next} onChange={e => setPwForm({ ...pwForm, next: e.target.value })}
+                  placeholder="Mínimo 6 caracteres" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Confirmar nueva contraseña</label>
+                <input type="password" value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })}
+                  placeholder="Repite la contraseña" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+            </div>
+            {pwMsg && (
+              <p className={`text-sm rounded-lg px-3 py-2 ${pwMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{pwMsg.text}</p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setShowPwModal(false)} className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-xl text-sm hover:bg-gray-50">Cancelar</button>
+              <button onClick={handleChangePw} disabled={pwSaving || !pwForm.next || !pwForm.confirm}
+                className="flex-1 bg-emerald-500 text-white py-2 rounded-xl text-sm font-semibold hover:bg-emerald-600 disabled:opacity-50">
+                {pwSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

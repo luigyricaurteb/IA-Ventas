@@ -55,6 +55,8 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
   const [editingUser, setEditingUser]         = useState<number | null>(null);
   const [showNewUser, setShowNewUser]         = useState(false);
   const [newUserForm, setNewUserForm]         = useState({ username:"", name:"", password:"", is_admin:false, permissions: Object.fromEntries(MODULES.map(m=>[m,false])) });
+  const [pwModal, setPwModal]                 = useState<{ id: number; name: string; pw: string } | null>(null);
+  const [pwSaving, setPwSaving]               = useState(false);
 
   const fetchAll = useCallback(() => {
     Promise.all([
@@ -344,6 +346,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                             {isEditing?"Cerrar":"✏️ Permisos"}
                           </button>
                         )}
+                        <button onClick={()=>setPwModal({ id: u.id, name: u.name, pw: "" })}
+                          className="text-xs bg-purple-900 text-purple-300 hover:bg-purple-800 px-3 py-1.5 rounded-lg">
+                          🔑 Contraseña
+                        </button>
                         <button onClick={()=>toggleUserActive(u)}
                           className="text-xs bg-amber-900 text-amber-300 hover:bg-amber-800 px-3 py-1.5 rounded-lg">
                           {u.active?"⏸":"▶"}
@@ -497,6 +503,49 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
           </div>
         )}
       </div>
+
+      {/* ── Modal cambiar contraseña de usuario ── */}
+      {pwModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-white font-bold">🔑 Cambiar contraseña</h3>
+            <p className="text-gray-400 text-sm">Usuario: <strong className="text-white">{pwModal.name}</strong></p>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Nueva contraseña</label>
+              <input
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={pwModal.pw}
+                onChange={e => setPwModal({ ...pwModal, pw: e.target.value })}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPwModal(null)} className="flex-1 bg-gray-700 text-gray-300 hover:bg-gray-600 py-2 rounded-lg text-sm">
+                Cancelar
+              </button>
+              <button
+                disabled={pwSaving || pwModal.pw.length < 6}
+                onClick={async () => {
+                  if (!usersCompanyId) return;
+                  setPwSaving(true);
+                  await fetch(`/api/master/companies/${usersCompanyId}/users/${pwModal.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ password: pwModal.pw }),
+                  });
+                  setPwSaving(false);
+                  setPwModal(null);
+                }}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                {pwSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal empresa (crear / editar) ── */}
       {showNewCompany && (

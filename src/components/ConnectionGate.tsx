@@ -131,8 +131,7 @@ export default function ConnectionGate() {
     return <div className="min-h-screen flex items-center justify-center bg-gray-900"><div className="w-8 h-8 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /></div>;
   }
 
-  // Usuarios normales sin WhatsApp conectado → pantalla QR
-  if (!connected && !currentUser?.isMaster) return <QRScreen onConnected={handleConnected} />;
+  // El dashboard es siempre accesible — WhatsApp se configura en el módulo de Chat o en Ajustes
 
   const selectedConv  = conversations.find(c => c.id === selectedId) ?? null;
   const perms         = currentUser?.permissions ?? {};
@@ -235,8 +234,20 @@ export default function ConnectionGate() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 overflow-auto">
-                <QRScreen onConnected={handleConnected} />
+              <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
+                <div className="text-center max-w-sm">
+                  <div className="text-5xl mb-4">📱</div>
+                  <h2 className="text-lg font-bold text-gray-800 mb-2">WhatsApp no conectado</h2>
+                  <p className="text-sm text-gray-500 mb-5">
+                    Para recibir y enviar mensajes, conecta WhatsApp desde el panel de Ajustes.
+                  </p>
+                  <button
+                    onClick={() => setActiveModule("settings" as import("./layout/Sidebar").Module)}
+                    className="bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-emerald-600 transition-colors"
+                  >
+                    Ir a Ajustes → WhatsApp
+                  </button>
+                </div>
               </div>
             )
           )}
