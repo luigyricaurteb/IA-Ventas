@@ -435,21 +435,63 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           {/* Selector de proveedor */}
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">Proveedor de email</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
+              <button onClick={() => setSmtp({...smtp, provider: "brevo"})}
+                className={`border-2 rounded-xl p-3 text-left transition-colors ${smtp.provider === "brevo" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <p className="font-semibold text-gray-800 text-sm">✉️ Brevo</p>
+                <p className="text-xs text-gray-500 mt-0.5">Sin dominio propio</p>
+                <p className="text-xs text-emerald-600 mt-1">Gratis: 300/día</p>
+              </button>
               <button onClick={() => setSmtp({...smtp, provider: "resend"})}
-                className={`border-2 rounded-xl p-4 text-left transition-colors ${smtp.provider === "resend" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
+                className={`border-2 rounded-xl p-3 text-left transition-colors ${smtp.provider === "resend" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
                 <p className="font-semibold text-gray-800 text-sm">🚀 Resend</p>
-                <p className="text-xs text-gray-500 mt-0.5">Recomendado — API HTTPS, funciona en Railway</p>
-                <p className="text-xs text-emerald-600 mt-1">Gratis: 3.000 emails/mes</p>
+                <p className="text-xs text-gray-500 mt-0.5">Dominio propio</p>
+                <p className="text-xs text-emerald-600 mt-1">Gratis: 3.000/mes</p>
               </button>
               <button onClick={() => setSmtp({...smtp, provider: "smtp"})}
-                className={`border-2 rounded-xl p-4 text-left transition-colors ${smtp.provider !== "resend" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
+                className={`border-2 rounded-xl p-3 text-left transition-colors ${smtp.provider === "smtp" ? "border-emerald-500 bg-emerald-50" : "border-gray-200 hover:border-gray-300"}`}>
                 <p className="font-semibold text-gray-800 text-sm">📬 SMTP</p>
-                <p className="text-xs text-gray-500 mt-0.5">Gmail, Outlook, servidor propio</p>
-                <p className="text-xs text-orange-500 mt-1">Puerto 587/465 puede ser bloqueado</p>
+                <p className="text-xs text-gray-500 mt-0.5">Servidor propio</p>
+                <p className="text-xs text-orange-500 mt-1">Bloqueado en Railway</p>
               </button>
             </div>
           </div>
+
+          {/* Brevo */}
+          {smtp.provider === "brevo" && (
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-1">
+                <p className="font-semibold">✅ Brevo funciona sin dominio propio</p>
+                <p className="text-xs">Puedes enviar desde tu Gmail directamente. 300 emails/día gratis.</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs mt-2">
+                  <li>Ve a <strong>brevo.com</strong> → crea cuenta gratuita con tu Gmail</li>
+                  <li>Dashboard → <strong>SMTP & API</strong> → pestaña <strong>API</strong></li>
+                  <li>Clic en <strong>Generate a new API key</strong> → cópiala</li>
+                  <li>Pega aquí abajo y guarda</li>
+                </ol>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-700">API Key de Brevo *</label>
+                  <input type="password" placeholder="xkeysib-••••••••••••••••••••••••••"
+                    onChange={(e) => setSmtp({...smtp, resend_api_key: e.target.value})}
+                    className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email remitente (from)</label>
+                  <input value={smtp.resend_from ?? ""} onChange={(e) => setSmtp({...smtp, resend_from: e.target.value})}
+                    placeholder="infobeachlandgroup@gmail.com"
+                    className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                  <p className="text-xs text-gray-500 mt-1">Usa el mismo email con que te registraste en Brevo</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Nombre remitente</label>
+                  <input value={smtp.from_name ?? ""} onChange={(e) => setSmtp({...smtp, from_name: e.target.value})}
+                    placeholder="Hivo Alertas" className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Resend */}
           {smtp.provider === "resend" && (
@@ -505,7 +547,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           )}
 
           {/* SMTP tradicional */}
-          {smtp.provider !== "resend" && (
+          {smtp.provider === "smtp" && (
             <div className="space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
                 ⚠️ Railway bloquea los puertos SMTP (587, 465). Si tienes problemas de conexión, usa <strong>Resend</strong> en su lugar.

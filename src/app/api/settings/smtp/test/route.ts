@@ -45,6 +45,33 @@ export async function POST(req: NextRequest) {
       <p style="color:#6b7280;font-size:13px;margin:0">Las alertas de nuevas conversaciones, pagos y reservas llegarán correctamente.</p>
     </div>`;
 
+    const isBrevo = smtp?.provider === "brevo";
+
+    if (isBrevo) {
+      if (!smtp?.resend_api_key) return NextResponse.json({ ok: false, error: "Falta la API Key de Brevo. Créala gratis en brevo.com → SMTP & API → API Keys" });
+      const fromEmail = smtp.resend_from ?? smtp.from_email ?? smtp.user ?? "noreply@brevo.com";
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": smtp.resend_api_key, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: { name: smtp.from_name ?? company.name ?? "Hivo", email: fromEmail },
+          to: [{ email: company.email }],
+          subject: "✅ Prueba Brevo — Hivo",
+          htmlContent: html,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const d = await res.json() as { messageId?: string; message?: string; code?: string };
+      if (!res.ok) {
+        let msg = d.message ?? String(res.status);
+        if (msg.toLowerCase().includes("sender") || msg.toLowerCase().includes("not authorized")) {
+          msg = `El email remitente "${fromEmail}" no está autorizado en Brevo. Usa el mismo email con el que te registraste en brevo.com, o agrégalo en Brevo → Senders & IPs → Senders.`;
+        }
+        return NextResponse.json({ ok: false, error: msg });
+      }
+      return NextResponse.json({ ok: true, sentTo: company.email, provider: "brevo" });
+    }
+
     if (isResend) {
       // Resend — usa HTTPS port 443, nunca bloqueado
       if (!smtp?.resend_api_key) return NextResponse.json({ ok: false, error: "Falta la API Key de Resend. Créala gratis en resend.com" });
@@ -53,12 +80,13 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "Authorization": `Bearer ${smtp.resend_api_key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ from: `"${smtp.from_name ?? company.name ?? "Hivo"}" <${fromAddr}>`, to: [company.email], subject: "✅ Prueba Resend — Hivo", html }),
+        signal: AbortSignal.timeout(15000),
       });
       const d = await res.json() as { id?: string; name?: string; message?: string };
       if (!res.ok) {
         let msg = d.message ?? d.name ?? String(res.status);
         if (msg.includes("domain is not verified") || msg.includes("gmail.com")) {
-          msg = `El email remitente "${fromAddr}" no está verificado en Resend. Usa "onboarding@resend.dev" como remitente (el destinatario que recibe las alertas se configura en Ajustes → Empresa → Correo de contacto).`;
+          msg = `El dominio del remitente no está verificado en Resend. Necesitas verificar un dominio propio en resend.com → Domains. Alternativa: usa Brevo (funciona con Gmail sin verificar dominio).`;
         }
         return NextResponse.json({ ok: false, error: msg });
       }
