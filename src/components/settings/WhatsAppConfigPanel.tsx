@@ -228,7 +228,7 @@ export default function WhatsAppConfigPanel() {
           {result && activeTab === "facebook" && (
             <div className={`rounded-lg p-3 text-sm ${result.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{result.msg}</div>
           )}
-          <button onClick={handleSaveFb} disabled={saving || !fbPageId || !fbPageToken}
+          <button onClick={handleSaveFb} disabled={saving || !fbPageToken}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
             {saving ? "Guardando..." : "Guardar Facebook"}
           </button>
