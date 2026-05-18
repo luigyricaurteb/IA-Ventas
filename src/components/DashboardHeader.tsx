@@ -17,7 +17,7 @@ export default function DashboardHeader({ phone, onDisconnect, currentUser, onLo
   const [showSla, setShowSla]         = useState(false);
   const [slaList, setSlaList]         = useState<SlaBreachItem[]>([]);
   const [subDays, setSubDays]         = useState<number | null>(null);
-  const [companyName, setCompanyName] = useState("Agente DMC");
+  const [companyName, setCompanyName] = useState("Hivo");
 
   // Cambio de contraseña propio
   const [showPwModal, setShowPwModal] = useState(false);

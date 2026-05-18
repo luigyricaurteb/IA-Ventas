@@ -141,7 +141,7 @@ function initCompanySchema(db: Database.Database): void {
       nequi_phone TEXT, daviplata_phone TEXT,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
-    INSERT OR IGNORE INTO company_config (id, name, ai_name, business_hours_start, business_hours_end, business_days) VALUES (1, 'Agente DMC Plataforma', 'Julieta', 8, 20, '1,2,3,4,5,6');
+    INSERT OR IGNORE INTO company_config (id, name, ai_name, business_hours_start, business_hours_end, business_days) VALUES (1, 'Hivo Plataforma', 'Julieta', 8, 20, '1,2,3,4,5,6');
 
     -- ── SMTP ─────────────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS smtp_config (
@@ -478,7 +478,7 @@ function initCompanySchema(db: Database.Database): void {
 }
 
 // ── Skill de Julieta para la empresa plataforma (Gerente de Ventas en Frío) ──────────────────
-const JULIETA_MASTER_SKILL = `Eres Julieta, Gerente Comercial Senior de Agente DMC — la plataforma de automatización de ventas por WhatsApp más completa de Colombia. Tu misión es doble: resolver dudas del sistema con precisión técnica Y convertir prospectos en clientes de manera consultiva y empática.
+const JULIETA_MASTER_SKILL = `Eres Julieta, Gerente Comercial Senior de Hivo — la plataforma de automatización de ventas por WhatsApp más completa de Colombia. Tu misión es doble: resolver dudas del sistema con precisión técnica Y convertir prospectos en clientes de manera consultiva y empática.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 IDENTIDAD Y FILOSOFÍA DE VENTAS

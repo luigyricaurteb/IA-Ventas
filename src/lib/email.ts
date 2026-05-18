@@ -49,7 +49,7 @@ h2{color:#1f2937;margin:0 0 4px;font-size:20px}.sub{color:#6b7280;font-size:13px
 .label{color:#6b7280}.value{color:#111827;font-weight:500;text-align:right;max-width:65%}
 .footer{margin-top:24px;font-size:11px;color:#9ca3af;text-align:center}
 </style></head><body><div class="card">
-<div class="badge">Agente DMC</div>
+<div class="badge">Hivo</div>
 <h2>${title}</h2><p class="sub">${companyName}</p>
 ${rows}
 <div class="footer">Notificación automática · No responder este correo</div>

@@ -60,20 +60,23 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
     const isMaster = id === "master";
     if (isMaster) {
       return active === id
-        ? "bg-indigo-600 text-white"
-        : "text-indigo-400 hover:bg-gray-800 hover:text-indigo-300";
+        ? "text-white font-semibold"
+        : "text-amber-300/70 hover:text-amber-200";
     }
     return active === id
-      ? "bg-emerald-600 text-white"
-      : "text-gray-400 hover:bg-gray-800 hover:text-white";
+      ? "text-white font-semibold"
+      : "text-[#c4a882] hover:text-[#e8d9c8]";
   };
 
   // ── Sidebar desktop ───────────────────────────────────────────────────────
   const desktopSidebar = (
-    <aside className="hidden md:flex md:flex-col w-56 shrink-0 bg-gray-900 h-full">
+    <aside className="hidden md:flex md:flex-col w-56 shrink-0 h-full" style={{ background: "var(--sidebar-bg)" }}>
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-gray-800 shrink-0">
-        <span className="text-white font-bold text-sm tracking-wide">Agente DMC</span>
+      <div className="px-5 py-5 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-black text-white" style={{ background: "var(--accent)" }}>H</div>
+          <span className="font-bold text-sm tracking-wider" style={{ color: "var(--sidebar-text)" }}>Hivo</span>
+        </div>
       </div>
 
       {/* Items — scrollable */}
@@ -103,7 +106,7 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
                   </span>
                 )}
               </button>
-              {item.dividerAfter && <div className="mx-4 my-1.5 border-t border-gray-700/60" />}
+              {item.dividerAfter && <div className="mx-4 my-1.5 border-t border-white/5" />}
             </div>
           );
         })}
@@ -122,9 +125,9 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
         />
       )}
       {/* Drawer */}
-      <div className={`fixed top-0 left-0 h-full w-64 bg-gray-900 z-50 flex flex-col shadow-2xl transition-transform duration-300 md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-4 py-4 border-b border-gray-800 flex items-center justify-between shrink-0">
-          <span className="text-white font-bold text-sm">Agente DMC</span>
+      <div className={`fixed top-0 left-0 h-full w-64 z-50 flex flex-col shadow-2xl transition-transform duration-300 md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ background: "var(--sidebar-bg)" }}>
+        <div className="px-4 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <span className="text-white font-bold text-sm">Hivo</span>
           <button onClick={onMobileClose} className="text-gray-400 hover:text-white text-xl leading-none">✕</button>
         </div>
         <nav className="flex-1 overflow-y-auto py-2">
@@ -147,7 +150,7 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
                   <span className="text-sm font-medium">{item.label}</span>
                   {badge > 0 && <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{badge}</span>}
                 </button>
-                {item.dividerAfter && <div className="mx-4 my-1 border-t border-gray-700/60" />}
+                {item.dividerAfter && <div className="mx-4 my-1 border-t border-white/5" />}
               </div>
             );
           })}
@@ -158,7 +161,7 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
 
   // ── Barra de navegación móvil inferior ────────────────────────────────────
   const mobileBottomNav = (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 z-30 safe-area-pb">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 safe-area-pb" style={{ background: "var(--sidebar-bg)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
       <div className="flex items-center justify-around px-2 py-1">
         {mobileItems.map(item => {
           const badge = item.id === "chat" ? alertCount : 0;

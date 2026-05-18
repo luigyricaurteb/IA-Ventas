@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Agente DMC//Reservas//ES",
+    "PRODID:-//Hivo//Reservas//ES",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "X-WR-CALNAME:Reservas",

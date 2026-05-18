@@ -4,7 +4,7 @@ import type Database from "better-sqlite3";
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
   baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: { "HTTP-Referer": "http://localhost:8080", "X-Title": "Agente DMC Auto-Learn" },
+  defaultHeaders: { "HTTP-Referer": "http://localhost:8080", "X-Title": "Hivo Auto-Learn" },
 });
 const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 

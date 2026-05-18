@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agente DMC",
+  title: "Hivo",
   description: "Dashboard de ventas y atención al cliente por WhatsApp",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Agente DMC" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Hivo" },
 };
 
 export const viewport: Viewport = {

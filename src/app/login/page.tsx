@@ -50,25 +50,27 @@ export default function LoginPage() {
   const selectedInfo = activeCompanies.find(c => c.slug === selectedCompany);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #fdf8f2 0%, #f0e4d0 50%, #e8d5bb 100%)" }}>
       <div className="w-full max-w-sm">
         {/* Logo / Header */}
         <div className="text-center mb-8">
           {selectedInfo?.logo_filename ? (
             <img src={`/uploads/master/${selectedInfo.logo_filename}`} alt={selectedInfo.name}
-              className="w-16 h-16 object-contain rounded-2xl mx-auto mb-4 bg-white p-1" />
+              className="w-16 h-16 object-contain rounded-2xl mx-auto mb-4 p-1" style={{ background: "var(--surface)" }} />
           ) : (
-            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-lg">🤖</div>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg text-white text-2xl font-black" style={{ background: "var(--accent)" }}>
+              H
+            </div>
           )}
-          <h1 className="text-3xl font-bold text-white">
-            {selectedInfo ? selectedInfo.name : "Agente DMC"}
+          <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
+            {selectedInfo ? selectedInfo.name : "Hivo"}
           </h1>
-          <p className="text-gray-400 mt-1 text-sm">
-            {selectedCompany === "__master__" ? "Administración de Plataforma" : "Plataforma de ventas por WhatsApp"}
+          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+            {selectedCompany === "__master__" ? "Administración de Plataforma" : "Plataforma de ventas inteligente"}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xl p-8 space-y-4">
+        <form onSubmit={handleSubmit} className="rounded-2xl shadow-xl p-8 space-y-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
           {/* Selector de empresa */}
           <div>
             <label className="text-sm font-medium text-gray-700">Empresa</label>
