@@ -6,6 +6,7 @@ import { getCompanyDb } from "../master/db-company";
 import { processBotMessage } from "../bot/state-machine";
 import { sendWithAntiBlock } from "../bot/anti-block";
 import { sendAlert } from "../email";
+import { resolveLid } from "./lid-map";
 
 // Detecta si el mensaje contiene el nombre del cliente
 function extractNameFromText(text: string): string | null {
@@ -71,8 +72,14 @@ export async function handleIncomingMessage(
     // ── Mensaje enviado por la empresa desde su propio WhatsApp ────────────
     if (msg.key.fromMe) {
       const remoteJid = msg.key.remoteJid ?? "";
-      if (!remoteJid.endsWith("@s.whatsapp.net")) return;
-      const phone = remoteJid.split("@")[0];
+      if (!remoteJid.endsWith("@s.whatsapp.net") && !remoteJid.endsWith("@lid")) return;
+      let phone: string;
+      if (remoteJid.endsWith("@lid")) {
+        const lidId = remoteJid.split("@")[0];
+        phone = resolveLid(slug, lidId) ?? lidId;
+      } else {
+        phone = remoteJid.split("@")[0];
+      }
       const db    = getCompanyDb(slug);
 
       const conv = db.prepare("SELECT id, mode FROM conversations WHERE phone=?").get(phone) as { id: number; mode: string } | null;
@@ -97,9 +104,29 @@ export async function handleIncomingMessage(
     }
 
     const remoteJid = msg.key.remoteJid ?? "";
-    if (!remoteJid.endsWith("@s.whatsapp.net")) return; // ignorar grupos, LIDs y otros
+    const isLid = remoteJid.endsWith("@lid");
+    if (!remoteJid.endsWith("@s.whatsapp.net") && !isLid) return; // ignorar grupos y otros
 
-    const phone    = remoteJid.split("@")[0];
+    // Resolver LID al teléfono real (o usar LID como identificador temporal)
+    let phone: string;
+    let sendJid: string; // JID usado para enviar respuestas
+    if (isLid) {
+      const lidId = remoteJid.split("@")[0];
+      const resolved = resolveLid(slug, lidId);
+      if (resolved) {
+        phone   = resolved;
+        sendJid = `${resolved}@s.whatsapp.net`;
+      } else {
+        // LID sin resolución aún — almacenar con LID, enviar vía JID original
+        phone   = lidId;
+        sendJid = remoteJid; // Baileys puede enviar a @lid
+        console.log(`[bot:${slug}] ⚠️ LID ${lidId} sin resolución aún — pushName: ${msg.pushName ?? "sin nombre"}`);
+      }
+    } else {
+      phone   = remoteJid.split("@")[0];
+      sendJid = remoteJid;
+    }
+
     const pushName = msg.pushName ?? undefined;
     const db       = getCompanyDb(slug);
 
@@ -131,7 +158,7 @@ export async function handleIncomingMessage(
       console.log(`[bot:${slug}] 📎 Archivo recibido — mimetype: ${mimetype}, ext: ${ext ?? "NO PERMITIDO"}`);
 
       if (!ext) {
-        await sendWithAntiBlock(sock, remoteJid,
+        await sendWithAntiBlock(sock, sendJid,
           "Solo aceptamos comprobantes en: JPG, PNG, PDF, Word o Excel. Por favor reenvíalo en uno de esos formatos. 😊",
           phone
         );
@@ -226,7 +253,7 @@ Responde SOLO con el JSON, sin texto adicional.` }
             reply = `Recibí tu imagen. ¿Puedes contarme más sobre lo que necesitas? Un asesor te responderá en breve 😊`;
           }
 
-          await sendWithAntiBlock(sock, remoteJid, reply, phone);
+          await sendWithAntiBlock(sock, sendJid, reply, phone);
           db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "assistant", reply);
           return;
         }
@@ -334,13 +361,13 @@ Responde SOLO con el JSON, sin texto adicional.` }
           confirmMsg = "📎 Recibimos tu comprobante. No pudimos leer el valor automáticamente.\n\nPor favor indica el monto exacto que transferiste (ej: *150000*).";
         }
 
-        await sendWithAntiBlock(sock, remoteJid, confirmMsg, phone);
+        await sendWithAntiBlock(sock, sendJid, confirmMsg, phone);
         db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)")
           .run(conv.id, "assistant", confirmMsg);
 
       } catch (err) {
         console.error(`[bot:${slug}] Error procesando archivo de ${phone}:`, err);
-        await sendWithAntiBlock(sock, remoteJid,
+        await sendWithAntiBlock(sock, sendJid,
           "Tuvimos un problema procesando tu comprobante. Por favor inténtalo de nuevo o escríbenos directamente.",
           phone
         );
@@ -380,7 +407,7 @@ Responde SOLO con el JSON, sin texto adicional.` }
       db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "user", catalog);
       db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
       console.log(`[bot:${slug}] 🛍️ Producto de catálogo WA Business: ${p.title}`);
-      await processBotMessage(sock, conv.id, phone, remoteJid, catalog, [], slug, pushName);
+      await processBotMessage(sock, conv.id, phone, sendJid, catalog, [], slug, pushName);
       return;
     }
 
@@ -392,7 +419,7 @@ Responde SOLO con el JSON, sin texto adicional.` }
       db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "user", orderText);
       db.prepare("UPDATE conversations SET last_message_at=unixepoch() WHERE id=?").run(conv.id);
       console.log(`[bot:${slug}] 🛒 Pedido WA Business: ${orderMsg.products.length} item(s)`);
-      await processBotMessage(sock, conv.id, phone, remoteJid, orderText, [], slug, pushName);
+      await processBotMessage(sock, conv.id, phone, sendJid, orderText, [], slug, pushName);
       return;
     }
 
@@ -470,7 +497,7 @@ Responde SOLO con el JSON, sin texto adicional.` }
       "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 30"
     ).all(conv.id) as { role: string; content: string }[];
 
-    await processBotMessage(sock, conv.id, phone, remoteJid, text, history, slug, pushName);
+    await processBotMessage(sock, conv.id, phone, sendJid, text, history, slug, pushName);
 
   } catch (err) {
     console.error(`[bot:${slug}] Error CRÍTICO en handleIncomingMessage:`, err);

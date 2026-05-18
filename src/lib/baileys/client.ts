@@ -12,9 +12,36 @@ import path from "node:path";
 import fs from "node:fs";
 import { getCompanyDb } from "../master/db-company";
 import { handleIncomingMessage } from "./handler";
+import { setLid } from "./lid-map";
 
 const AUTH_BASE = process.env.AUTH_DIR || path.resolve(process.cwd(), "auth");
 const logger = pino({ level: "silent" });
+
+// Versión de WhatsApp Web cacheada — se busca una vez y se reutiliza en reconexiones
+let cachedWAVersion: [number, number, number] | undefined;
+
+async function getWAVersion(): Promise<[number, number, number] | undefined> {
+  if (cachedWAVersion) return cachedWAVersion;
+  try {
+    // Timeout de 5s: si la red tarda, NO bloqueamos el inicio del bot.
+    // IMPORTANTE: si retorna undefined, NO la pasamos a makeWASocket
+    // porque { ...defaults, version: undefined } SOBREESCRIBIRÍA la versión bundled
+    // de Baileys causando que WhatsApp rechace la conexión y nunca llegue el QR.
+    const fetched = await Promise.race([
+      fetchLatestBaileysVersion(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+    ]);
+    if (fetched && "version" in fetched) {
+      cachedWAVersion = fetched.version as [number, number, number];
+    }
+    return cachedWAVersion; // undefined si timeout → NO se pasa a makeWASocket
+  } catch {
+    return undefined;
+  }
+}
+
+// Precarga la versión en background para que las reconexiones sean instantáneas
+getWAVersion().catch(() => {});
 
 export interface BotHandle {
   slug: string;
@@ -63,22 +90,18 @@ export async function startCompany(slug: string): Promise<void> {
 
   const { state, saveCreds } = await useMultiFileAuthState(authDir);
 
-  let version: [number, number, number] | undefined;
-  try {
-    const fetched = await fetchLatestBaileysVersion();
-    version = fetched.version;
-  } catch {}
+  // Obtener versión con timeout.
+  // CRÍTICO: si es undefined, NO la incluir en el config — pasar version:undefined
+  // sobreescribe el default bundled de Baileys causando que WhatsApp rechace la conexión.
+  const version = await getWAVersion();
 
   const sock = makeWASocket({
-    version,
+    // Solo incluir `version` si la tenemos — si no, Baileys usa su versión interna
+    ...(version ? { version } : {}),
     auth: state,
     logger,
     browser: Browsers.macOS("Desktop"),
     markOnlineOnConnect: false,
-    // syncFullHistory: true hace que WhatsApp tarde más en emitir el QR porque
-    // prepara el historial completo antes de la autenticación.
-    // Lo dejamos en false para que el QR aparezca rápido (<30s).
-    // El historial llega igual vía messaging-history.set después de conectar.
     syncFullHistory: false,
     getMessage: async () => ({ conversation: "" }),
   });
@@ -86,9 +109,10 @@ export async function startCompany(slug: string): Promise<void> {
   const handle: BotHandle = {
     slug,
     sock,
+    // shutdown: cierra el socket SIN hacer logout (preserva la sesión).
+    // Para desconectar permanentemente usa logoutCompany().
     shutdown: async () => {
       handles.delete(slug);
-      try { await sock.logout(); } catch {}
       try { sock.end(undefined); } catch {}
     },
   };
@@ -147,7 +171,17 @@ export async function startCompany(slug: string): Promise<void> {
 
       if (code === DisconnectReason.loggedOut) {
         db.prepare("UPDATE connection_state SET status='disconnected', qr_string=NULL, phone=NULL, updated_at=unixepoch() WHERE id=1").run();
-        console.log(`[bot:${slug}] Sesión cerrada (logout). Esperando nuevo QR.`);
+        console.log(`[bot:${slug}] Sesión inválida (401). Borrando credenciales y solicitando nuevo QR...`);
+        // Borrar credenciales inválidas para que el próximo inicio pida QR
+        try {
+          if (fs.existsSync(authDir)) {
+            for (const f of fs.readdirSync(authDir)) {
+              try { fs.unlinkSync(path.join(authDir, f)); } catch {}
+            }
+          }
+        } catch {}
+        // Reconectar automáticamente — sin auth → WhatsApp envía QR nuevo
+        setTimeout(() => startCompany(slug).catch(e => console.error(`[bot:${slug}] Error al reconectar tras logout:`, e)), 3000);
         return;
       }
       scheduleReconnect(slug, code);
@@ -176,6 +210,9 @@ export async function startCompany(slug: string): Promise<void> {
         }
 
         if (!phone || !lid) continue;
+
+        // Poblar el mapa en memoria para resolución en tiempo real
+        setLid(slug, lid, phone);
 
         // Buscar conversaciones con ese LID y actualizar al teléfono real
         const lidConvs = db.prepare("SELECT id, name FROM conversations WHERE phone=?").all(lid) as { id: number; name: string | null }[];
@@ -215,6 +252,7 @@ export async function startCompany(slug: string): Promise<void> {
           lid = c.id.split("@")[0]; phone = ((c as { jid?: string }).jid!).split("@")[0];
         }
         if (!phone || !lid) continue;
+        setLid(slug, lid, phone);
         const lidConv = db.prepare("SELECT id FROM conversations WHERE phone=?").get(lid) as { id: number } | null;
         if (lidConv) {
           db.prepare("UPDATE conversations SET phone=? WHERE id=? AND phone=?").run(phone, lidConv.id, lid);
@@ -222,6 +260,36 @@ export async function startCompany(slug: string): Promise<void> {
         }
       } catch {}
     }
+  });
+
+  // ── Evento dedicado LID → teléfono real (Baileys 6.7+) ──────────────────
+  // chats.phoneNumberShare se dispara cuando WhatsApp revela el número real
+  // correspondiente a un LID. Es el evento más confiable para esta resolución.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sock.ev.on("chats.phoneNumberShare" as any, ({ lid, jid }: { lid: string; jid: string }) => {
+    try {
+      const phone = jid.split("@")[0];
+      const lidId = lid.split("@")[0];
+      setLid(slug, lidId, phone);
+      console.log(`[bot:${slug}] 📱 chats.phoneNumberShare: LID ${lidId} → ${phone}`);
+
+      // Actualizar conversaciones en DB que tenían el LID como teléfono
+      const lidConvs = db.prepare("SELECT id, name FROM conversations WHERE phone=?").all(lidId) as { id: number; name: string | null }[];
+      for (const conv of lidConvs) {
+        const existing = db.prepare("SELECT id FROM conversations WHERE phone=? AND id!=?").get(phone, conv.id) as { id: number } | null;
+        if (existing) {
+          db.prepare("UPDATE messages SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("UPDATE bot_conversation_state SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("UPDATE contacts SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("UPDATE crm_deals SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("UPDATE payment_proofs SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("UPDATE outbox SET conversation_id=? WHERE conversation_id=?").run(existing.id, conv.id);
+          db.prepare("DELETE FROM conversations WHERE id=?").run(conv.id);
+        } else {
+          db.prepare("UPDATE conversations SET phone=? WHERE id=?").run(phone, conv.id);
+        }
+      }
+    } catch {}
   });
 
   // ── Historial al conectar (conversaciones previas) ──────────────────────
@@ -312,6 +380,7 @@ function importHistory(
       const phone = c.id.split("@")[0];
       const lid   = c.lid.split("@")[0];
       lidToPhone.set(lid, phone);
+      setLid(slug, lid, phone); // también en memoria para resolución en tiempo real
       if (name) contactNames.set(phone, name);
     }
     // Caso 2: id es @lid y tiene jid → mapeamos lid → phone
@@ -319,6 +388,7 @@ function importHistory(
       const lid   = c.id.split("@")[0];
       const phone = c.jid.split("@")[0];
       lidToPhone.set(lid, phone);
+      setLid(slug, lid, phone); // también en memoria
       if (name) contactNames.set(phone, name);
     }
     // Caso 3: id es @s.whatsapp.net sin lid → solo guardar nombre
@@ -485,6 +555,32 @@ function scheduleReconnect(slug: string, code?: number) {
     startCompany(slug).catch(err => console.error(`[bot:${slug}] Error al reconectar:`, err));
   }, delay);
   reconnectTimers.set(slug, timer);
+}
+
+// Desconectar permanentemente (logout real de WhatsApp — elimina la sesión)
+export async function logoutCompany(slug: string): Promise<void> {
+  const handle = handles.get(slug);
+  handles.delete(slug);
+  if (handle) {
+    try { await handle.sock.logout(); } catch {}
+    try { handle.sock.end(undefined); } catch {}
+  }
+  // Borrar archivos de autenticación para forzar QR en el próximo inicio
+  const authDir = path.join(AUTH_BASE, `company_${slug}`);
+  try {
+    if (fs.existsSync(authDir)) {
+      for (const f of fs.readdirSync(authDir)) fs.unlinkSync(path.join(authDir, f));
+    }
+  } catch {}
+}
+
+// Solicitar código de emparejamiento por teléfono (alternativa al QR)
+// phone: número en formato internacional sin + (ej: "573006150725")
+export async function requestPairingCode(slug: string, phone: string): Promise<string> {
+  const handle = handles.get(slug);
+  if (!handle) throw new Error("Bot no está corriendo para " + slug);
+  const code = await handle.sock.requestPairingCode(phone.replace(/\D/g, ""));
+  return code as string;
 }
 
 // Compatibilidad: arrancar empresa "platform" (empresa del master)

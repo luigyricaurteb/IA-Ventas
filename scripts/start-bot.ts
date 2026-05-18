@@ -3,7 +3,7 @@ import "./env-loader";
 
 import fs from "node:fs";
 import path from "node:path";
-import { startCompany, getHandle, getAllHandles } from "../src/lib/baileys/client";
+import { startCompany, getHandle, getAllHandles, requestPairingCode } from "../src/lib/baileys/client";
 import { listCompanies, getExpiringSubscriptions } from "../src/lib/master/db-master";
 import { getCompanyDb } from "../src/lib/master/db-company";
 
@@ -39,6 +39,22 @@ async function startAllCompanies() {
 
 async function main() {
   console.log("[bot] Iniciando sistema multi-empresa WhatsApp...");
+
+  // ── Restart flag: configurar PRIMERO antes de iniciar empresas ──────────
+  // Si el inicio se cuelga (ej. fetchLatestBaileysVersion sin respuesta),
+  // el intervalo sigue corriendo y puede recuperar el proceso cuando el
+  // dashboard escriba el flag de reinicio.
+  setInterval(async () => {
+    const flagPath = findRestartFlag();
+    if (!flagPath) return;
+    try { fs.unlinkSync(flagPath); } catch {}
+    console.log("[bot] Flag de reinicio detectado. Reiniciando bots...");
+    for (const [, handle] of getAllHandles()) {
+      try { await handle.shutdown(); } catch {}
+    }
+    await new Promise(r => setTimeout(r, 500));
+    await startAllCompanies();
+  }, 1000);
 
   await startAllCompanies();
 
@@ -150,19 +166,35 @@ async function main() {
     }
   }, 2 * 60 * 1000);
 
-  // Restart flag: detecta cuando el dashboard pide reiniciar el bot
-  // Busca en múltiples rutas para compatibilidad Railway/local
+  // Heartbeat: escribe timestamp cada 20s para que el API sepa que el bot está vivo
+  const HEARTBEAT_PATH  = path.join(DATA_DIR, ".bot_alive");
+  const PAIRING_REQ     = path.join(DATA_DIR, ".pairing_req");
+  const PAIRING_RESP    = path.join(DATA_DIR, ".pairing_resp");
+
+  const writeHeartbeat = () => {
+    try { fs.writeFileSync(HEARTBEAT_PATH, String(Math.floor(Date.now() / 1000))); } catch {}
+  };
+  writeHeartbeat();
+  setInterval(writeHeartbeat, 20_000);
+
+  // Pairing code IPC: detecta solicitudes de código y las responde
   setInterval(async () => {
-    const flagPath = findRestartFlag();
-    if (!flagPath) return;
-    try { fs.unlinkSync(flagPath); } catch {}
-    console.log("[bot] Flag de reinicio detectado. Reiniciando bots...");
-    // Apagar todos los handles activos
-    for (const [, handle] of getAllHandles()) {
-      try { await handle.shutdown(); } catch {}
+    if (!fs.existsSync(PAIRING_REQ)) return;
+    let reqLine = "";
+    try { reqLine = fs.readFileSync(PAIRING_REQ, "utf8").trim(); fs.unlinkSync(PAIRING_REQ); } catch { return; }
+
+    const [slug, phone] = reqLine.split("|");
+    if (!slug || !phone) return;
+
+    console.log(`[bot] Solicitud pairing code para ${slug} → ${phone}`);
+    try {
+      const code = await requestPairingCode(slug, phone);
+      fs.writeFileSync(PAIRING_RESP, code);
+      console.log(`[bot] Pairing code generado: ${code}`);
+    } catch (e) {
+      fs.writeFileSync(PAIRING_RESP, `ERROR:${(e as Error).message}`);
+      console.error("[bot] Error generando pairing code:", e);
     }
-    await new Promise(r => setTimeout(r, 2000));
-    await startAllCompanies();
   }, 1000);
 
   console.log("[bot] Sistema iniciado. Esperando mensajes...");
