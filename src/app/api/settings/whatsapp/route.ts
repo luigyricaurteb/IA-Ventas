@@ -11,20 +11,28 @@ export async function GET(req: NextRequest) {
   const cfg = db.prepare("SELECT * FROM whatsapp_config WHERE id=1").get() as {
     wa_access_token: string | null;
     wa_phone_number_id: string | null;
-    wa_business_account_id: string | null;
     wa_phone_display: string | null;
     wa_verified_name: string | null;
     provider: string;
+    fb_page_id: string | null;
+    fb_page_token: string | null;
+    fb_page_name: string | null;
+    ig_account_id: string | null;
+    ig_username: string | null;
   } | null;
 
   return NextResponse.json({
-    provider: cfg?.provider ?? "baileys",
-    wa_phone_number_id: cfg?.wa_phone_number_id ?? "",
-    wa_phone_display: cfg?.wa_phone_display ?? "",
-    wa_verified_name: cfg?.wa_verified_name ?? "",
-    // No devolver el token completo por seguridad
-    has_token: !!(cfg?.wa_access_token),
+    provider:                cfg?.provider ?? "baileys",
+    wa_phone_number_id:      cfg?.wa_phone_number_id ?? "",
+    wa_phone_display:        cfg?.wa_phone_display ?? "",
+    wa_verified_name:        cfg?.wa_verified_name ?? "",
+    has_token:               !!(cfg?.wa_access_token),
     wa_access_token_preview: cfg?.wa_access_token ? `${cfg.wa_access_token.slice(0, 8)}...` : "",
+    fb_page_id:              cfg?.fb_page_id ?? "",
+    fb_page_name:            cfg?.fb_page_name ?? "",
+    has_fb_token:            !!(cfg?.fb_page_token),
+    ig_account_id:           cfg?.ig_account_id ?? "",
+    ig_username:             cfg?.ig_username ?? "",
   });
 }
 
@@ -33,61 +41,72 @@ export async function POST(req: NextRequest) {
   if (!ctx) return unauthorized();
   const { db } = ctx;
 
-  const body = await req.json() as {
-    provider?: string;
-    wa_access_token?: string;
-    wa_phone_number_id?: string;
-    wa_business_account_id?: string;
-    action?: "verify" | "save" | "disconnect";
-  };
+  const body = await req.json() as Record<string, string>;
+  const { action } = body;
 
-  if (body.action === "disconnect") {
-    db.prepare(`UPDATE whatsapp_config SET
-      provider='baileys', wa_access_token=NULL,
-      wa_phone_number_id=NULL, wa_business_account_id=NULL,
-      wa_phone_display=NULL, wa_verified_name=NULL, updated_at=unixepoch()
-      WHERE id=1`).run();
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
+  if (action === "disconnect_whatsapp") {
+    db.prepare("UPDATE whatsapp_config SET provider='baileys', wa_access_token=NULL, wa_phone_number_id=NULL, wa_phone_display=NULL, wa_verified_name=NULL, updated_at=unixepoch() WHERE id=1").run();
     return NextResponse.json({ ok: true });
   }
 
-  if (body.action === "verify") {
-    if (!body.wa_access_token || !body.wa_phone_number_id) {
-      return NextResponse.json({ ok: false, error: "Token y Phone Number ID son requeridos" }, { status: 400 });
+  if (action === "verify") {
+    const { wa_access_token, wa_phone_number_id } = body;
+    if (!wa_access_token || !wa_phone_number_id) return NextResponse.json({ ok: false, error: "Token y Phone Number ID son requeridos" }, { status: 400 });
+    return NextResponse.json(await verifyConnection(wa_access_token, wa_phone_number_id));
+  }
+
+  if (action === "save") {
+    const { wa_access_token, wa_phone_number_id } = body;
+    if (!wa_access_token || !wa_phone_number_id) return NextResponse.json({ ok: false, error: "Faltan campos requeridos" }, { status: 400 });
+    const verify = await verifyConnection(wa_access_token, wa_phone_number_id);
+    if (!verify.ok) return NextResponse.json({ ok: false, error: verify.error }, { status: 400 });
+    db.prepare("UPDATE whatsapp_config SET provider='meta', wa_access_token=?, wa_phone_number_id=?, wa_phone_display=?, wa_verified_name=?, updated_at=unixepoch() WHERE id=1")
+      .run(wa_access_token, wa_phone_number_id, verify.phone ?? null, verify.name ?? null);
+    db.prepare("UPDATE connection_state SET status='connected', phone=?, qr_string=NULL, updated_at=unixepoch() WHERE id=1")
+      .run(verify.phone ?? wa_phone_number_id);
+    return NextResponse.json({ ok: true, phone: verify.phone, name: verify.name });
+  }
+
+  // ── Facebook Messenger ────────────────────────────────────────────────────
+  if (action === "save_facebook") {
+    const { fb_page_id, fb_page_token } = body;
+    if (!fb_page_id || !fb_page_token) return NextResponse.json({ ok: false, error: "Page ID y Page Token son requeridos" }, { status: 400 });
+
+    // Obtener nombre de la página desde Graph API
+    let pageName: string | null = null;
+    try {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${fb_page_id}?fields=name&access_token=${fb_page_token}`, { signal: AbortSignal.timeout(8000) });
+      const d = await r.json() as { name?: string; error?: { message?: string } };
+      if (d.error) return NextResponse.json({ ok: false, error: d.error.message }, { status: 400 });
+      pageName = d.name ?? null;
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: "No se pudo verificar el token de la página" }, { status: 400 });
     }
-    const result = await verifyConnection(body.wa_access_token, body.wa_phone_number_id);
-    return NextResponse.json(result);
+
+    db.prepare("UPDATE whatsapp_config SET fb_page_id=?, fb_page_token=?, fb_page_name=?, updated_at=unixepoch() WHERE id=1")
+      .run(fb_page_id, fb_page_token, pageName);
+    return NextResponse.json({ ok: true, page_name: pageName });
   }
 
-  // Guardar configuración
-  if (!body.wa_access_token || !body.wa_phone_number_id) {
-    return NextResponse.json({ ok: false, error: "Faltan campos requeridos" }, { status: 400 });
+  if (action === "disconnect_facebook") {
+    db.prepare("UPDATE whatsapp_config SET fb_page_id=NULL, fb_page_token=NULL, fb_page_name=NULL, updated_at=unixepoch() WHERE id=1").run();
+    return NextResponse.json({ ok: true });
   }
 
-  // Verificar antes de guardar
-  const verify = await verifyConnection(body.wa_access_token, body.wa_phone_number_id);
-  if (!verify.ok) {
-    return NextResponse.json({ ok: false, error: verify.error }, { status: 400 });
+  // ── Instagram ─────────────────────────────────────────────────────────────
+  if (action === "save_instagram") {
+    const { ig_account_id, ig_username } = body;
+    if (!ig_account_id) return NextResponse.json({ ok: false, error: "Instagram Account ID es requerido" }, { status: 400 });
+    db.prepare("UPDATE whatsapp_config SET ig_account_id=?, ig_username=?, updated_at=unixepoch() WHERE id=1")
+      .run(ig_account_id, ig_username ?? null);
+    return NextResponse.json({ ok: true });
   }
 
-  db.prepare(`UPDATE whatsapp_config SET
-    provider='meta',
-    wa_access_token=?,
-    wa_phone_number_id=?,
-    wa_business_account_id=?,
-    wa_phone_display=?,
-    wa_verified_name=?,
-    updated_at=unixepoch()
-    WHERE id=1`).run(
-    body.wa_access_token,
-    body.wa_phone_number_id,
-    body.wa_business_account_id ?? null,
-    verify.phone ?? null,
-    verify.name ?? null,
-  );
+  if (action === "disconnect_instagram") {
+    db.prepare("UPDATE whatsapp_config SET ig_account_id=NULL, ig_username=NULL, updated_at=unixepoch() WHERE id=1").run();
+    return NextResponse.json({ ok: true });
+  }
 
-  // También actualizar connection_state para que el dashboard muestre "connected"
-  db.prepare("UPDATE connection_state SET status='connected', phone=?, qr_string=NULL, updated_at=unixepoch() WHERE id=1")
-    .run(verify.phone ?? body.wa_phone_number_id);
-
-  return NextResponse.json({ ok: true, phone: verify.phone, name: verify.name });
+  return NextResponse.json({ ok: false, error: "Acción no reconocida" }, { status: 400 });
 }
