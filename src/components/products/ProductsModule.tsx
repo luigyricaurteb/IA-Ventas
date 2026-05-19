@@ -139,7 +139,10 @@ export default function ProductsModule() {
     await fetch(`/api/products/${productId}/images`, {
       method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageId }),
     });
-    fetch_();
+    const fresh = await fetch("/api/products").then(r => r.json()) as { products: Product[] };
+    setProducts(fresh.products);
+    const updated = fresh.products.find(p => p.id === productId);
+    if (updated && editing?.id === productId) setEditing(updated);
   }
 
   async function handleImportFile(file: File) {

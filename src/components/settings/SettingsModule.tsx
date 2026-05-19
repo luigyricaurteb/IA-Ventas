@@ -19,7 +19,7 @@ const MODULE_LIST: { id: string; label: string; icon: string }[] = [
 ];
 
 interface BankAccount { id: number; bank_name: string; account_type: string; account_number: string; account_holder: string | null }
-interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null; notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number }
+interface CompanyConfig { name: string | null; phone: string | null; email: string | null; logo_filename: string | null; business_hours_start: number; business_hours_end: number; business_days: string; ai_name: string | null; ai_general_instructions: string | null; nequi_phone: string | null; daviplata_phone: string | null; notify_new_conversation: number; notify_new_payment: number; notify_new_reservation: number; admin_wa_phone: string | null; admin_wa_keyword: string | null }
 interface SystemUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
 interface SmtpConfig { host: string | null; port: number; secure: number; user: string | null; from_name: string | null; from_email: string | null; provider?: string; resend_api_key?: string; resend_from?: string }
 interface AiLearning { id: number; topic: string; content: string; created_at: number; source?: string }
@@ -46,7 +46,7 @@ function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; labe
 export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean; company?: string } | null }) {
   const [tab, setTab] = useState<Tab>("company");
   const companySlug = (currentUser as { company?: string } | null | undefined)?.company ?? "";
-  const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "", notify_new_conversation: 1, notify_new_payment: 1, notify_new_reservation: 1 });
+  const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "", notify_new_conversation: 1, notify_new_payment: 1, notify_new_reservation: 1, admin_wa_phone: "", admin_wa_keyword: "admin" });
 
   // WhatsApp state
   const [waStatus, setWaStatus] = useState<"disconnected"|"qr"|"connecting"|"connected">("disconnected");
@@ -420,6 +420,40 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                   checked={company[key] === 1}
                   onChange={v => setCompany({ ...company, [key]: v ? 1 : 0 })} />
               ))}
+            </div>
+          </div>
+
+          {/* Admin WhatsApp */}
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">🔧</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Modo Admin por WhatsApp</p>
+                <p className="text-xs text-gray-400">Escribe desde tu número con la palabra clave y consulta reservas, pagos y reportes en tiempo real</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-700">Tu número de WhatsApp (con código de país)</label>
+                <input value={company.admin_wa_phone ?? ""} onChange={e => setCompany({...company, admin_wa_phone: e.target.value})}
+                  placeholder="Ej: 573001234567"
+                  className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono" />
+                <p className="text-xs text-gray-400 mt-1">Solo este número tendrá acceso al modo admin</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Palabra clave secreta</label>
+                <input value={company.admin_wa_keyword ?? "admin"} onChange={e => setCompany({...company, admin_wa_keyword: e.target.value})}
+                  placeholder="admin"
+                  className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+                <p className="font-semibold mb-1">¿Cómo usarlo?</p>
+                <p>Escribe tu palabra clave desde tu WhatsApp y consulta:</p>
+                <p className="mt-1">• <strong>reservas hoy</strong></p>
+                <p>• <strong>cobros pendientes</strong></p>
+                <p>• <strong>reserva RES-xxx</strong></p>
+                <p>• <strong>resumen</strong></p>
+              </div>
             </div>
           </div>
 

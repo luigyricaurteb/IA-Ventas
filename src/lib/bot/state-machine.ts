@@ -22,6 +22,7 @@ import { getCompanyDb } from "../master/db-company";
 import { generateStructuredReply, isUncertainResponse } from "../openrouter";
 import { sendWithAntiBlock, sendMultipleWithAntiBlock, isOptOutMessage } from "./anti-block";
 import { autoLearn } from "./auto-learn";
+import { isAdminPhone, checkAdminKeyword, handleAdminQuery } from "./admin-mode";
 
 type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
@@ -156,6 +157,30 @@ export async function processBotMessage(
 
   let bs = getBotState(db, conversationId);
   console.log(`[bot:${slug}] Estado: ${bs?.state ?? "null→INIT"} opted_out=${bs?.opted_out ?? 0}`);
+
+  // ── Modo Admin ───────────────────────────────────────────────────────────
+  if (isAdminPhone(db, phone)) {
+    // Activar modo admin con la palabra clave
+    if (checkAdminKeyword(db, text) || bs?.state === "ADMIN") {
+      if (bs?.state !== "ADMIN") {
+        setState(db, conversationId, "ADMIN" as BotState);
+        await send(db, sock, jid, phone, conversationId,
+          `🔧 *Modo Admin activado*\n\nHola! Estoy lista para ayudarte con la gestión. ¿Qué necesitas?\n\nEscribe *ayuda* para ver los comandos disponibles.`
+        );
+        return;
+      }
+      // Si escribe la keyword de nuevo estando en admin, confirmar
+      if (checkAdminKeyword(db, text) && bs?.state === "ADMIN") {
+        await send(db, sock, jid, phone, conversationId, `✅ Ya estás en modo admin. Escribe *ayuda* para ver comandos.`);
+        return;
+      }
+    }
+    if (bs?.state === "ADMIN") {
+      const response = await handleAdminQuery(db, text);
+      await send(db, sock, jid, phone, conversationId, response);
+      return;
+    }
+  }
 
   // ── Opt-out reactivación ─────────────────────────────────────────────
   if (bs?.opted_out) {
