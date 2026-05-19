@@ -12,5 +12,7 @@ export async function GET() {
     price_usd: p.price_usd ?? 0,
     billing_cycle: p.billing_cycle,
     max_users: p.max_users,
+    max_wa_numbers: p.max_wa_numbers ?? 1,
+    modules: (() => { try { return JSON.parse(p.modules || "{}"); } catch { return {}; } })(),
   }))});
 }
