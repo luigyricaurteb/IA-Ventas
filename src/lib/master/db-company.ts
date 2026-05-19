@@ -436,6 +436,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE conversations ADD COLUMN channel TEXT NOT NULL DEFAULT 'whatsapp'",
     "ALTER TABLE conversations ADD COLUMN channel_user_id TEXT",
     "ALTER TABLE conversations ADD COLUMN channel_page_id TEXT",
+    // Google Sheets sync
+    "ALTER TABLE company_config ADD COLUMN sheets_url TEXT",
+    "ALTER TABLE company_config ADD COLUMN sheets_enabled INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE company_config ADD COLUMN sheets_last_sync INTEGER",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)

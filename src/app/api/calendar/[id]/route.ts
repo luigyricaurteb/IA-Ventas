@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthCtx, unauthorized } from "@/lib/api-helpers";
+import { upsertReservationInSheet } from "@/lib/sheets/sync";
 
 interface Ctx { params: Promise<{ id: string }> }
 
@@ -21,6 +22,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   db.prepare(
     `UPDATE reservations SET ${sets}, updated_at = unixepoch() WHERE id = ?`
   ).run(...fields.map((f) => body[f]), Number(id));
+
+  // Auto-sync to Google Sheet if enabled
+  const sheetCfg = db.prepare("SELECT sheets_url, sheets_enabled FROM company_config WHERE id=1").get() as { sheets_url: string | null; sheets_enabled: number } | null;
+  if (sheetCfg?.sheets_enabled === 1 && sheetCfg.sheets_url) {
+    upsertReservationInSheet(db, sheetCfg.sheets_url, Number(id)).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true });
 }

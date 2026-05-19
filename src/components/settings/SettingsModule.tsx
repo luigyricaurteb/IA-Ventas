@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import WhatsAppConfigPanel from "./WhatsAppConfigPanel";
 
-type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla";
+type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla" | "sheets";
 
 const MODULE_LIST: { id: string; label: string; icon: string }[] = [
   { id: "chat",       label: "Chat",         icon: "💬" },
@@ -69,6 +69,11 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [newDrive, setNewDrive] = useState({ name: "", drive_url: "", topic: "" });
   const [driveSyncing, setDriveSyncing] = useState<number | null>(null);
   const [driveMsg, setDriveMsg] = useState<string | null>(null);
+  const [sheetsConfig, setSheetsConfig] = useState<{ sheets_url: string; sheets_enabled: boolean; sheets_last_sync: number | null; service_account_email: string }>({ sheets_url: "", sheets_enabled: false, sheets_last_sync: null, service_account_email: "" });
+  const [sheetsSaving, setSheetsSaving] = useState(false);
+  const [sheetsTesting, setSheetsTesting] = useState(false);
+  const [sheetsSyncing, setSheetsSyncing] = useState(false);
+  const [sheetsMsg, setSheetsMsg] = useState<string | null>(null);
   const [templates, setTemplates] = useState<MsgTemplate[]>([]);
   const [newTpl, setNewTpl] = useState({ name: "", content: "", category: "" });
   const [slaMinutes, setSlaMinutes] = useState(30);
@@ -140,6 +145,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     fetch("/api/settings/learnings").then((r) => r.json()).then((d) => setLearnings(d.learnings));
     fetch("/api/templates").then((r) => r.json()).then((d) => setTemplates(d.templates ?? []));
     fetch("/api/sla").then((r) => r.json()).then((d) => { if (d.sla_minutes) setSlaMinutes(d.sla_minutes); });
+    fetch("/api/settings/sheets").then((r) => r.json()).then((d) => setSheetsConfig({ sheets_url: d.sheets_url ?? "", sheets_enabled: d.sheets_enabled ?? false, sheets_last_sync: d.sheets_last_sync ?? null, service_account_email: d.service_account_email ?? "" }));
     if (isAdmin) {
       fetch("/api/users").then((r) => r.json()).then((d) => setUsers(d.users ?? []));
       fetch("/api/settings/drive").then((r) => r.json()).then((d) => setDriveSources(d.sources ?? []));
@@ -297,6 +303,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     { id: "templates", label: "Plantillas" },
     { id: "sla",       label: "SLA", adminOnly: true },
     { id: "drive",     label: "Google Drive", adminOnly: true },
+    { id: "sheets",    label: "📊 Google Sheets", adminOnly: true },
     { id: "users",     label: "Usuarios", adminOnly: true },
   ];
   const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin) as { id: Tab; label: string }[];
@@ -1057,6 +1064,118 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
               Crear usuario
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── GOOGLE SHEETS ── */}
+      {tab === "sheets" && (
+        <div className="space-y-6">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <h3 className="font-semibold text-emerald-800 mb-1">📊 Sincronización con Google Sheets</h3>
+            <p className="text-sm text-emerald-700">Cada reserva creada o actualizada se agrega automáticamente a tu hoja de cálculo.</p>
+          </div>
+
+          {/* Paso 1: Compartir la hoja */}
+          <div className="bg-white border rounded-xl p-4 space-y-3">
+            <h4 className="font-semibold text-gray-800">Paso 1 — Comparte tu hoja con Hivo</h4>
+            <p className="text-sm text-gray-600">Abre tu Google Sheet → botón <strong>Compartir</strong> → agrega este correo como <strong>Editor</strong>:</p>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
+              <code className="text-sm text-emerald-700 font-mono flex-1 break-all">{sheetsConfig.service_account_email || "cargando..."}</code>
+              <button onClick={() => { navigator.clipboard.writeText(sheetsConfig.service_account_email); setSheetsMsg("Copiado"); setTimeout(() => setSheetsMsg(null), 2000); }}
+                className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 whitespace-nowrap">
+                Copiar
+              </button>
+            </div>
+          </div>
+
+          {/* Paso 2: Link de la hoja */}
+          <div className="bg-white border rounded-xl p-4 space-y-3">
+            <h4 className="font-semibold text-gray-800">Paso 2 — Pega el link de tu Google Sheet</h4>
+            <p className="text-sm text-gray-500">Ejemplo: https://docs.google.com/spreadsheets/d/1ABC.../edit</p>
+            <input
+              value={sheetsConfig.sheets_url}
+              onChange={(e) => setSheetsConfig({ ...sheetsConfig, sheets_url: e.target.value })}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
+            />
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={async () => {
+                  setSheetsTesting(true); setSheetsMsg(null);
+                  const res = await fetch("/api/settings/sheets/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sheets_url: sheetsConfig.sheets_url }) });
+                  const d = await res.json() as { ok: boolean; title?: string; error?: string };
+                  setSheetsMsg(d.ok ? `✅ Conexión exitosa: "${d.title}"` : `❌ ${d.error}`);
+                  setSheetsTesting(false);
+                }}
+                disabled={sheetsTesting || !sheetsConfig.sheets_url}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50">
+                {sheetsTesting ? "Verificando..." : "Verificar conexión"}
+              </button>
+              <button
+                onClick={async () => {
+                  setSheetsSaving(true); setSheetsMsg(null);
+                  await fetch("/api/settings/sheets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sheets_url: sheetsConfig.sheets_url, sheets_enabled: sheetsConfig.sheets_enabled }) });
+                  setSheetsMsg("✅ Configuración guardada");
+                  setSheetsSaving(false);
+                }}
+                disabled={sheetsSaving}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                {sheetsSaving ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+
+          {/* Activar sync + acciones */}
+          <div className="bg-white border rounded-xl p-4 space-y-4">
+            <h4 className="font-semibold text-gray-800">Paso 3 — Activar sincronización</h4>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <button type="button"
+                onClick={() => setSheetsConfig({ ...sheetsConfig, sheets_enabled: !sheetsConfig.sheets_enabled })}
+                className={`relative w-11 h-6 rounded-full transition-colors ${sheetsConfig.sheets_enabled ? "bg-emerald-500" : "bg-gray-300"}`}>
+                <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${sheetsConfig.sheets_enabled ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+              <span className="text-sm text-gray-700">Sincronización automática activa</span>
+            </label>
+
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={async () => {
+                  setSheetsSyncing(true); setSheetsMsg(null);
+                  const res = await fetch("/api/settings/sheets/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "export" }) });
+                  const d = await res.json() as { ok: boolean; exported?: number; error?: string };
+                  setSheetsMsg(d.ok ? `✅ ${d.exported} reservas exportadas a la hoja` : `❌ ${d.error}`);
+                  if (d.ok) fetch("/api/settings/sheets").then(r => r.json()).then(d => setSheetsConfig(prev => ({ ...prev, sheets_last_sync: (d as { sheets_last_sync: number }).sheets_last_sync })));
+                  setSheetsSyncing(false);
+                }}
+                disabled={sheetsSyncing || !sheetsConfig.sheets_url}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                {sheetsSyncing ? "Exportando..." : "⬆️ Exportar todas las reservas"}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm("¿Importar reservas desde la hoja? Solo importa filas que no existan en el sistema.")) return;
+                  setSheetsSyncing(true); setSheetsMsg(null);
+                  const res = await fetch("/api/settings/sheets/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "import" }) });
+                  const d = await res.json() as { ok: boolean; imported?: number; skipped?: number; error?: string };
+                  setSheetsMsg(d.ok ? `✅ Importadas: ${d.imported}, omitidas (ya existían): ${d.skipped}` : `❌ ${d.error}`);
+                  setSheetsSyncing(false);
+                }}
+                disabled={sheetsSyncing || !sheetsConfig.sheets_url}
+                className="bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-100 disabled:opacity-50">
+                {sheetsSyncing ? "Importando..." : "⬇️ Importar desde la hoja"}
+              </button>
+            </div>
+
+            {sheetsConfig.sheets_last_sync && (
+              <p className="text-xs text-gray-400">Última sincronización: {new Date(sheetsConfig.sheets_last_sync * 1000).toLocaleString("es-CO")}</p>
+            )}
+          </div>
+
+          {sheetsMsg && (
+            <div className={`rounded-xl p-3 text-sm ${sheetsMsg.startsWith("✅") || sheetsMsg === "Copiado" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+              {sheetsMsg}
+            </div>
+          )}
         </div>
       )}
     </div>
