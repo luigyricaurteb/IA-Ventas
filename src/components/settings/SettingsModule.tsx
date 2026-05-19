@@ -1130,7 +1130,12 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             <h4 className="font-semibold text-gray-800">Paso 3 — Activar sincronización</h4>
             <label className="flex items-center gap-3 cursor-pointer">
               <button type="button"
-                onClick={() => setSheetsConfig({ ...sheetsConfig, sheets_enabled: !sheetsConfig.sheets_enabled })}
+                onClick={async () => {
+                  const newVal = !sheetsConfig.sheets_enabled;
+                  setSheetsConfig({ ...sheetsConfig, sheets_enabled: newVal });
+                  await fetch("/api/settings/sheets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sheets_enabled: newVal }) });
+                  setSheetsMsg(newVal ? "✅ Sincronización activada" : "Sincronización desactivada");
+                }}
                 className={`relative w-11 h-6 rounded-full transition-colors ${sheetsConfig.sheets_enabled ? "bg-emerald-500" : "bg-gray-300"}`}>
                 <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${sheetsConfig.sheets_enabled ? "translate-x-5" : "translate-x-0"}`} />
               </button>
