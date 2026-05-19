@@ -247,7 +247,7 @@ export default function ProductsModule() {
               {/* Foto principal */}
               {mainImg ? (
                 <div className="relative">
-                  <img src={`/uploads/products/${mainImg.filename}`} className="w-full h-44 object-cover" />
+                  <img src={`/api/uploads/products/${mainImg.filename}`} className="w-full h-44 object-cover" />
                   <div className="absolute top-2 left-2 flex gap-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.product_type === "producto" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
                       {p.product_type === "producto" ? "📦 Producto" : "🎯 Servicio"}
@@ -337,7 +337,7 @@ export default function ProductsModule() {
                         <div className="flex gap-3 items-start">
                           {main ? (
                             <div className="relative group">
-                              <img src={`/uploads/products/${main.filename}`} className="h-28 w-28 object-cover rounded-xl border-2 border-emerald-400" />
+                              <img src={`/api/uploads/products/${main.filename}`} className="h-28 w-28 object-cover rounded-xl border-2 border-emerald-400" />
                               <button onClick={() => deleteImage(editing.id, main.id)}
                                 className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                               <span className="absolute bottom-1 left-1 bg-emerald-500 text-white text-[10px] px-1 rounded">Principal</span>
@@ -371,7 +371,7 @@ export default function ProductsModule() {
                     <div className="flex gap-2 flex-wrap">
                       {editing.images.filter(i => i.is_main !== 1).map(img => (
                         <div key={img.id} className="relative group">
-                          <img src={`/uploads/products/${img.filename}`} className="h-20 w-20 object-cover rounded-lg border" />
+                          <img src={`/api/uploads/products/${img.filename}`} className="h-20 w-20 object-cover rounded-lg border" />
                           <button onClick={() => deleteImage(editing.id, img.id)}
                             className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
                         </div>

@@ -40,7 +40,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const buffer = Buffer.from(bytes);
   const ext = file.name.split(".").pop() ?? "jpg";
   const filename = `product_${productId}_${Date.now()}.${ext}`;
-  const uploadDir = path.resolve(process.cwd(), "public", "uploads", "products");
+  const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
+  const uploadDir = path.join(DATA_DIR, "uploads", "products");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   fs.writeFileSync(path.join(uploadDir, filename), buffer);
 
@@ -66,6 +67,10 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
 }
 
 function tryDeleteFile(filename: string) {
-  const uploadDir = path.resolve(process.cwd(), "public", "uploads", "products");
-  try { fs.unlinkSync(path.join(uploadDir, filename)); } catch {}
+  const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
+  const candidates = [
+    path.join(DATA_DIR, "uploads", "products", filename),
+    path.join(process.cwd(), "public", "uploads", "products", filename),
+  ];
+  for (const p of candidates) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch {} }
 }

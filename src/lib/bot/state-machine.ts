@@ -103,12 +103,16 @@ async function sendProductImages(
     "SELECT filename FROM product_images WHERE product_id=? ORDER BY order_index ASC"
   ).all(productId) as { filename: string }[];
   if (!images.length) return;
-  const dir = path.resolve(process.cwd(), "public", "uploads", "products");
+  const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
   for (let i = 0; i < images.length; i++) {
-    const fp = path.join(dir, images[i].filename);
-    if (!fs.existsSync(fp)) continue;
+    const candidates = [
+      path.join(DATA_DIR, "uploads", "products", images[i].filename),
+      path.resolve(process.cwd(), "public", "uploads", "products", images[i].filename),
+    ];
+    const fp = candidates.find(c => fs.existsSync(c)) ?? null;
+    if (!fp) continue;
     try {
-      const buffer = fs.readFileSync(fp);
+      const buffer = fs.readFileSync(fp as string);
       await sock.sendMessage(jid, {
         image: buffer,
         caption: i === 0 ? caption : undefined,
