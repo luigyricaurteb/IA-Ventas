@@ -12,9 +12,10 @@ export function middleware(request: NextRequest) {
   const isPublicApi   = pathname.startsWith("/api/public");
   const isWebhook     = pathname.startsWith("/api/whatsapp/webhook");
   const isPublicPdf   = pathname.startsWith("/api/pdf/public");
-  const isResetPage   = pathname.startsWith("/reset-password");
+  const isResetPage    = pathname.startsWith("/reset-password");
+  const isRegisterPage = pathname.startsWith("/register");
 
-  if (isPublicAsset || isAuthApi || isPublicApi || isWebhook || isPublicPdf || isResetPage) return NextResponse.next();
+  if (isPublicAsset || isAuthApi || isPublicApi || isWebhook || isPublicPdf || isResetPage || isRegisterPage) return NextResponse.next();
 
   if (!token && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));

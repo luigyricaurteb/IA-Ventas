@@ -14,6 +14,191 @@ const BL: Record<string,string> = { monthly:"Mensual", yearly:"Anual", permanent
 
 function fmt(n: number) { return n.toLocaleString("es-CO"); }
 
+// ── Equipo IA interno ────────────────────────────────────────────────────────
+type AgentId = "developer"|"pm"|"marketing"|"sales"|"assistant";
+const AGENTS: { id: AgentId; name: string; emoji: string; desc: string }[] = [
+  { id: "developer",  name: "Dev Lead",          emoji: "🧑‍💻", desc: "Código, bugs, arquitectura" },
+  { id: "pm",         name: "Project Manager",   emoji: "📋", desc: "Planificación, roadmap, prioridades" },
+  { id: "marketing",  name: "Marketing Manager", emoji: "📈", desc: "Estrategia, copy, campañas" },
+  { id: "sales",      name: "Sales Manager",     emoji: "💼", desc: "Ventas, pricing, conversión" },
+  { id: "assistant",  name: "Asistente",         emoji: "🤖", desc: "Consultas generales y coordinación" },
+];
+
+function AITeamPanel() {
+  const [agent, setAgent] = useState<AgentId>("assistant");
+  const [messages, setMessages] = useState<{ role: "user"|"assistant"; content: string; agent?: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const currentAgent = AGENTS.find(a => a.id === agent)!;
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput("");
+    const newMessages = [...messages, { role: "user" as const, content: userMsg }];
+    setMessages(newMessages);
+    setLoading(true);
+
+    const res = await fetch("/api/master/ai-team", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent, messages: newMessages }),
+    });
+    const d = await res.json() as { reply?: string; error?: string };
+    setMessages([...newMessages, { role: "assistant", content: d.reply ?? d.error ?? "Error", agent }]);
+    setLoading(false);
+  }
+
+  function clearChat() { setMessages([]); }
+
+  return (
+    <div className="flex gap-4 h-[calc(100vh-12rem)]">
+      {/* Selector de agentes */}
+      <div className="w-52 shrink-0 space-y-1.5">
+        <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">Tu equipo IA</p>
+        {AGENTS.map(a => (
+          <button key={a.id} onClick={() => setAgent(a.id)}
+            className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors ${agent === a.id ? "bg-emerald-900/50 border border-emerald-500/50" : "hover:bg-gray-700/50 border border-transparent"}`}>
+            <span className="text-2xl shrink-0 mt-0.5">{a.emoji}</span>
+            <div>
+              <p className={`text-sm font-medium ${agent === a.id ? "text-emerald-300" : "text-gray-200"}`}>{a.name}</p>
+              <p className="text-gray-500 text-[11px] mt-0.5">{a.desc}</p>
+            </div>
+          </button>
+        ))}
+        <button onClick={clearChat} className="w-full mt-3 text-xs text-gray-500 hover:text-gray-300 py-1.5 border border-gray-700 rounded-lg">
+          🗑 Limpiar chat
+        </button>
+      </div>
+
+      {/* Chat */}
+      <div className="flex-1 flex flex-col bg-gray-800 border border-gray-700 rounded-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-gray-700 flex items-center gap-3">
+          <span className="text-2xl">{currentAgent.emoji}</span>
+          <div>
+            <p className="text-white font-semibold text-sm">{currentAgent.name}</p>
+            <p className="text-gray-400 text-xs">{currentAgent.desc}</p>
+          </div>
+          <span className="ml-auto flex items-center gap-1.5">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-emerald-400 text-xs">En línea</span>
+          </span>
+        </div>
+
+        {/* Mensajes */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center text-center py-8">
+              <span className="text-5xl mb-3">{currentAgent.emoji}</span>
+              <p className="text-gray-300 font-medium">{currentAgent.name}</p>
+              <p className="text-gray-500 text-sm mt-1 max-w-xs">{currentAgent.desc}. Pregúntame lo que necesites.</p>
+              <div className="mt-5 grid grid-cols-2 gap-2 max-w-sm w-full">
+                {agent === "developer" && [
+                  "¿Cómo funciona el sistema de reservas?",
+                  "¿Qué hace el modo admin de WhatsApp?",
+                  "Dame el plan para implementar pagos Wompi",
+                  "¿Cómo mejorar el rendimiento?"
+                ].map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
+                    {s}
+                  </button>
+                ))}
+                {agent === "marketing" && [
+                  "Crea copy para landing page de Hivo",
+                  "Estrategia para conseguir 10 clientes",
+                  "¿Cómo compite Hivo vs ManyChat?",
+                  "Ideas de contenido para LinkedIn"
+                ].map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
+                    {s}
+                  </button>
+                ))}
+                {agent === "sales" && [
+                  "Script para vender Hivo a un restaurante",
+                  "¿Cómo manejar la objeción del precio?",
+                  "Propuesta comercial para una agencia",
+                  "Proyección de ingresos a 12 meses"
+                ].map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
+                    {s}
+                  </button>
+                ))}
+                {agent === "pm" && [
+                  "¿Qué debería priorizar esta semana?",
+                  "Crea un roadmap para Q3",
+                  "¿Qué features tienen más impacto?",
+                  "Planifica el onboarding de nuevos clientes"
+                ].map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
+                    {s}
+                  </button>
+                ))}
+                {agent === "assistant" && [
+                  "¿Cuántas empresas activas tenemos?",
+                  "Resumen del estado de la plataforma",
+                  "¿Qué tickets están pendientes?",
+                  "¿Qué debería hacer hoy?"
+                ].map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {messages.map((m, i) => (
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              {m.role === "assistant" && (
+                <span className="text-xl mr-2 mt-1 shrink-0">{AGENTS.find(a => a.id === (m.agent ?? agent))?.emoji ?? "🤖"}</span>
+              )}
+              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                m.role === "user"
+                  ? "bg-blue-600 text-white rounded-br-sm"
+                  : "bg-gray-700 text-gray-100 rounded-bl-sm"
+              }`}>
+                <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <span className="text-xl mr-2">{currentAgent.emoji}</span>
+              <div className="bg-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="p-4 border-t border-gray-700">
+          <div className="flex gap-2">
+            <textarea value={input} onChange={e => setInput(e.target.value)}
+              placeholder={`Pregunta al ${currentAgent.name}...`}
+              rows={2}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              className="flex-1 bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-white text-sm resize-none placeholder-gray-500 focus:outline-none focus:border-emerald-500" />
+            <button onClick={send} disabled={loading || !input.trim()}
+              className="text-white px-5 rounded-xl font-medium text-sm disabled:opacity-50 self-end"
+              style={{ background: "#0077b6" }}>
+              {loading ? "..." : "→"}
+            </button>
+          </div>
+          <p className="text-gray-600 text-xs mt-1.5">Enter para enviar · Shift+Enter para nueva línea</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Pasarelas de pago ─────────────────────────────────────────────────────────
 function GatewayPanel() {
   const [cfg, setCfg] = useState({ mercadopago_public_key:"", mercadopago_access_token:"", mercadopago_active:false, wompi_public_key:"", wompi_private_key:"", wompi_events_key:"", wompi_active:false });
@@ -110,7 +295,7 @@ const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0,
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways">("companies");
+  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways"|"aiteam">("companies");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [plans, setPlans]         = useState<Plan[]>([]);
   const [subs, setSubs]           = useState<Subscription[]>([]);
@@ -286,10 +471,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
       </header>
 
       <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0 overflow-x-auto">
-        {(["companies","plans","subscriptions","gateways"] as const).map(id=>(
+        {(["companies","plans","subscriptions","gateways","aiteam"] as const).map(id=>(
           <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
-            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":"🔗 Pasarelas"}
+            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="gateways"?"🔗 Pasarelas":"🧠 Equipo IA"}
           </button>
         ))}
       </div>
@@ -585,6 +770,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         )}
 
         {tab==="gateways" && <GatewayPanel />}
+        {tab==="aiteam"   && <AITeamPanel />}
       </div>
 
       {/* ── Modal cambiar contraseña de usuario ── */}

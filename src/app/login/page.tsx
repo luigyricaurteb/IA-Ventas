@@ -139,7 +139,10 @@ export default function LoginPage() {
           </div>
         </form>
 
-        <p className="text-center text-gray-600 text-xs mt-4">{BUILD}</p>
+        <p className="text-center text-sm mt-4" style={{ color: "var(--text-muted)" }}>
+          ¿No tienes cuenta? <a href="/register" className="font-medium" style={{ color: "var(--accent)" }}>Regístrate gratis</a>
+        </p>
+        <p className="text-center text-gray-600 text-xs mt-2">{BUILD}</p>
       </div>
 
       {showForgot && (
