@@ -36,11 +36,6 @@ export async function GET(req: NextRequest) {
   if (!ctx) return unauthorized();
   const { db } = ctx;
 
-  // ── Meta Cloud API: credenciales desde Railway env vars O desde la DB ───────
-  // Las env vars tienen prioridad — persisten entre redeploys sin volumen.
-  const envToken   = process.env.WHATSAPP_ACCESS_TOKEN;
-  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
   const waConfig = db.prepare(
     "SELECT provider, wa_access_token, wa_phone_number_id, wa_phone_display FROM whatsapp_config WHERE id=1"
   ).get() as {
@@ -50,11 +45,15 @@ export async function GET(req: NextRequest) {
     wa_phone_display: string | null;
   } | null;
 
-  const metaToken   = envToken   || waConfig?.wa_access_token;
-  const metaPhoneId = envPhoneId || waConfig?.wa_phone_number_id;
-  const isMeta      = (waConfig?.provider === "meta" || (!!envToken && !!envPhoneId));
+  // Env vars solo aplican si esta empresa tiene provider='meta' en su propia DB
+  // Evita que credenciales globales (de otra empresa) contaminen la plataforma master
+  const isMeta = waConfig?.provider === "meta";
+  const envToken   = isMeta ? process.env.WHATSAPP_ACCESS_TOKEN : null;
+  const envPhoneId = isMeta ? process.env.WHATSAPP_PHONE_NUMBER_ID : null;
+  const metaToken   = waConfig?.wa_access_token || envToken;
+  const metaPhoneId = waConfig?.wa_phone_number_id || envPhoneId;
 
-  if (isMeta && metaToken && metaPhoneId) {
+  if (isMeta && metaToken && metaPhoneId) {  // eslint-disable-line @typescript-eslint/no-unnecessary-condition
     const phone = waConfig?.wa_phone_display ?? metaPhoneId;
 
     // Sincronizar DB con env vars si están configuradas en Railway

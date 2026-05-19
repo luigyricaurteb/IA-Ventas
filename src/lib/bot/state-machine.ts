@@ -169,8 +169,13 @@ function wantsCatalog(text: string): boolean {
     "tienen algo","tienen algún","tienen algun","qué hay","info","información",
     "detalles","opciones disponibles","disponibles","portafolio","menú","menu",
     "qué manejan","what do you","show me","products","services","pricing",
-    "quiero ver","muéstrame","muéstrame","dime qué","lista","catálogo",
+    "quiero ver","muéstrame","dime qué","lista","catálogo",
     "what options","what services","what products",
+    // Planes / paquetes (contexto turismo)
+    "planes","paquetes","qué planes","sus planes","los planes","tienen planes",
+    "pasadía","pasadia","tour","excursión","excursion","actividades",
+    "cuánto cobran","cuánto cobras","cuánto sale","cuanto sale",
+    "hay disponible","tienen disponible","qué incluye","qué tiene",
   ];
   return keywords.some(kw => lower.includes(kw));
 }
@@ -251,8 +256,6 @@ export async function processBotMessage(
   })();
 
   // ── Detección global de cancelación ──────────────────────────────────
-  // Si el cliente quiere cancelar en cualquier estado de flujo comercial,
-  // reset a ACTIVE y dejamos que la IA responda con empatía
   const FLOW_STATES: BotState[] = ["COLLECTING_PEOPLE","QUOTE_SENT","AWAITING_PAYMENT","CONFIRMING_PAYMENT"];
   if (FLOW_STATES.includes(currentState) && isCancellation(text)) {
     setState(db, conversationId, "ACTIVE");
@@ -260,6 +263,27 @@ export async function processBotMessage(
     await send(db, sock, jid, phone, conversationId, reply);
     autoLearn(db, conversationId).catch(() => {});
     return;
+  }
+
+  // ── Escape hatch: cliente pregunta por catálogo en cualquier estado ────
+  // Si está esperando pago pero pregunta por productos/planes, se los mostramos
+  const CATALOG_ESCAPE_STATES: BotState[] = ["COLLECTING_PEOPLE","QUOTE_SENT","AWAITING_PAYMENT","DONE"];
+  if (CATALOG_ESCAPE_STATES.includes(currentState) && wantsCatalog(text)) {
+    const products = db.prepare("SELECT id, name, price_per_person, description FROM products WHERE active=1").all() as { id: number; name: string; price_per_person: number; description: string | null }[];
+    if (products.length > 0) {
+      setState(db, conversationId, "ACTIVE");
+      if (products.length === 1) {
+        const p = products[0];
+        const caption = `*${p.name}*\n💰 $${p.price_per_person.toLocaleString("es-CO")} por persona${p.description ? `\n\n${p.description}` : ""}`;
+        await sendProductImages(db, sock, jid, phone, conversationId, p.id, caption);
+        await send(db, sock, jid, phone, conversationId, `¿Para cuántas personas lo necesitas?`);
+      } else {
+        const list = products.map((p, i) => `*${i + 1}. ${p.name}* — $${p.price_per_person.toLocaleString("es-CO")}/persona`).join("\n");
+        await send(db, sock, jid, phone, conversationId, `Claro, estos son nuestros servicios disponibles 🌊\n\n${list}\n\n¿Cuál te interesa?`);
+        await sendProductImages(db, sock, jid, phone, conversationId, products[0].id, `📸 ${products[0].name}`);
+      }
+      return;
+    }
   }
 
   // ── INIT ──────────────────────────────────────────────────────────────
