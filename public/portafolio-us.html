@@ -248,8 +248,7 @@ async function loadPlans(){
       if(usd>0)document.getElementById('hivo-usd-compare').textContent='From $'+usd.toLocaleString('en-US')+' USD';
     }
     container.innerHTML=monthly.map((p,i)=>{
-      const usd=Number(p.price_usd)>0?`$${Number(p.price_usd).toLocaleString('en-US')}`:'';
-      const cop=Number(p.price_cop).toLocaleString('es-CO');
+      const usd=Number(p.price_usd)>0?`$${Number(p.price_usd).toLocaleString('en-US')}`:'Contact us';
       const mods=p.modules||{};
       const enabled=Object.keys(MODULE_LABELS).filter(k=>mods[k]);
       const disabled=Object.keys(MODULE_LABELS).filter(k=>!mods[k]);
@@ -258,8 +257,7 @@ async function loadPlans(){
         ${isFeatured?'<div class="plan-badge">⭐ Most popular</div>':''}
         <div class="plan-name">${PLAN_ICONS[i]||'⚙️'} ${p.name}</div>
         ${p.description?`<div style="font-size:12px;color:#64748b;margin-bottom:12px">${p.description}</div>`:''}
-        <div class="plan-price-usd">${usd||'Contact us'}</div>
-        ${usd?`<div class="plan-price-cop">COP $${cop}</div>`:''}
+        <div class="plan-price-usd">${usd}</div>
         <div class="plan-cycle">USD · per month</div>
         <div class="plan-divider"></div>
         <ul class="plan-features">
@@ -276,10 +274,9 @@ async function loadPlans(){
       const pb=document.getElementById('perm-box');
       if(pb){
         pb.style.display='block';
-        const usd=Number(permanent.price_usd)>0?`$${Number(permanent.price_usd).toLocaleString('en-US')} USD`:'';
-        const cop=`COP $${Number(permanent.price_cop).toLocaleString('es-CO')}`;
-        document.getElementById('perm-price-usd').textContent=usd||cop;
-        document.getElementById('perm-price-cop').textContent=usd?`${cop} · One-time payment`:'One-time payment';
+        const usd=Number(permanent.price_usd)>0?`$${Number(permanent.price_usd).toLocaleString('en-US')} USD`:'One-time payment';
+        document.getElementById('perm-price-usd').textContent=usd;
+        document.getElementById('perm-price-cop').textContent='One-time payment';
         document.getElementById('perm-name').textContent='🔐 '+permanent.name;
       }
     }

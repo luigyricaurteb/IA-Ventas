@@ -528,7 +528,6 @@ async function loadPlans() {
 
     container.innerHTML = monthly.map((p, i) => {
       const cop  = Number(p.price_cop).toLocaleString('es-CO');
-      const usd  = Number(p.price_usd) > 0 ? `USD $${Number(p.price_usd).toLocaleString('en-US')} / month` : '';
       const mods = p.modules || {};
       const enabled  = Object.keys(MODULE_LABELS).filter(k => mods[k]);
       const disabled = Object.keys(MODULE_LABELS).filter(k => !mods[k]);
@@ -539,8 +538,7 @@ async function loadPlans() {
         <div class="plan-name">${PLAN_ICONS[i] || '⚙️'} ${p.name}</div>
         ${p.description ? `<div style="font-size:12px;color:#64748b;margin-bottom:12px">${p.description}</div>` : ''}
         <div class="plan-price-cop">$${cop}</div>
-        <div class="plan-price-usd">${usd}</div>
-        <div class="plan-cycle">COP · por mes</div>
+        <div class="plan-cycle">COP / mes</div>
         <div class="plan-divider"></div>
         <ul class="plan-features">
           ${enabled.map(k => `<li>${MODULE_LABELS[k]}</li>`).join('')}
@@ -559,9 +557,9 @@ async function loadPlans() {
       if (permBox) {
         permBox.style.display = 'block';
         const cop = Number(permanent.price_cop).toLocaleString('es-CO');
-        const usd = Number(permanent.price_usd) > 0 ? `USD $${Number(permanent.price_usd).toLocaleString('en-US')} · Pago único` : 'Pago único';
         document.getElementById('perm-price-cop').textContent = '$' + cop;
-        document.getElementById('perm-price-usd').textContent = usd;
+        const permUsd = document.getElementById('perm-price-usd');
+        if (permUsd) permUsd.style.display = 'none';
         document.getElementById('perm-name').textContent = '🔐 ' + permanent.name;
       }
     }
