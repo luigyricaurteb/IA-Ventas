@@ -303,7 +303,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     { id: "templates", label: "Plantillas" },
     { id: "sla",       label: "SLA", adminOnly: true },
     { id: "drive",     label: "Google Drive", adminOnly: true },
-    { id: "sheets",    label: "📊 Google Sheets", adminOnly: true },
+    { id: "sheets",    label: "📊 Google Sheets" },
     { id: "users",     label: "Usuarios", adminOnly: true },
   ];
   const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin) as { id: Tab; label: string }[];
