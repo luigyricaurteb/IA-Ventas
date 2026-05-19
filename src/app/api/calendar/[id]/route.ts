@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const body = await req.json();
 
   const allowed = ["deal_id","contact_id","client_name","service_name","service_date",
-    "people_count","total_value","status","notes"];
+    "people_count","service_price","discount","total_value","amount_paid","status","notes"];
   const fields = Object.keys(body).filter((k) => allowed.includes(k));
   if (fields.length === 0) return NextResponse.json({ ok: true });
 

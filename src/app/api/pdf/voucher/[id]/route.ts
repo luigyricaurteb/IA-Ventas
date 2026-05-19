@@ -21,7 +21,8 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   ).get(resId) as {
     id: number; reservation_code: string | null; client_name: string | null;
     service_name: string | null; service_date: number; people_count: number;
-    total_value: number | null; notes: string | null; status: string;
+    service_price: number | null; discount: number; total_value: number | null;
+    amount_paid: number; notes: string | null; status: string;
   } | null;
 
   if (!reservation) return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
@@ -133,13 +134,60 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       y += 20;
     }
 
-    // ── Total ────────────────────────────────────────────────────────
-    if (reservation.total_value) {
+    // ── Resumen financiero ───────────────────────────────────────────
+    const total      = reservation.total_value ?? 0;
+    const amountPaid = reservation.amount_paid ?? 0;
+    const saldo      = Math.max(0, total - amountPaid);
+
+    if (total > 0 || reservation.service_price) {
+      y += 8;
+      doc.fillColor("#374151").fontSize(10).font("Helvetica-Bold").text("RESUMEN DE PAGO", 50, y);
       y += 5;
-      doc.rect(50, y, W, 30).fillColor(accentColor).fill();
-      doc.font("Helvetica-Bold").fillColor("white").fontSize(12)
-         .text(`TOTAL PAGADO: $${reservation.total_value.toLocaleString("es-CO")} COP`, 55, y + 9, { width: W - 10 });
-      y += 42;
+      doc.moveTo(50, y + 11).lineTo(545, y + 11).strokeColor("#e5e7eb").lineWidth(1).stroke();
+      y += 16;
+
+      const financials: [string, string, string][] = [];
+      if (reservation.service_price && reservation.people_count > 1) {
+        financials.push(["Precio por persona", `$${reservation.service_price.toLocaleString("es-CO")} × ${reservation.people_count}`, `$${(reservation.service_price * reservation.people_count).toLocaleString("es-CO")}`]);
+      } else if (reservation.service_price) {
+        financials.push(["Precio del servicio", "", `$${reservation.service_price.toLocaleString("es-CO")}`]);
+      }
+      if ((reservation.discount ?? 0) > 0) {
+        financials.push(["Descuento", "", `- $${reservation.discount.toLocaleString("es-CO")}`]);
+      }
+
+      for (const [label, sub, value] of financials) {
+        doc.rect(50, y - 2, W, 18).fillColor("#f9fafb").fill();
+        doc.font("Helvetica-Bold").fillColor("#6b7280").fontSize(9).text(label + (sub ? ` (${sub})` : "") + ":", 55, y, { width: 250 });
+        doc.font("Helvetica").fillColor("#111827").text(value, 310, y, { width: W - 265, align: "right" });
+        y += 20;
+      }
+
+      if (total > 0) {
+        doc.rect(50, y, W, 28).fillColor(accentColor).fill();
+        doc.font("Helvetica-Bold").fillColor("white").fontSize(11)
+           .text("TOTAL:", 55, y + 8, { width: 200 });
+        doc.text(`$${total.toLocaleString("es-CO")} COP`, 55, y + 8, { width: W - 10, align: "right" });
+        y += 36;
+      }
+
+      if (amountPaid > 0) {
+        doc.rect(50, y - 2, W, 18).fillColor("#d1fae5").fill();
+        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("✓ Pagado:", 55, y, { width: 200 });
+        doc.text(`$${amountPaid.toLocaleString("es-CO")} COP`, 55, y, { width: W - 10, align: "right" });
+        y += 22;
+      }
+
+      if (saldo > 0) {
+        doc.rect(50, y - 2, W, 22).fillColor("#fef3c7").fill();
+        doc.font("Helvetica-Bold").fillColor("#92400e").fontSize(10).text("⚠ SALDO PENDIENTE:", 55, y + 4, { width: 200 });
+        doc.text(`$${saldo.toLocaleString("es-CO")} COP`, 55, y + 4, { width: W - 10, align: "right" });
+        y += 28;
+      } else if (amountPaid > 0 && total > 0) {
+        doc.rect(50, y - 2, W, 18).fillColor("#d1fae5").fill();
+        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("✅ PAGADO EN SU TOTALIDAD", 55, y, { width: W - 10, align: "center" });
+        y += 22;
+      }
     }
 
     // ── Notas ────────────────────────────────────────────────────────

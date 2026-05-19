@@ -482,12 +482,15 @@ export async function processBotMessage(
           `Un asesor verificará tu pago. Para completar la reserva, deberás cancelar el saldo pendiente. Puedes enviarlo cuando quieras con otro comprobante. 🙏`;
 
       } else {
-        // Pago completo
+        // Pago completo — crear reserva y confirmar
         respuesta =
           `✅ *¡Pago confirmado!*\n\n` +
           `💵 Valor recibido: *${fmt(aiMonto)}*\n` +
           (total > 0 ? `📊 Total del servicio: *${fmt(total)}*\n` : "") +
-          `\nUn asesor verificará tu comprobante y confirmará tu reserva pronto. ¡Gracias por confiar en nosotros! 🙏`;
+          `\n🎉 ¡Tu reserva está confirmada! Te enviaremos el recibo en un momento.`;
+
+        // Crear reserva en la DB
+        createReservationFromDeal(db, conversationId, totalPaid, proofId ?? null);
       }
 
       await send(db, sock, jid, phone, conversationId, respuesta);
@@ -535,6 +538,78 @@ export async function processBotMessage(
   }
   void cfg;
   autoLearn(db, conversationId).catch(() => {});
+}
+
+// ── Crear reserva desde un deal confirmado por el bot ────────────────────────
+function createReservationFromDeal(
+  db: Database.Database,
+  conversationId: number,
+  amountPaid: number,
+  proofId: number | null
+) {
+  try {
+    const deal = db.prepare(`
+      SELECT d.id, d.total_value, d.people_count, d.product_id,
+             p.name as product_name, p.price_per_person,
+             c.full_name as contact_name, c.id as contact_id,
+             conv.phone
+      FROM crm_deals d
+      LEFT JOIN products p ON d.product_id = p.id
+      LEFT JOIN contacts c ON d.contact_id = c.id
+      LEFT JOIN conversations conv ON d.conversation_id = conv.id
+      WHERE d.conversation_id = ? ORDER BY d.id DESC LIMIT 1
+    `).get(conversationId) as {
+      id: number; total_value: number | null; people_count: number | null;
+      product_id: number | null; product_name: string | null; price_per_person: number | null;
+      contact_name: string | null; contact_id: number | null; phone: string | null;
+    } | null;
+
+    if (!deal) return;
+
+    // Check if reservation already exists for this deal
+    const existing = db.prepare("SELECT id FROM reservations WHERE deal_id=? LIMIT 1").get(deal.id);
+    if (existing) return;
+
+    const code = `RES-${Date.now()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
+    const now = Math.floor(Date.now() / 1000);
+    const saldo = Math.max(0, (deal.total_value ?? 0) - amountPaid);
+
+    db.prepare(`
+      INSERT INTO reservations
+        (deal_id, contact_id, reservation_code, client_name, service_name,
+         service_date, people_count, service_price, total_value, amount_paid,
+         status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      deal.id, deal.contact_id, code,
+      deal.contact_name ?? deal.phone,
+      deal.product_name,
+      now + 86400, // mañana por defecto — el admin ajusta la fecha real
+      deal.people_count ?? 1,
+      deal.price_per_person,
+      deal.total_value,
+      amountPaid,
+      saldo <= 0 ? "confirmed" : "pending",
+      now, now
+    );
+
+    // Register payment in accounting
+    if (amountPaid > 0) {
+      const desc = `Reserva ${code} — ${deal.contact_name ?? deal.phone ?? "Cliente"} — ${deal.product_name ?? "Servicio"}`;
+      try {
+        db.prepare("INSERT INTO accounting_income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(amountPaid, desc, now, now);
+      } catch { try { db.prepare("INSERT INTO income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(amountPaid, desc, now, now); } catch {} }
+    }
+
+    // Mark proof as reviewed
+    if (proofId) db.prepare("UPDATE payment_proofs SET reviewed=1 WHERE id=?").run(proofId);
+
+    // Update deal stage
+    db.prepare("UPDATE crm_deals SET stage='CERRADO_GANADO' WHERE id=?").run(deal.id);
+
+  } catch (e) {
+    console.error("[bot] Error creando reserva desde deal:", (e as Error).message);
+  }
 }
 
 // ── Función centralizada de respuesta IA ─────────────────────────────────────

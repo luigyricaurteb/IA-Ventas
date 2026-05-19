@@ -440,6 +440,11 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN sheets_url TEXT",
     "ALTER TABLE company_config ADD COLUMN sheets_enabled INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE company_config ADD COLUMN sheets_last_sync INTEGER",
+    // Reservations: pricing breakdown, discounts, partial payments
+    "ALTER TABLE reservations ADD COLUMN service_price REAL",
+    "ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE reservations ADD COLUMN amount_paid REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE reservations ADD COLUMN reservation_date INTEGER",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)

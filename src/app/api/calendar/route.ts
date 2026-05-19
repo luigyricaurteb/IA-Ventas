@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
   const reservation = db.prepare(`
     INSERT INTO reservations
       (deal_id, contact_id, reservation_code, client_name, service_name,
-       service_date, people_count, total_value, status, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       service_date, people_count, service_price, discount, total_value, amount_paid, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     RETURNING *
   `).get(
     body.deal_id      ?? null,
@@ -81,10 +81,22 @@ export async function POST(req: NextRequest) {
     body.service_name ?? null,
     Number(body.service_date),
     Number(body.people_count ?? 1),
+    body.service_price ? Number(body.service_price) : null,
+    Number(body.discount ?? 0),
     body.total_value  ? Number(body.total_value) : null,
+    Number(body.amount_paid ?? 0),
     body.status       ?? "pending",
     body.notes        ?? null,
   );
+
+  // Register initial payment in accounting if amount_paid > 0
+  if (Number(body.amount_paid ?? 0) > 0) {
+    const now = Math.floor(Date.now() / 1000);
+    const desc = `Abono inicial reserva ${code} — ${body.client_name ?? "Cliente"} — ${body.service_name ?? "Servicio"}`;
+    try {
+      db.prepare("INSERT INTO accounting_income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(Number(body.amount_paid), desc, now, now);
+    } catch { try { db.prepare("INSERT INTO income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(Number(body.amount_paid), desc, now, now); } catch {} }
+  }
 
   // Auto-sync to Google Sheet if enabled
   const sheetCfg = db.prepare("SELECT sheets_url, sheets_enabled FROM company_config WHERE id=1").get() as { sheets_url: string | null; sheets_enabled: number } | null;
