@@ -13,24 +13,42 @@ interface SidebarProps {
   onMobileOpen?: () => void;
 }
 
-const ALL_ITEMS: { id: Module; label: string; icon: string; dividerAfter?: boolean }[] = [
-  { id: "master",       label: "Plataforma",    icon: "🏛️", dividerAfter: true },
-  { id: "chat",         label: "Chat",          icon: "💬" },
-  { id: "crm",          label: "CRM",           icon: "👥" },
-  { id: "calendar",     label: "Calendario",    icon: "📅" },
-  { id: "analytics",    label: "Analytics",     icon: "📊" },
-  { id: "accounting",   label: "Contabilidad",  icon: "💰" },
-  { id: "suppliers",    label: "Proveedores",   icon: "🤝" },
-  { id: "products",     label: "Productos",     icon: "🛍️" },
-  { id: "campaigns",    label: "Campañas",      icon: "📧" },
-  { id: "documents",    label: "Documentos",    icon: "📄" },
-  { id: "settings",     label: "Ajustes",       icon: "⚙️" },
-  { id: "flows",        label: "Flujos",        icon: "🔀" },
-  { id: "subscription", label: "Suscripción",   icon: "💳" },
-  { id: "help",         label: "Manual",        icon: "📖" },
+const NAV_GROUPS: { label?: string; items: { id: Module; label: string; icon: string }[] }[] = [
+  {
+    items: [
+      { id: "master", label: "Plataforma", icon: "🏛️" },
+    ]
+  },
+  {
+    label: "Principal",
+    items: [
+      { id: "chat",      label: "Chat",        icon: "💬" },
+      { id: "crm",       label: "CRM",         icon: "👥" },
+      { id: "calendar",  label: "Calendario",  icon: "📅" },
+      { id: "analytics", label: "Analytics",   icon: "📊" },
+    ]
+  },
+  {
+    label: "Gestión",
+    items: [
+      { id: "accounting",  label: "Contabilidad", icon: "💰" },
+      { id: "products",    label: "Productos",    icon: "🛍️" },
+      { id: "suppliers",   label: "Proveedores",  icon: "🤝" },
+      { id: "campaigns",   label: "Campañas",     icon: "📧" },
+      { id: "documents",   label: "Documentos",   icon: "📄" },
+    ]
+  },
+  {
+    label: "Sistema",
+    items: [
+      { id: "flows",        label: "Flujos",      icon: "🔀" },
+      { id: "settings",     label: "Ajustes",     icon: "⚙️" },
+      { id: "subscription", label: "Suscripción", icon: "💳" },
+      { id: "help",         label: "Manual",      icon: "📖" },
+    ]
+  }
 ];
 
-// Items que se muestran en la barra inferior de móvil (los más usados)
 const MOBILE_NAV: Module[] = ["chat", "crm", "calendar", "settings"];
 
 export default function Sidebar({ active, onChange, allowedModules, mobileOpen = false, onMobileClose, onMobileOpen }: SidebarProps) {
@@ -48,162 +66,121 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
     return () => clearInterval(iv);
   }, []);
 
-  const visibleItems = ALL_ITEMS.filter(item => allowedModules.includes(item.id));
-  const mobileItems  = visibleItems.filter(item => MOBILE_NAV.includes(item.id));
+  function handleClick(id: Module) { onChange(id); onMobileClose?.(); }
 
-  function handleClick(id: Module) {
-    onChange(id);
-    onMobileClose?.();
-  }
-
-  const itemClass = (id: Module) => {
-    const isMaster = id === "master";
-    if (isMaster) {
-      return active === id
-        ? "text-white font-semibold"
-        : "text-amber-300/70 hover:text-amber-200";
-    }
-    return active === id
-      ? "text-white font-semibold"
-      : "text-[#c4a882] hover:text-[#e8d9c8]";
+  const NavItem = ({ id, label, icon, compact = false }: { id: Module; label: string; icon: string; compact?: boolean }) => {
+    const isActive = active === id;
+    const badge = id === "chat" ? alertCount : 0;
+    return (
+      <button
+        onClick={() => handleClick(id)}
+        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 relative group ${
+          isActive
+            ? "bg-[#0077b6] text-white font-medium"
+            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+        } ${compact ? "py-1.5" : ""}`}
+      >
+        <span className={`shrink-0 text-sm w-4 text-center ${isActive ? "opacity-100" : "opacity-75 group-hover:opacity-100"}`}>
+          {icon}
+        </span>
+        <span className="text-sm truncate">{label}</span>
+        {badge > 0 && (
+          <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1 shrink-0">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </button>
+    );
   };
 
-  // ── Sidebar desktop ───────────────────────────────────────────────────────
-  const desktopSidebar = (
-    <aside className="hidden md:flex md:flex-col w-56 shrink-0 h-full" style={{ background: "var(--sidebar-bg)" }}>
+  const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
+    <>
       {/* Logo */}
-      <div className="px-5 py-5 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-black text-white" style={{ background: "var(--accent)" }}>H</div>
-          <span className="font-bold text-sm tracking-wider" style={{ color: "var(--sidebar-text)" }}>Hivo</span>
+      <div className={`flex items-center gap-2.5 px-4 ${mobile ? "py-4" : "py-5"} shrink-0`}
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-white text-sm shrink-0"
+          style={{ background: "var(--accent)" }}>
+          H
         </div>
+        <div>
+          <span className="font-bold text-sm text-white tracking-wide">Hivo</span>
+          <span className="block text-[10px] text-slate-500 leading-none -mt-0.5">Business Platform</span>
+        </div>
+        {mobile && (
+          <button onClick={onMobileClose} className="ml-auto text-slate-500 hover:text-white text-lg leading-none">✕</button>
+        )}
       </div>
 
-      {/* Items — scrollable */}
-      <nav className="flex-1 overflow-y-auto py-2 scrollbar-thin">
-        {visibleItems.map(item => {
-          const badge = item.id === "chat" ? alertCount : 0;
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
+        {NAV_GROUPS.map((group, gi) => {
+          const visibleItems = group.items.filter(item => allowedModules.includes(item.id));
+          if (visibleItems.length === 0) return null;
           return (
-            <div key={item.id}>
-              <button
-                onClick={() => handleClick(item.id)}
-                title={item.label}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 mx-1.5 rounded-lg transition-colors text-left ${itemClass(item.id)}`}
-                style={{ width: "calc(100% - 0.75rem)" }}
-              >
-                <span className="text-base shrink-0 relative w-5 text-center">
-                  {item.icon}
-                  {badge > 0 && (
-                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
-                      {badge > 9 ? "9+" : badge}
-                    </span>
-                  )}
-                </span>
-                <span className="text-sm font-medium truncate">{item.label}</span>
-                {badge > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold shrink-0">
-                    {badge}
-                  </span>
-                )}
-              </button>
-              {item.dividerAfter && <div className="mx-4 my-1.5 border-t border-white/5" />}
+            <div key={gi} className={gi > 0 ? "mt-4" : ""}>
+              {group.label && (
+                <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {visibleItems.map(item => (
+                  <NavItem key={item.id} {...item} />
+                ))}
+              </div>
             </div>
           );
         })}
       </nav>
-    </aside>
-  );
-
-  // ── Drawer móvil (slide-in desde la izquierda) ────────────────────────────
-  const mobilDrawer = (
-    <>
-      {/* Overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={onMobileClose}
-        />
-      )}
-      {/* Drawer */}
-      <div className={`fixed top-0 left-0 h-full w-64 z-50 flex flex-col shadow-2xl transition-transform duration-300 md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`} style={{ background: "var(--sidebar-bg)" }}>
-        <div className="px-4 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <span className="text-white font-bold text-sm">Hivo</span>
-          <button onClick={onMobileClose} className="text-gray-400 hover:text-white text-xl leading-none">✕</button>
-        </div>
-        <nav className="flex-1 overflow-y-auto py-2">
-          {visibleItems.map(item => {
-            const badge = item.id === "chat" ? alertCount : 0;
-            return (
-              <div key={item.id}>
-                <button
-                  onClick={() => handleClick(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${itemClass(item.id)}`}
-                >
-                  <span className="text-xl shrink-0 relative w-6 text-center">
-                    {item.icon}
-                    {badge > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                        {badge > 9 ? "9+" : badge}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-sm font-medium">{item.label}</span>
-                  {badge > 0 && <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">{badge}</span>}
-                </button>
-                {item.dividerAfter && <div className="mx-4 my-1 border-t border-white/5" />}
-              </div>
-            );
-          })}
-        </nav>
-      </div>
     </>
-  );
-
-  // ── Barra de navegación móvil inferior ────────────────────────────────────
-  const mobileBottomNav = (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 safe-area-pb" style={{ background: "var(--sidebar-bg)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-      <div className="flex items-center justify-around px-2 py-1">
-        {mobileItems.map(item => {
-          const badge = item.id === "chat" ? alertCount : 0;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onChange(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[56px] transition-colors ${
-                active === item.id ? "text-emerald-400" : "text-gray-500"
-              }`}
-            >
-              <span className="text-xl relative">
-                {item.icon}
-                {badge > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
-                    {badge > 9 ? "9" : badge}
-                  </span>
-                )}
-              </span>
-              <span className={`text-[10px] font-medium ${active === item.id ? "text-emerald-400" : "text-gray-600"}`}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-        {/* Botón "Más" → abre el drawer completo */}
-        <button
-          onClick={onMobileOpen}
-          className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[56px] text-gray-500"
-        >
-          <span className="text-xl">☰</span>
-          <span className="text-[10px] font-medium text-gray-600">Más</span>
-        </button>
-      </div>
-    </nav>
   );
 
   return (
     <>
-      {desktopSidebar}
-      {mobilDrawer}
-      {mobileBottomNav}
+      {/* Desktop */}
+      <aside className="hidden md:flex md:flex-col w-52 shrink-0 h-full" style={{ background: "#0f172a" }}>
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={onMobileClose} />
+      )}
+
+      {/* Mobile drawer */}
+      <div className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ background: "#0f172a" }}>
+        <SidebarContent mobile />
+      </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t"
+        style={{ background: "#0f172a", borderColor: "rgba(255,255,255,0.06)" }}>
+        <div className="flex items-center justify-around px-1 py-1">
+          {MOBILE_NAV.filter(id => allowedModules.includes(id)).map(id => {
+            const item = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === id);
+            if (!item) return null;
+            const badge = id === "chat" ? alertCount : 0;
+            const isActive = active === id;
+            return (
+              <button key={id} onClick={() => onChange(id)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[52px] transition-colors ${isActive ? "text-[#0077b6]" : "text-slate-500"}`}>
+                <span className="text-lg relative">
+                  {item.icon}
+                  {badge > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">{badge > 9 ? "9" : badge}</span>
+                  )}
+                </span>
+                <span className={`text-[10px] font-medium ${isActive ? "text-[#0077b6]" : "text-slate-600"}`}>{item.label}</span>
+              </button>
+            );
+          })}
+          <button onClick={onMobileOpen} className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[52px] text-slate-500">
+            <span className="text-lg">☰</span>
+            <span className="text-[10px] font-medium text-slate-600">Más</span>
+          </button>
+        </div>
+      </nav>
     </>
   );
 }

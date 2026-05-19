@@ -1,42 +1,61 @@
 @import "tailwindcss";
-/* Hivo — Arena & Mar design system */
+
+/* ── Hivo Design System — Clean Professional ─────────────────────────────── */
 
 :root {
-  /* Opción 3: tonos cálidos arena + azul caribe */
-  --background:   #fdf8f2;        /* arena clara */
-  --surface:      #fff9f4;        /* blanco cálido */
-  --surface-alt:  #f5ede0;        /* arena media */
-  --border:       #e8d9c8;        /* borde arena */
-  --accent:       #0077b6;        /* azul caribe */
-  --accent-light: #e8f4fd;        /* azul muy claro */
-  --accent-hover: #005f8e;        /* azul caribe oscuro */
-  --text-primary:   #1a1208;      /* marrón muy oscuro */
-  --text-secondary: #6b5744;      /* arena oscura */
-  --text-muted:     #b09880;      /* arena media */
-  --sidebar-bg:     #1a0f05;      /* negro arena profundo */
-  --sidebar-text:   #e8d9c8;      /* arena clara */
-  --sidebar-active: #0077b6;      /* azul caribe */
+  /* Neutrals — clean slate palette */
+  --background:   #f1f5f9;
+  --surface:      #ffffff;
+  --surface-alt:  #f8fafc;
+  --border:       #e2e8f0;
+  --border-light: #f1f5f9;
+
+  /* Brand */
+  --accent:       #0077b6;
+  --accent-light: #e0f2fe;
+  --accent-hover: #005f8e;
+  --accent-muted: #bae6fd;
+
+  /* Text */
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+
+  /* Sidebar */
+  --sidebar-bg:     #0f172a;
+  --sidebar-text:   #94a3b8;
+  --sidebar-active: #0077b6;
+
+  /* Semantic */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+
   --foreground: var(--text-primary);
 }
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 
 html { overflow-x: hidden; }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden;
   max-width: 100vw;
-  position: relative;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Bordes y fondos globales cálidos */
-.bg-white       { background-color: var(--surface) !important; }
-.bg-gray-50     { background-color: var(--background) !important; }
-.bg-gray-100    { background-color: var(--surface-alt) !important; }
-.border-gray-100, .border-gray-200 { border-color: var(--border) !important; }
+/* ── Overrides globales ───────────────────────────────────────────────────── */
 
-/* Botones de acento */
+.bg-white       { background-color: var(--surface) !important; }
+.bg-gray-50     { background-color: var(--surface-alt) !important; }
+.bg-gray-100    { background-color: #f1f5f9 !important; }
+.border-gray-100 { border-color: var(--border-light) !important; }
+.border-gray-200 { border-color: var(--border) !important; }
+
+/* Brand buttons */
 .bg-emerald-500 { background-color: var(--accent) !important; }
 .bg-emerald-600 { background-color: var(--accent-hover) !important; }
 .hover\:bg-emerald-600:hover { background-color: var(--accent-hover) !important; }
@@ -44,25 +63,42 @@ body {
 .text-emerald-700 { color: var(--accent-hover) !important; }
 .border-emerald-500 { border-color: var(--accent) !important; }
 .ring-emerald-400  { --tw-ring-color: var(--accent) !important; }
-
-/* Chips de estado IA */
 .bg-emerald-100 { background-color: var(--accent-light) !important; }
+.bg-emerald-50  { background-color: #f0f9ff !important; }
+.text-emerald-500 { color: var(--accent) !important; }
+.border-emerald-200 { border-color: var(--accent-muted) !important; }
 
-/* Scrollbar sutil */
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.03);
 }
 
-::-webkit-scrollbar {
-  width: 6px;
+/* ── Input focus ───────────────────────────────────────────────────────────── */
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(0,119,182,.1);
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+/* ── Animations ────────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
+.animate-fade-in { animation: fade-in 0.15s ease-out; }

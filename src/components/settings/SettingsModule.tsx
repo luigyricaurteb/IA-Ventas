@@ -371,24 +371,6 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
           </div>
           <div className="border-t pt-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Horario de atención del bot</p>
-            <div className="flex gap-4 items-center flex-wrap">
-              <div>
-                <label className="text-xs text-gray-500">Desde (hora)</label>
-                <input type="number" min={0} max={23} value={company.business_hours_start}
-                  onChange={(e) => setCompany({ ...company, business_hours_start: Number(e.target.value) })}
-                  className="w-16 border rounded px-2 py-1 text-sm mt-1 block" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500">Hasta (hora)</label>
-                <input type="number" min={0} max={23} value={company.business_hours_end}
-                  onChange={(e) => setCompany({ ...company, business_hours_end: Number(e.target.value) })}
-                  className="w-16 border rounded px-2 py-1 text-sm mt-1 block" />
-              </div>
-              <p className="text-xs text-gray-400 self-end pb-1">Días activos: {company.business_days}<br/>(0=dom · 1=lun · 5=vie · 6=sáb)</p>
-            </div>
-          </div>
-          <div className="border-t pt-4">
             <p className="text-sm font-medium text-gray-700 mb-2">Pagos QR (Nequi / Daviplata)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
