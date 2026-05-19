@@ -295,34 +295,63 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     showSaved();
   }
 
-  const ALL_TABS: { id: Tab; label: string; adminOnly?: boolean }[] = [
-    { id: "company",   label: "Empresa" },
-    { id: "whatsapp",  label: "☁️ Meta" },
-    { id: "banks",     label: "Cuentas bancarias" },
-    { id: "smtp",      label: "Email SMTP" },
-    { id: "learning",  label: `${aiName} IA` },
-    { id: "templates", label: "Plantillas" },
-    { id: "sla",       label: "SLA", adminOnly: true },
-    { id: "drive",     label: "Google Drive", adminOnly: true },
-    { id: "sheets",    label: "📊 Google Sheets" },
-    { id: "users",     label: "Usuarios", adminOnly: true },
+  const ALL_TABS: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
+    { id: "company",   label: "Empresa",          icon: "🏢" },
+    { id: "whatsapp",  label: "Meta / WhatsApp",  icon: "☁️" },
+    { id: "banks",     label: "Cuentas bancarias", icon: "🏦" },
+    { id: "smtp",      label: "Email",             icon: "📧" },
+    { id: "learning",  label: `${aiName} IA`,      icon: "🤖" },
+    { id: "templates", label: "Plantillas",        icon: "📝" },
+    { id: "sheets",    label: "Google Sheets",     icon: "📊" },
+    { id: "sla",       label: "SLA",               icon: "⏱️", adminOnly: true },
+    { id: "drive",     label: "Google Drive",      icon: "🗂️", adminOnly: true },
+    { id: "users",     label: "Usuarios",          icon: "👥", adminOnly: true },
   ];
-  const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin) as { id: Tab; label: string }[];
+  const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin);
+  const activeTab = TABS.find(t => t.id === tab);
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-6 max-w-3xl w-full">
-      <h1 className="text-xl font-bold text-gray-800 mb-4">Configuración</h1>
-      {/* Tabs — scroll horizontal en móvil */}
-      <div className="overflow-x-auto mb-6 -mx-4 md:mx-0 px-4 md:px-0">
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 min-w-max md:min-w-0 md:flex-wrap">
+    <div className="flex-1 flex overflow-hidden">
+      {/* ── Sidebar de navegación ── */}
+      <aside className="w-56 shrink-0 border-r bg-white flex flex-col overflow-y-auto hidden md:flex">
+        <div className="px-4 py-5 border-b">
+          <h1 className="text-base font-bold text-gray-800">Configuración</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Ajustes del sistema</p>
+        </div>
+        <nav className="flex-1 py-2">
           {TABS.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`shrink-0 px-3 py-2 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${tab === t.id ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
-              {t.label}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors text-left ${
+                tab === t.id
+                  ? "bg-emerald-50 text-emerald-700 border-r-2 border-emerald-500"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+              }`}>
+              <span className="text-base leading-none">{t.icon}</span>
+              <span>{t.label}</span>
             </button>
           ))}
-        </div>
+        </nav>
+      </aside>
+
+      {/* ── Selector móvil ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-30 px-3 py-2">
+        <select value={tab} onChange={e => setTab(e.target.value as Tab)}
+          className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+          {TABS.map(t => <option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+        </select>
       </div>
+
+      {/* ── Panel de contenido ── */}
+      <div className="flex-1 overflow-auto">
+        {/* Header del panel */}
+        <div className="sticky top-0 z-10 bg-white border-b px-6 py-4 flex items-center gap-3">
+          <span className="text-xl">{activeTab?.icon}</span>
+          <div>
+            <h2 className="font-semibold text-gray-800">{activeTab?.label}</h2>
+          </div>
+          {saved && <span className="ml-auto text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-1 rounded-full">✓ Guardado</span>}
+        </div>
+        <div className="p-6 max-w-2xl">
 
       {/* ── EMPRESA ── */}
       {tab === "company" && (
@@ -1183,6 +1212,11 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           )}
         </div>
       )}
+
+        </div>{/* fin p-6 */}
+        {/* padding bottom móvil para el select fijo */}
+        <div className="h-16 md:h-0" />
+      </div>{/* fin panel contenido */}
     </div>
   );
 }
