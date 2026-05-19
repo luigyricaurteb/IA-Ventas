@@ -443,6 +443,8 @@ function initCompanySchema(db: Database.Database): void {
     // Admin WhatsApp mode
     "ALTER TABLE company_config ADD COLUMN admin_wa_phone TEXT",
     "ALTER TABLE company_config ADD COLUMN admin_wa_keyword TEXT NOT NULL DEFAULT 'admin'",
+    // User email for password reset
+    "ALTER TABLE users ADD COLUMN email TEXT",
     // Products: type (producto/servicio) and main image flag
     "ALTER TABLE products ADD COLUMN product_type TEXT NOT NULL DEFAULT 'servicio'",
     "ALTER TABLE product_images ADD COLUMN is_main INTEGER NOT NULL DEFAULT 0",

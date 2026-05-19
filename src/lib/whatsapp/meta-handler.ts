@@ -110,14 +110,18 @@ export async function handleMetaMessage(
 // sin ningún cambio en la lógica del bot.
 function createMetaSock(db: import("better-sqlite3").Database, phone: string) {
   return {
-    sendMessage: async (jid: string, content: { text?: string }) => {
+    sendMessage: async (jid: string, content: Record<string, unknown>) => {
       const target = jid.replace("@s.whatsapp.net", "").replace("@lid", "");
       if (content.text) {
-        await sendText(db, target, content.text);
+        await sendText(db, target, String(content.text));
       }
+      // Image sending via Meta is handled separately in sendProductImages
     },
-    // Stub de métodos de Baileys que podría llamar el estado machine pero no se usan con Meta
     user: { id: `${phone}@s.whatsapp.net` },
     ev: { emit: () => {}, on: () => {}, off: () => {} },
+    // Flags for Meta-specific handling
+    _isMeta: true,
+    _db: db,
+    _phone: phone,
   };
 }

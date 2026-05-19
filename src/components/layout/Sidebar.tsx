@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master" | "help" | "flows" | "subscription";
+export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master" | "help" | "flows" | "subscription" | "tickets";
 
 interface SidebarProps {
   active: Module;
@@ -41,6 +41,7 @@ const NAV_GROUPS: { label?: string; items: { id: Module; label: string; icon: st
   {
     label: "Sistema",
     items: [
+      { id: "tickets",      label: "Soporte",     icon: "🎫" },
       { id: "flows",        label: "Flujos",      icon: "🔀" },
       { id: "settings",     label: "Ajustes",     icon: "⚙️" },
       { id: "subscription", label: "Suscripción", icon: "💳" },

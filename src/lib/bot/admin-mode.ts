@@ -27,7 +27,10 @@ export function isAdminPhone(db: Database.Database, phone: string): boolean {
   const cfg = db.prepare("SELECT admin_wa_phone FROM company_config WHERE id=1").get() as { admin_wa_phone: string | null } | null;
   if (!cfg?.admin_wa_phone) return false;
   const clean = (p: string) => p.replace(/\D/g, "");
-  return clean(cfg.admin_wa_phone) === clean(phone);
+  const stored = clean(cfg.admin_wa_phone);
+  const incoming = clean(phone);
+  // Match exactly, or if stored without country code match the suffix
+  return incoming === stored || incoming.endsWith(stored) || stored.endsWith(incoming);
 }
 
 export function checkAdminKeyword(db: Database.Database, text: string): boolean {

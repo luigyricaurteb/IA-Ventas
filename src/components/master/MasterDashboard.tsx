@@ -14,6 +14,87 @@ const BL: Record<string,string> = { monthly:"Mensual", yearly:"Anual", permanent
 
 function fmt(n: number) { return n.toLocaleString("es-CO"); }
 
+// ── Pasarelas de pago ─────────────────────────────────────────────────────────
+function GatewayPanel() {
+  const [cfg, setCfg] = useState({ mercadopago_public_key:"", mercadopago_access_token:"", mercadopago_active:false, wompi_public_key:"", wompi_private_key:"", wompi_events_key:"", wompi_active:false });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/master/gateways").then(r=>r.json()).then(d => setCfg(d)).catch(()=>{});
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    await fetch("/api/master/gateways", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg) });
+    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false), 2000);
+  }
+
+  const Field = ({ label, field, type="text", placeholder="" }: { label:string; field:keyof typeof cfg; type?:string; placeholder?:string }) => (
+    <div>
+      <label className="text-gray-400 text-xs block mb-1">{label}</label>
+      <input type={type} value={String(cfg[field])} placeholder={placeholder}
+        onChange={e => setCfg({...cfg, [field]: e.target.value})}
+        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h2 className="text-white font-semibold mb-1">🔗 Pasarelas de pago</h2>
+        <p className="text-gray-400 text-sm">Configura las credenciales. Solo actívalas cuando tengas la integración completa.</p>
+      </div>
+
+      {/* Mercado Pago */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">MP</div>
+            <div>
+              <p className="text-white font-medium">Mercado Pago</p>
+              <p className="text-xs text-gray-400">checkout.mercadopago.com</p>
+            </div>
+          </div>
+          <button type="button" onClick={()=>setCfg({...cfg, mercadopago_active:!cfg.mercadopago_active})}
+            className={`relative w-10 h-6 rounded-full transition-colors ${cfg.mercadopago_active?"bg-emerald-500":"bg-gray-600"}`}>
+            <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${cfg.mercadopago_active?"translate-x-4":""}`} />
+          </button>
+        </div>
+        <Field label="Public Key" field="mercadopago_public_key" placeholder="APP_USR-..." />
+        <Field label="Access Token" field="mercadopago_access_token" placeholder="APP_USR-..." />
+        <p className="text-xs text-gray-500">Obtén las credenciales en mercadopago.com.co → Tu negocio → Credenciales</p>
+      </div>
+
+      {/* Wompi */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">W</div>
+            <div>
+              <p className="text-white font-medium">Wompi</p>
+              <p className="text-xs text-gray-400">wompi.co — Pasarela colombiana</p>
+            </div>
+          </div>
+          <button type="button" onClick={()=>setCfg({...cfg, wompi_active:!cfg.wompi_active})}
+            className={`relative w-10 h-6 rounded-full transition-colors ${cfg.wompi_active?"bg-emerald-500":"bg-gray-600"}`}>
+            <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${cfg.wompi_active?"translate-x-4":""}`} />
+          </button>
+        </div>
+        <Field label="Llave pública" field="wompi_public_key" placeholder="pub_prod_..." />
+        <Field label="Llave privada" field="wompi_private_key" placeholder="prv_prod_..." />
+        <Field label="Llave de eventos" field="wompi_events_key" placeholder="prod_integrity_..." />
+        <p className="text-xs text-gray-500">Obtén las llaves en dashboard.wompi.co → Desarrolladores → Llaves de API</p>
+      </div>
+
+      <button onClick={save} disabled={saving}
+        className="bg-emerald-500 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-600 disabled:opacity-50">
+        {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar credenciales"}
+      </button>
+    </div>
+  );
+}
+
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <div className="flex items-center gap-2 cursor-pointer" onClick={() => onChange(!checked)}>
@@ -29,7 +110,7 @@ const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0,
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions">("companies");
+  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways">("companies");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [plans, setPlans]         = useState<Plan[]>([]);
   const [subs, setSubs]           = useState<Subscription[]>([]);
@@ -204,11 +285,11 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         <button onClick={onLogout} className="text-gray-400 hover:text-red-400 text-sm">Salir</button>
       </header>
 
-      <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0">
-        {(["companies","plans","subscriptions"] as const).map(id=>(
-          <button key={id} onClick={()=>{ setTab(id); setUsersCompanyId(null); }}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
-            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":"💳 Pagos"}
+      <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0 overflow-x-auto">
+        {(["companies","plans","subscriptions","gateways"] as const).map(id=>(
+          <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
+            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":"🔗 Pasarelas"}
           </button>
         ))}
       </div>
@@ -502,6 +583,8 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
             </div>
           </div>
         )}
+
+        {tab==="gateways" && <GatewayPanel />}
       </div>
 
       {/* ── Modal cambiar contraseña de usuario ── */}

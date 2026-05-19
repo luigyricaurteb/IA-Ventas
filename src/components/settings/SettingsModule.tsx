@@ -416,11 +416,14 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="text-sm font-medium text-gray-700">Tu número de WhatsApp (con código de país)</label>
-                <input value={company.admin_wa_phone ?? ""} onChange={e => setCompany({...company, admin_wa_phone: e.target.value})}
-                  placeholder="Ej: 573001234567"
-                  className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono" />
-                <p className="text-xs text-gray-400 mt-1">Solo este número tendrá acceso al modo admin</p>
+                <label className="text-sm font-medium text-gray-700">Tu número de WhatsApp</label>
+                <div className="flex gap-2 mt-1">
+                  <span className="border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 shrink-0 flex items-center">+</span>
+                  <input value={company.admin_wa_phone ?? ""} onChange={e => setCompany({...company, admin_wa_phone: e.target.value})}
+                    placeholder="573001234567 (LADA + número)"
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono" />
+                </div>
+                <p className="text-xs text-orange-600 mt-1 font-medium">⚠️ Obligatorio incluir el código de país: Colombia = 57, USA = 1, México = 52</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Palabra clave secreta</label>

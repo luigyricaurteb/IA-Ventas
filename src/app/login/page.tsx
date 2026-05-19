@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
 
 const BUILD = "v2.6 · " + new Date("2025-05-16").toLocaleDateString("es-CO", { day:"2-digit", month:"short", year:"numeric" });
 
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [form, setForm]                = useState({ username: "", password: "" });
   const [error, setError]              = useState("");
   const [loading, setLoading]          = useState(false);
+  const [showForgot, setShowForgot]    = useState(false);
 
   useEffect(() => {
     fetch("/api/public/companies")
@@ -128,10 +130,25 @@ export default function LoginPage() {
           >
             {loading ? "Verificando..." : "Ingresar →"}
           </button>
+
+          <div className="text-center">
+            <button type="button" onClick={() => setShowForgot(true)}
+              className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2">
+              ¿Olvidaste tu usuario o contraseña?
+            </button>
+          </div>
         </form>
 
         <p className="text-center text-gray-600 text-xs mt-4">{BUILD}</p>
       </div>
+
+      {showForgot && (
+        <ForgotPasswordModal
+          selectedCompany={selectedCompany}
+          activeCompanies={activeCompanies}
+          onClose={() => setShowForgot(false)}
+        />
+      )}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { generateStructuredReply, isUncertainResponse } from "../openrouter";
 import { sendWithAntiBlock, sendMultipleWithAntiBlock, isOptOutMessage } from "./anti-block";
 import { autoLearn } from "./auto-learn";
 import { isAdminPhone, checkAdminKeyword, handleAdminQuery } from "./admin-mode";
+import { sendImage as metaSendImage } from "../whatsapp/meta-api";
 
 type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
@@ -100,10 +101,34 @@ async function sendProductImages(
   db: Database.Database, sock: WASocket, jid: string,
   phone: string, convId: number, productId: number, caption: string
 ) {
+  // Only send main image + up to 3 additional (is_main first, then others)
   const images = db.prepare(
-    "SELECT filename FROM product_images WHERE product_id=? ORDER BY order_index ASC"
-  ).all(productId) as { filename: string }[];
+    "SELECT filename, is_main FROM product_images WHERE product_id=? ORDER BY is_main DESC, order_index ASC LIMIT 4"
+  ).all(productId) as { filename: string; is_main: number }[];
   if (!images.length) return;
+
+  // If using Meta Cloud API, send via public URL link
+  const isMeta = (sock as unknown as { _isMeta?: boolean })._isMeta === true;
+  if (isMeta) {
+    const metaDb = (sock as unknown as { _db: Database.Database })._db ?? db;
+    const metaPhone = (sock as unknown as { _phone: string })._phone ?? phone.replace(/\D/g, "");
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      ?? process.env.RAILWAY_STATIC_URL
+      ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+
+    for (let i = 0; i < images.length; i++) {
+      const imageUrl = `${appUrl}/api/uploads/products/${images[i].filename}`;
+      try {
+        await metaSendImage(metaDb, metaPhone, imageUrl, i === 0 ? caption : undefined);
+        if (i < images.length - 1) await new Promise(r => setTimeout(r, 1000));
+      } catch (e) {
+        console.error(`[bot] Error enviando imagen Meta:`, (e as Error).message);
+      }
+    }
+    return;
+  }
+
+  // Baileys: send via buffer
   const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
   for (let i = 0; i < images.length; i++) {
     const candidates = [

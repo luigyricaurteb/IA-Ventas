@@ -91,12 +91,68 @@ masterDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_login_attempts ON login_attempts(identifier, attempted_at);
 `);
 
-// Migraciones seguras para columnas añadidas después del despliegue inicial
+// Migraciones seguras
 for (const sql of [
   "ALTER TABLE companies ADD COLUMN nit TEXT",
   "ALTER TABLE companies ADD COLUMN address TEXT",
   "ALTER TABLE plans ADD COLUMN price_usd REAL DEFAULT 0",
+  "ALTER TABLE master_users ADD COLUMN email TEXT",
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT UNIQUE NOT NULL,
+    user_type TEXT NOT NULL DEFAULT 'company',
+    company_slug TEXT,
+    username TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`,
+  `CREATE TABLE IF NOT EXISTS support_tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_number TEXT UNIQUE NOT NULL,
+    company_slug TEXT NOT NULL,
+    company_name TEXT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    priority TEXT CHECK(priority IN ('low','medium','high','critical')) NOT NULL DEFAULT 'medium',
+    status TEXT CHECK(status IN ('open','in_review','resolved','closed')) NOT NULL DEFAULT 'open',
+    category TEXT,
+    assigned_to TEXT,
+    resolved_at INTEGER,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`,
+  `CREATE TABLE IF NOT EXISTS ticket_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES support_tickets(id),
+    author_role TEXT NOT NULL DEFAULT 'company',
+    author_name TEXT,
+    content TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`,
+  `CREATE TABLE IF NOT EXISTS ticket_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL REFERENCES support_tickets(id),
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    mimetype TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`,
+  `CREATE TABLE IF NOT EXISTS gateway_config (
+    id INTEGER PRIMARY KEY CHECK(id=1),
+    mercadopago_public_key TEXT,
+    mercadopago_access_token TEXT,
+    mercadopago_active INTEGER NOT NULL DEFAULT 0,
+    wompi_public_key TEXT,
+    wompi_private_key TEXT,
+    wompi_events_key TEXT,
+    wompi_active INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )`,
 ]) { try { masterDb.exec(sql); } catch {} }
+
+// Init gateway config row
+masterDb.prepare("INSERT OR IGNORE INTO gateway_config (id) VALUES (1)").run();
 
 // Planes por defecto
 const planCount = (masterDb.prepare("SELECT COUNT(*) as c FROM plans").get() as { c: number }).c;
