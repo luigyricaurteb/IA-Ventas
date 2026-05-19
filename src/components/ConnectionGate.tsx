@@ -63,7 +63,7 @@ export default function ConnectionGate() {
 
   useEffect(() => {
     if (!currentUser) return;
-    const allowed = getAllowedModules(currentUser.permissions, currentUser.isMaster);
+    const allowed = getAllowedModules(currentUser.permissions, currentUser.isMaster || currentUser.role === "master");
     if (allowed.length > 0 && !allowed.includes(activeModule as Module)) {
       setActiveModule(allowed[0] as Module);
     }
@@ -136,7 +136,7 @@ export default function ConnectionGate() {
 
   const selectedConv  = conversations.find(c => c.id === selectedId) ?? null;
   const perms         = currentUser?.permissions ?? {};
-  const isMaster      = currentUser?.isMaster ?? false;
+  const isMaster      = (currentUser?.isMaster ?? false) || currentUser?.role === "master";
   const isAdmin       = currentUser?.is_admin ?? false;
   const allowedMods   = getAllowedModules(perms, isMaster, isAdmin);
 

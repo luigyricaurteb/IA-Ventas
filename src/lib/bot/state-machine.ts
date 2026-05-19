@@ -159,6 +159,22 @@ function detectProduct(text: string, products: { id: number; name: string; price
   return products.find(p => lower.includes(p.name.toLowerCase().substring(0, 6))) ?? null;
 }
 
+// Detecta si el cliente quiere VER el catálogo completo
+function wantsCatalog(text: string): boolean {
+  const lower = text.toLowerCase();
+  const keywords = [
+    "qué tienen","qué ofrecen","qué servicios","qué productos","cuáles son",
+    "ver catálogo","ver productos","ver servicios","ver precios","ver opciones",
+    "cuanto cuesta","cuánto cuesta","cuanto vale","cuánto vale","precios",
+    "tienen algo","tienen algún","tienen algun","qué hay","info","información",
+    "detalles","opciones disponibles","disponibles","portafolio","menú","menu",
+    "qué manejan","what do you","show me","products","services","pricing",
+    "quiero ver","muéstrame","muéstrame","dime qué","lista","catálogo",
+    "what options","what services","what products",
+  ];
+  return keywords.some(kw => lower.includes(kw));
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export async function processBotMessage(
@@ -409,8 +425,34 @@ export async function processBotMessage(
       "SELECT id, name, price_per_person, description FROM products WHERE active=1"
     ).all() as { id: number; name: string; price_per_person: number; description: string | null }[];
 
-    // ¿El usuario quiere comprar/seleccionar un producto?
     if (products.length > 0) {
+      // ¿El usuario quiere VER el catálogo completo?
+      if (wantsCatalog(text) && !detectProduct(text, products)) {
+        if (products.length === 1) {
+          // Un solo producto: enviarlo directamente con foto
+          const p = products[0];
+          const caption = `*${p.name}*\n💰 $${p.price_per_person.toLocaleString("es-CO")} por persona${p.description ? `\n\n${p.description}` : ""}`;
+          await sendProductImages(db, sock, jid, phone, conversationId, p.id, caption);
+          await send(db, sock, jid, phone, conversationId,
+            `☝️ Este es nuestro servicio disponible. ¿Para cuántas personas lo necesitas?`
+          );
+        } else {
+          // Varios productos: listar texto primero, luego enviar foto del primero
+          const list = products.map((p, i) =>
+            `*${i + 1}. ${p.name}*\n   💰 $${p.price_per_person.toLocaleString("es-CO")} por persona${p.description ? `\n   ${p.description.slice(0, 80)}` : ""}`
+          ).join("\n\n");
+          await send(db, sock, jid, phone, conversationId,
+            `¡Hola! Estos son nuestros servicios disponibles 🌟\n\n${list}\n\n¿Cuál te interesa? Puedes escribir el nombre o el número.`
+          );
+          // Enviar foto del primer producto como muestra
+          const first = products[0];
+          const caption = `📸 *${first.name}* — desde $${first.price_per_person.toLocaleString("es-CO")}/persona`;
+          await sendProductImages(db, sock, jid, phone, conversationId, first.id, caption);
+        }
+        return;
+      }
+
+      // ¿El usuario quiere un producto específico?
       const selected = detectProduct(text, products);
       if (selected) {
         setState(db, conversationId, "COLLECTING_PEOPLE", stateData, selected.id);
