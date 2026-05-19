@@ -94,8 +94,9 @@ export async function POST(req: NextRequest) {
     const now = Math.floor(Date.now() / 1000);
     const desc = `Abono inicial reserva ${code} — ${body.client_name ?? "Cliente"} — ${body.service_name ?? "Servicio"}`;
     try {
-      db.prepare("INSERT INTO accounting_income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(Number(body.amount_paid), desc, now, now);
-    } catch { try { db.prepare("INSERT INTO income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(Number(body.amount_paid), desc, now, now); } catch {} }
+      const resRow = reservation as { id: number } | null;
+      db.prepare("INSERT INTO accounting_income (reservation_id, client_name, service_name, amount, currency, notes, income_date, created_at) VALUES (?,?,?,?,'COP',?,?,?)").run(resRow?.id ?? null, body.client_name ?? null, body.service_name ?? null, Number(body.amount_paid), desc, now, now);
+    } catch (e) { console.error("[calendar] Error registrando ingreso:", (e as Error).message); }
   }
 
   // Auto-sync to Google Sheet if enabled

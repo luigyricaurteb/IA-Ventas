@@ -693,8 +693,8 @@ function createReservationFromDeal(
     if (amountPaid > 0) {
       const desc = `Reserva ${code} — ${deal.contact_name ?? deal.phone ?? "Cliente"} — ${deal.product_name ?? "Servicio"}`;
       try {
-        db.prepare("INSERT INTO accounting_income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(amountPaid, desc, now, now);
-      } catch { try { db.prepare("INSERT INTO income (amount, description, category, date, created_at) VALUES (?,?,'reservas',?,?)").run(amountPaid, desc, now, now); } catch {} }
+        db.prepare("INSERT INTO accounting_income (reservation_id, client_name, service_name, amount, currency, notes, income_date, created_at) VALUES (?,?,?,?,'COP',?,?,?)").run(null, deal.contact_name ?? deal.phone, deal.product_name, amountPaid, desc, now, now);
+      } catch (e) { console.error("[bot] Error registrando ingreso:", (e as Error).message); }
     }
 
     // Mark proof as reviewed
