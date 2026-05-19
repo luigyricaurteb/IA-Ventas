@@ -96,6 +96,7 @@ async function ensureHeaders(sheets: ReturnType<typeof google.sheets>, sheetId: 
 interface ReservationRow {
   id: number;
   reservation_code: string | null;
+  client_name: string | null;
   contact_name: string | null;
   phone: string | null;
   email: string | null;
@@ -113,7 +114,7 @@ function toSheetRow(r: ReservationRow): string[] {
   return [
     r.reservation_code ?? `RES-${r.id}`,
     new Date(r.created_at * 1000).toLocaleDateString("es-CO"),
-    r.contact_name ?? "",
+    r.contact_name ?? r.client_name ?? "",
     r.phone ?? "",
     r.email ?? "",
     r.service_name ?? "",
@@ -142,7 +143,8 @@ export async function exportReservationsToSheet(
       SELECT r.id, r.reservation_code, r.people_count, r.status,
              r.service_date, r.service_name, r.total_value, r.notes,
              r.created_at, r.updated_at,
-             ct.full_name as contact_name, ct.email,
+             r.client_name,
+             COALESCE(ct.full_name, r.client_name) as contact_name, ct.email,
              c.phone
       FROM reservations r
       LEFT JOIN contacts ct ON ct.conversation_id = (
@@ -196,7 +198,8 @@ export async function upsertReservationInSheet(
       SELECT r.id, r.reservation_code, r.people_count, r.status,
              r.service_date, r.service_name, r.total_value, r.notes,
              r.created_at, r.updated_at,
-             ct.full_name as contact_name, ct.email,
+             r.client_name,
+             COALESCE(ct.full_name, r.client_name) as contact_name, ct.email,
              c.phone
       FROM reservations r
       LEFT JOIN contacts ct ON ct.conversation_id = (

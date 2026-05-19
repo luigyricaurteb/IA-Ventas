@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
   // Auto-sync to Google Sheet if enabled
   const sheetCfg = db.prepare("SELECT sheets_url, sheets_enabled FROM company_config WHERE id=1").get() as { sheets_url: string | null; sheets_enabled: number } | null;
   if (sheetCfg?.sheets_enabled === 1 && sheetCfg.sheets_url && (reservation as { id: number } | null)?.id) {
-    upsertReservationInSheet(db, sheetCfg.sheets_url, (reservation as { id: number }).id).catch(() => {});
+    upsertReservationInSheet(db, sheetCfg.sheets_url, (reservation as { id: number }).id)
+      .catch((e) => console.error("[sheets] auto-sync error:", (e as Error).message));
   }
 
   return NextResponse.json({ reservation }, { status: 201 });
