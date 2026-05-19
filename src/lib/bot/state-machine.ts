@@ -474,20 +474,20 @@ export async function processBotMessage(
       } else if (saldo > 0) {
         // Pago parcial válido (≥ 50%) — hay saldo pendiente
         respuesta =
-          `✅ *¡Abono confirmado!*\n\n` +
+          `🙏 *¡Muchas gracias por confirmar tu pago!*\n\n` +
           `💵 Abono recibido: *${fmt(aiMonto)}*\n` +
           (total > 0 ? `📊 Total del servicio: *${fmt(total)}*\n` : "") +
           `📊 Total pagado hasta ahora: *${fmt(totalPaid)}*\n` +
           `⚠️ *Saldo pendiente: ${fmt(saldo)}*\n\n` +
-          `Un asesor verificará tu pago. Para completar la reserva, deberás cancelar el saldo pendiente. Puedes enviarlo cuando quieras con otro comprobante. 🙏`;
+          `Pronto recibirás nuestra confirmación. El saldo lo puedes cancelar en cualquier momento enviando otro comprobante. 🙏`;
 
       } else {
         // Pago completo — crear reserva y confirmar
         respuesta =
-          `✅ *¡Pago confirmado!*\n\n` +
+          `🙏 *¡Muchas gracias por confirmar tu pago!*\n\n` +
           `💵 Valor recibido: *${fmt(aiMonto)}*\n` +
           (total > 0 ? `📊 Total del servicio: *${fmt(total)}*\n` : "") +
-          `\n🎉 ¡Tu reserva está confirmada! Te enviaremos el recibo en un momento.`;
+          `\nEstamos verificando tu comprobante y en breve recibirás la confirmación oficial de tu reserva con todos los detalles. ¡Ya casi es tuya! 🎉`;
 
         // Crear reserva en la DB
         createReservationFromDeal(db, conversationId, totalPaid, proofId ?? null);

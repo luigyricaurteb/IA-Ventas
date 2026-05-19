@@ -167,27 +167,35 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     let confirmMsg: string;
     const fmtAmt = (n: number) => `$${n.toLocaleString("es-CO")} COP`;
 
+    // Build public PDF link using reservation code
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+      ?? process.env.RAILWAY_PUBLIC_DOMAIN
+      ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+    const pdfLink = reservationCode ? `${baseUrl}/api/pdf/public?code=${reservationCode}` : null;
+
     if (isFullyPaid) {
       confirmMsg =
         `✅ *¡Tu reserva está confirmada, ${clientName}!*\n\n` +
         `📦 Servicio: ${serviceName}\n` +
         (deal?.people_count ? `👥 ${deal.people_count} persona${deal.people_count !== 1 ? "s" : ""}\n` : "") +
         (travelDate ? `📅 Fecha: ${travelDate}\n` : "") +
-        (reservationCode ? `🔖 Código de reserva: *${reservationCode}*\n` : "") +
+        (reservationCode ? `🔖 Código: *${reservationCode}*\n` : "") +
         `💰 Pago total: *${fmtAmt(totalExpected > 0 ? totalExpected : approvedAmount)}*\n\n` +
-        `¡Gracias por confiar en *${companyName}*! Nos pondremos en contacto con todos los detalles. 🙏`;
+        (pdfLink ? `📄 Tu recibo de reserva:\n${pdfLink}\n\n` : "") +
+        `¡Gracias por confiar en *${companyName}*! 🙏`;
     } else {
       confirmMsg =
-        `📋 *Abono registrado y reserva creada, ${clientName}!*\n\n` +
+        `📋 *Abono registrado, ${clientName}!*\n\n` +
         `📦 Servicio: ${serviceName}\n` +
         (deal?.people_count ? `👥 ${deal.people_count} persona${deal.people_count !== 1 ? "s" : ""}\n` : "") +
         (travelDate ? `📅 Fecha solicitada: ${travelDate}\n` : "") +
-        (reservationCode ? `🔖 Código de reserva: *${reservationCode}*\n` : "") +
+        (reservationCode ? `🔖 Código: *${reservationCode}*\n` : "") +
         `\n💵 Abono recibido: *${fmtAmt(approvedAmount)}*\n` +
-        (totalExpected > 0 ? `💳 Valor total del servicio: ${fmtAmt(totalExpected)}\n` : "") +
+        (totalExpected > 0 ? `💳 Total del servicio: ${fmtAmt(totalExpected)}\n` : "") +
         (saldo > 0
-          ? `⚠️ *Saldo pendiente: ${fmtAmt(saldo)}*\n\nTu reserva está *apartada* y se confirmará al cancelar el saldo. Puedes pagar el día del servicio.`
-          : `✅ Pago completo. ¡Tu reserva está confirmada!`) +
+          ? `⚠️ *Saldo pendiente: ${fmtAmt(saldo)}*\n\nTu reserva está *apartada*. Puedes cancelar el saldo en cualquier momento.`
+          : `✅ ¡Pago completo!`) +
+        (pdfLink ? `\n\n📄 Tu recibo:\n${pdfLink}` : "") +
         `\n\n¡Gracias por confiar en *${companyName}*! 🙏`;
     }
 

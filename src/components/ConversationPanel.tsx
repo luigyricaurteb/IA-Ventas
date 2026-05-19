@@ -184,15 +184,23 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
       body: JSON.stringify({ type, amount, totalExpected: total }),
     });
     if (!res.ok) { const d = await res.json() as { error: string }; alert(d.error ?? "Error al aprobar"); return; }
-    const d = await res.json() as { isFullyPaid?: boolean; saldo?: number; newPaidTotal?: number; approvedAmount?: number };
     setProofs(prev => prev.map(p => p.id === id ? { ...p, reviewed: 1 } : p));
-    setProofModal(null);
-    setTotalExpected("");
+    setProofModal(null); setTotalExpected("");
     await fetchMessages();
-    if (!d.isFullyPaid && d.saldo && d.saldo > 0) {
-      // mensaje informativo para el agente
-      console.log(`Abono registrado. Saldo pendiente: $${d.saldo.toLocaleString("es-CO")} COP`);
-    }
+  }
+
+  async function declineProof(id: number) {
+    const reason = prompt("Motivo del rechazo (opcional, se enviará al cliente):");
+    if (reason === null) return; // cancelled
+    const res = await fetch(`/api/alerts/${id}/decline`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) { alert("Error al rechazar"); return; }
+    setProofs(prev => prev.map(p => p.id === id ? { ...p, reviewed: -1 } : p));
+    setProofModal(null);
+    await fetchMessages();
   }
 
   async function toggleMode() {
@@ -703,8 +711,14 @@ export default function ConversationPanel({ conversation, onModeChange, onDelete
                       ? ` (saldo: $${Math.max(0, Number(totalExpected.replace(/\D/g,"")) - (proofModal.ai_amount ?? 0)).toLocaleString("es-CO")})`
                       : ""}
                   </button>
+                  <button
+                    onClick={() => declineProof(proofModal.id)}
+                    className="w-full bg-red-50 text-red-600 border border-red-200 rounded-xl py-2.5 font-medium hover:bg-red-100 transition-colors text-sm"
+                  >
+                    ❌ Rechazar — Notificar al cliente
+                  </button>
                   <p className="text-xs text-gray-400 text-center">
-                    El cliente recibirá confirmación por WhatsApp automáticamente
+                    Al aprobar, el cliente recibe confirmación + link al recibo por WhatsApp
                   </p>
                 </div>
               )}
