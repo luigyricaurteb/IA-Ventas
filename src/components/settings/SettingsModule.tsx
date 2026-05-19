@@ -70,6 +70,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [driveSyncing, setDriveSyncing] = useState<number | null>(null);
   const [driveMsg, setDriveMsg] = useState<string | null>(null);
   const [sheetsConfig, setSheetsConfig] = useState<{ sheets_url: string; sheets_enabled: boolean; sheets_last_sync: number | null; service_account_email: string }>({ sheets_url: "", sheets_enabled: false, sheets_last_sync: null, service_account_email: "" });
+  const [showAutoLearnings, setShowAutoLearnings] = useState(false);
   const [sheetsSaving, setSheetsSaving] = useState(false);
   const [sheetsTesting, setSheetsTesting] = useState(false);
   const [sheetsSyncing, setSheetsSyncing] = useState(false);
@@ -641,25 +642,24 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
           {/* Aprendizajes automáticos — colapsable */}
           {(() => {
-            const [showAuto, setShowAuto] = (useState as <T>(v: T) => [T, (v: T) => void])(false);
             const PREVIEW = 3;
-            const visible = showAuto ? autoLearnings : autoLearnings.slice(0, PREVIEW);
+            const visible = showAutoLearnings ? autoLearnings : autoLearnings.slice(0, PREVIEW);
             return (
               <div className="border border-blue-100 rounded-xl overflow-hidden">
                 {/* Header clicable */}
                 <button
-                  onClick={() => setShowAuto(!showAuto)}
+                  onClick={() => setShowAutoLearnings(!showAutoLearnings)}
                   className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-800 text-sm">🧠 Aprendizaje autónomo</span>
                     <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">{autoLearnings.length} patrones</span>
                   </div>
-                  <span className="text-gray-400 text-sm">{showAuto ? "▲" : "▼"}</span>
+                  <span className="text-gray-400 text-sm">{showAutoLearnings ? "▲" : "▼"}</span>
                 </button>
 
                 {/* Contenido colapsable */}
-                {showAuto && (
+                {showAutoLearnings && (
                   <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
                     <p className="text-xs text-gray-400">{aiName} aprende de conversaciones. Puedes editar o eliminar patrones.</p>
                     {autoLearnings.length === 0 ? (
@@ -696,14 +696,14 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
                         </div>
                       ))
                     )}
-                    {!showAuto && autoLearnings.length > PREVIEW && (
-                      <button onClick={() => setShowAuto(true)} className="w-full text-xs text-blue-500 py-1">Ver {autoLearnings.length - PREVIEW} más...</button>
+                    {!showAutoLearnings && autoLearnings.length > PREVIEW && (
+                      <button onClick={() => setShowAutoLearnings(true)} className="w-full text-xs text-blue-500 py-1">Ver {autoLearnings.length - PREVIEW} más...</button>
                     )}
                   </div>
                 )}
 
                 {/* Preview cerrado — resumen compacto */}
-                {!showAuto && autoLearnings.length > 0 && (
+                {!showAutoLearnings && autoLearnings.length > 0 && (
                   <div className="px-4 py-2 flex flex-wrap gap-1.5">
                     {autoLearnings.slice(0, 5).map(l => (
                       <span key={l.id} className="text-[11px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">
