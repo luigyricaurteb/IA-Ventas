@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const withImages = products.map((p) => ({
     ...p,
     images: db.prepare(
-      "SELECT * FROM product_images WHERE product_id = ? ORDER BY order_index ASC"
+      "SELECT * FROM product_images WHERE product_id = ? ORDER BY is_main DESC, order_index ASC"
     ).all(p.id),
   }));
 
@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
   if (!body.name) return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
 
   const product = db.prepare(`
-    INSERT INTO products (name, description, price_per_person, ai_instructions, active)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO products (name, description, price_per_person, ai_instructions, active, product_type)
+    VALUES (?, ?, ?, ?, ?, ?)
     RETURNING *
   `).get(
     body.name,
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     Number(body.price_per_person ?? 0),
     body.ai_instructions ?? null,
     body.active !== false ? 1 : 0,
+    body.product_type ?? "servicio",
   );
 
   return NextResponse.json({ product }, { status: 201 });

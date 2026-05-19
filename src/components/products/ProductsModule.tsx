@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 
-interface ProductImage { id: number; filename: string; order_index: number }
+interface ProductImage { id: number; filename: string; order_index: number; is_main: number }
 interface Product {
   id: number; name: string; description: string | null;
   price_per_person: number; ai_instructions: string | null;
-  active: number; images: ProductImage[];
+  active: number; product_type: string; images: ProductImage[];
 }
 interface ImportPreview {
   name: string; description: string | null;
@@ -14,7 +14,7 @@ interface ImportPreview {
 }
 
 const EMPTY: Omit<Product, "id" | "images"> = {
-  name: "", description: "", price_per_person: 0, ai_instructions: "", active: 1,
+  name: "", description: "", price_per_person: 0, ai_instructions: "", active: 1, product_type: "servicio",
 };
 
 function PreviewTable({ rows, total, errors }: { rows: ImportPreview[]; total: number; errors: string[] }) {
@@ -91,16 +91,24 @@ export default function ProductsModule() {
   function openNew() { setEditing(null); setForm({ ...EMPTY }); setShowForm(true); }
   function openEdit(p: Product) {
     setEditing(p);
-    setForm({ name: p.name, description: p.description ?? "", price_per_person: p.price_per_person, ai_instructions: p.ai_instructions ?? "", active: p.active });
+    setForm({ name: p.name, description: p.description ?? "", price_per_person: p.price_per_person, ai_instructions: p.ai_instructions ?? "", active: p.active, product_type: p.product_type ?? "servicio" });
     setShowForm(true);
   }
 
   async function save() {
-    const method = editing ? "PATCH" : "POST";
-    const url = editing ? `/api/products/${editing.id}` : "/api/products";
-    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    setShowForm(false);
-    fetch_();
+    if (editing) {
+      await fetch(`/api/products/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      setShowForm(false); fetch_();
+    } else {
+      const res = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const d = await res.json() as { product: Product };
+      // Auto-switch to edit mode so user can upload images immediately
+      await fetch_();
+      const fresh = await fetch("/api/products").then(r => r.json()) as { products: Product[] };
+      const created = fresh.products.find(p => p.id === d.product.id) ?? d.product;
+      setEditing({ ...created, images: created.images ?? [] });
+      // keep form open for images
+    }
   }
 
   async function remove(id: number) {
@@ -109,13 +117,22 @@ export default function ProductsModule() {
     fetch_();
   }
 
-  async function uploadImage(productId: number, file: File) {
+  async function uploadImage(productId: number, file: File, isMain = false) {
     setUploading(true);
     const fd = new FormData();
     fd.append("image", file);
-    await fetch(`/api/products/${productId}/images`, { method: "POST", body: fd });
+    fd.append("is_main", isMain ? "1" : "0");
+    const res = await fetch(`/api/products/${productId}/images`, { method: "POST", body: fd });
+    if (!res.ok) {
+      const d = await res.json() as { error?: string };
+      alert(d.error ?? "Error al subir imagen");
+    }
     setUploading(false);
-    fetch_();
+    // Refresh editing product images
+    const fresh = await fetch("/api/products").then(r => r.json()) as { products: Product[] };
+    const updated = fresh.products.find(p => p.id === productId);
+    if (updated && editing?.id === productId) setEditing(updated);
+    setProducts(fresh.products);
   }
 
   async function deleteImage(productId: number, imageId: number) {
@@ -222,91 +239,189 @@ export default function ProductsModule() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {products.map((p) => (
-          <div key={p.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${!p.active ? "opacity-60" : ""}`}>
-            {p.images.length > 0 && (
-              <div className="flex gap-1 p-2 bg-gray-50 overflow-x-auto">
-                {p.images.map((img) => (
-                  <div key={img.id} className="relative group shrink-0">
-                    <img src={`/uploads/products/${img.filename}`} className="h-20 w-20 object-cover rounded" />
-                    <button
-                      onClick={() => deleteImage(p.id, img.id)}
-                      className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded px-1 opacity-0 group-hover:opacity-100"
-                    >×</button>
+        {products.map((p) => {
+          const mainImg = p.images.find(i => i.is_main === 1) ?? p.images[0] ?? null;
+          const extras = p.images.filter(i => i !== mainImg);
+          return (
+            <div key={p.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${!p.active ? "opacity-60" : ""}`}>
+              {/* Foto principal */}
+              {mainImg ? (
+                <div className="relative">
+                  <img src={`/uploads/products/${mainImg.filename}`} className="w-full h-44 object-cover" />
+                  <div className="absolute top-2 left-2 flex gap-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.product_type === "producto" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {p.product_type === "producto" ? "📦 Producto" : "🎯 Servicio"}
+                    </span>
+                    {extras.length > 0 && (
+                      <span className="text-xs bg-black/50 text-white px-2 py-0.5 rounded-full">+{extras.length} fotos</span>
+                    )}
                   </div>
-                ))}
-                <label className="h-20 w-20 border-2 border-dashed border-gray-200 rounded flex items-center justify-center cursor-pointer hover:border-emerald-400 shrink-0">
-                  {uploading ? "..." : "+"}
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(p.id, e.target.files[0])} />
-                </label>
-              </div>
-            )}
-            {p.images.length === 0 && (
-              <label className="flex items-center justify-center h-24 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
-                <span className="text-gray-400 text-sm">+ Agregar foto</span>
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadImage(p.id, e.target.files[0])} />
-              </label>
-            )}
-            <div className="p-4">
-              <div className="flex items-start justify-between">
-                <h3 className="font-semibold text-gray-800">{p.name}</h3>
-                {!p.active && <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded">Inactivo</span>}
-              </div>
-              {p.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
-              <p className="text-emerald-600 font-bold mt-2">${p.price_per_person.toLocaleString("es-CO")} / persona</p>
-              {p.ai_instructions && (
-                <details className="mt-2">
-                  <summary className="text-xs text-blue-500 cursor-pointer">Ver instrucciones IA</summary>
-                  <p className="text-xs text-gray-500 mt-1 whitespace-pre-wrap">{p.ai_instructions}</p>
-                </details>
+                  {!p.active && <span className="absolute top-2 right-2 text-xs bg-gray-800/70 text-white px-2 py-0.5 rounded-full">Inactivo</span>}
+                </div>
+              ) : (
+                <button onClick={() => openEdit(p)}
+                  className="w-full h-36 bg-gray-50 flex flex-col items-center justify-center hover:bg-gray-100 transition-colors relative">
+                  <span className="text-3xl mb-1">{p.product_type === "producto" ? "📦" : "🎯"}</span>
+                  <span className="text-xs text-gray-400">Sin foto — clic para agregar</span>
+                  <span className={`absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full font-medium ${p.product_type === "producto" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
+                    {p.product_type === "producto" ? "📦 Producto" : "🎯 Servicio"}
+                  </span>
+                </button>
               )}
-              <div className="flex gap-2 mt-3">
-                <button onClick={() => openEdit(p)} className="flex-1 text-sm border rounded-lg py-1.5 hover:bg-gray-50">Editar</button>
-                <button onClick={() => remove(p.id)} className="text-sm text-red-400 hover:text-red-600 px-2">Eliminar</button>
+              <div className="p-4">
+                <h3 className="font-semibold text-gray-800 truncate">{p.name}</h3>
+                {p.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
+                <p className="text-emerald-600 font-bold mt-2">${p.price_per_person.toLocaleString("es-CO")} / persona</p>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => openEdit(p)} className="flex-1 text-sm border rounded-lg py-1.5 hover:bg-gray-50">✏️ Editar</button>
+                  <button onClick={() => remove(p.id)} className="text-sm text-red-400 hover:text-red-600 px-3 border rounded-lg py-1.5">🗑</button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h2 className="font-bold text-gray-800">{editing ? "Editar producto" : "Nuevo producto"}</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 text-2xl leading-none">×</button>
+            <div className="p-5 border-b flex justify-between items-center">
+              <h2 className="font-bold text-gray-800">{editing ? `Editar — ${editing.name}` : "Nuevo producto / servicio"}</h2>
+              <button onClick={() => { setShowForm(false); setEditing(null); }} className="text-gray-400 text-2xl leading-none">×</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-4">
+
+              {/* Tipo */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Tipo</label>
+                <div className="flex gap-2">
+                  {[["servicio","🎯 Servicio"],["producto","📦 Producto"]].map(([val, label]) => (
+                    <button key={val} type="button"
+                      onClick={() => setForm({...form, product_type: val})}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${form.product_type === val ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-gray-600 border-gray-300 hover:border-emerald-300"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nombre */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Nombre *</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                <input value={form.name} onChange={e => setForm({...form, name: e.target.value})}
                   className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
               </div>
+
+              {/* Descripción */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Descripción</label>
-                <textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })}
+                <textarea value={form.description ?? ""} onChange={e => setForm({...form, description: e.target.value})}
                   rows={3} className="w-full border rounded-lg px-3 py-2 mt-1 text-sm resize-none" />
               </div>
+
+              {/* Precio */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Precio por persona (COP) *</label>
-                <input type="number" value={form.price_per_person} onChange={(e) => setForm({ ...form, price_per_person: Number(e.target.value) })}
+                <input type="number" value={form.price_per_person} onChange={e => setForm({...form, price_per_person: Number(e.target.value)})}
                   className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
               </div>
+
+              {/* Fotos — solo si ya tiene ID (editando o recién creado) */}
+              {editing && (
+                <div className="space-y-3">
+                  <div className="border-t pt-3">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">📷 Foto principal <span className="text-xs text-gray-400 font-normal">(la que Julieta envía al presentar el {form.product_type})</span></p>
+                    {(() => {
+                      const main = editing.images.find(i => i.is_main === 1);
+                      return (
+                        <div className="flex gap-3 items-start">
+                          {main ? (
+                            <div className="relative group">
+                              <img src={`/uploads/products/${main.filename}`} className="h-28 w-28 object-cover rounded-xl border-2 border-emerald-400" />
+                              <button onClick={() => deleteImage(editing.id, main.id)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                              <span className="absolute bottom-1 left-1 bg-emerald-500 text-white text-[10px] px-1 rounded">Principal</span>
+                            </div>
+                          ) : (
+                            <label className="h-28 w-28 border-2 border-dashed border-emerald-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-colors shrink-0">
+                              <span className="text-2xl">📷</span>
+                              <span className="text-xs text-emerald-600 mt-1 text-center px-1">Subir foto principal</span>
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(editing.id, f, true); }} />
+                            </label>
+                          )}
+                          {!main && (
+                            <p className="text-xs text-gray-400 self-center">Esta foto aparece cuando Julieta presenta el {form.product_type} al cliente.</p>
+                          )}
+                          {main && (
+                            <label className="h-28 w-28 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors shrink-0">
+                              <span className="text-xl">🔄</span>
+                              <span className="text-xs text-gray-400 mt-1 text-center">Cambiar</span>
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(editing.id, f, true); }} />
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700 mb-1">🖼️ Fotos adicionales <span className="text-xs text-gray-400 font-normal">máx. 3 — Julieta las envía si el cliente pide ver más</span></p>
+                    <div className="flex gap-2 flex-wrap">
+                      {editing.images.filter(i => i.is_main !== 1).map(img => (
+                        <div key={img.id} className="relative group">
+                          <img src={`/uploads/products/${img.filename}`} className="h-20 w-20 object-cover rounded-lg border" />
+                          <button onClick={() => deleteImage(editing.id, img.id)}
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                        </div>
+                      ))}
+                      {editing.images.filter(i => i.is_main !== 1).length < 3 && (
+                        <label className="h-20 w-20 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+                          {uploading ? <span className="text-xs text-gray-400">...</span> : <>
+                            <span className="text-xl text-gray-400">+</span>
+                            <span className="text-[10px] text-gray-400">Agregar</span>
+                          </>}
+                          <input type="file" accept="image/*" className="hidden"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(editing.id, f, false); }} />
+                        </label>
+                      )}
+                      {editing.images.filter(i => i.is_main !== 1).length === 0 && (
+                        <p className="text-xs text-gray-400 self-center">Ninguna aún.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!editing && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+                  💡 Después de crear, podrás agregar las fotos del {form.product_type}.
+                </div>
+              )}
+
+              {/* Instrucciones IA */}
               <div>
-                <label className="text-sm font-medium text-gray-700">Instrucciones para la IA</label>
-                <p className="text-xs text-gray-400 mb-1">La IA usará esto para responder preguntas sobre este producto.</p>
-                <textarea value={form.ai_instructions ?? ""} onChange={(e) => setForm({ ...form, ai_instructions: e.target.value })}
-                  rows={4} placeholder="Ej: Este paquete incluye... No incluye... Preguntas frecuentes..."
+                <label className="text-sm font-medium text-gray-700">Instrucciones para Julieta</label>
+                <p className="text-xs text-gray-400 mb-1">Julieta usará esto para responder preguntas específicas sobre este {form.product_type}.</p>
+                <textarea value={form.ai_instructions ?? ""} onChange={e => setForm({...form, ai_instructions: e.target.value})}
+                  rows={3} placeholder={`Incluye... No incluye... Duración... Preguntas frecuentes...`}
                   className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
               </div>
+
+              {/* Activo */}
               <div className="flex items-center gap-2">
-                <input type="checkbox" checked={form.active === 1} onChange={(e) => setForm({ ...form, active: e.target.checked ? 1 : 0 })} id="active" />
-                <label htmlFor="active" className="text-sm text-gray-700">Activo (visible para el bot)</label>
+                <input type="checkbox" id="active" checked={form.active === 1} onChange={e => setForm({...form, active: e.target.checked ? 1 : 0})} />
+                <label htmlFor="active" className="text-sm text-gray-700">Activo (visible para Julieta y el bot)</label>
               </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 border rounded-lg py-2 text-sm">Cancelar</button>
-                <button onClick={save} className="flex-1 bg-emerald-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-emerald-600">
-                  {editing ? "Guardar cambios" : "Crear producto"}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className="flex-1 border rounded-lg py-2 text-sm">
+                  {editing ? "Cerrar" : "Cancelar"}
+                </button>
+                <button onClick={save} disabled={!form.name}
+                  className="flex-1 bg-emerald-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+                  {editing ? "Guardar cambios" : `Crear ${form.product_type}`}
                 </button>
               </div>
             </div>

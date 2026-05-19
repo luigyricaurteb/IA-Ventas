@@ -440,6 +440,9 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN sheets_url TEXT",
     "ALTER TABLE company_config ADD COLUMN sheets_enabled INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE company_config ADD COLUMN sheets_last_sync INTEGER",
+    // Products: type (producto/servicio) and main image flag
+    "ALTER TABLE products ADD COLUMN product_type TEXT NOT NULL DEFAULT 'servicio'",
+    "ALTER TABLE product_images ADD COLUMN is_main INTEGER NOT NULL DEFAULT 0",
     // Reservations: pricing breakdown, discounts, partial payments
     "ALTER TABLE reservations ADD COLUMN service_price REAL",
     "ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAULT 0",
