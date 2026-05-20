@@ -92,6 +92,11 @@ async function send(db: Database.Database, sock: WASocket, jid: string, phone: s
   await sendWithAntiBlock(sock, jid, text, phone);
 }
 
+// Admin send: envía el mensaje pero NO guarda en DB (invisible en el sistema)
+async function adminSend(sock: WASocket, jid: string, phone: string, text: string) {
+  await sendWithAntiBlock(sock, jid, text, phone);
+}
+
 async function sendMany(db: Database.Database, sock: WASocket, jid: string, phone: string, convId: number, texts: string[]) {
   for (const t of texts) saveMsg(db, convId, "assistant", t);
   await sendMultipleWithAntiBlock(sock, jid, texts, phone);
@@ -215,26 +220,32 @@ export async function processBotMessage(
 
     // Toggle: misma keyword entra Y sale del modo admin
     if (keywordSent) {
+      // Borrar el mensaje de la clave del historial visible
+      db.prepare("DELETE FROM messages WHERE conversation_id=? AND content=? AND role='user' ORDER BY created_at DESC LIMIT 1").run(conversationId, text);
+
       if (!isInAdmin) {
         setState(db, conversationId, "ADMIN" as BotState);
-        await send(db, sock, jid, phone, conversationId,
-          `🔧 *Modo Admin activado*\n\nEscribe *ayuda* para ver los comandos disponibles.`
+        await adminSend(sock, jid, phone,
+          `🔧 *Modo Admin activado*\n\nHola. Puedes preguntarme cualquier cosa sobre el negocio en lenguaje natural.`
         );
       } else {
         setState(db, conversationId, "ACTIVE");
-        await send(db, sock, jid, phone, conversationId,
-          `✅ *Modo Admin desactivado*\n\nVolviendo al modo normal. El bot atenderá a los clientes normalmente.`
+        await adminSend(sock, jid, phone,
+          `✅ *Modo Admin desactivado*\n\nVolviendo al modo normal.`
         );
       }
       return;
     }
     if (isInAdmin) {
-      // Pasar historial de la conversación admin para contexto continuo
+      // Borrar el mensaje entrante del admin del historial visible
+      db.prepare("DELETE FROM messages WHERE conversation_id=? AND content=? AND role='user' ORDER BY created_at DESC LIMIT 1").run(conversationId, text);
+
+      // Historial SOLO de mensajes admin (para mantener contexto sin contaminar)
       const adminHistory = db.prepare(
-        "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY created_at DESC LIMIT 16"
+        "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at DESC LIMIT 16"
       ).all(conversationId) as { role: string; content: string }[];
       const response = await handleAdminQuery(db, text, adminHistory.reverse());
-      await send(db, sock, jid, phone, conversationId, response);
+      await adminSend(sock, jid, phone, response);
       return;
     }
   }
