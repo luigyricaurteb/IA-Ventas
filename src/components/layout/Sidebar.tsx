@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type Module = "chat" | "crm" | "calendar" | "accounting" | "suppliers" | "products" | "campaigns" | "documents" | "settings" | "analytics" | "master" | "help" | "flows" | "subscription" | "tickets" | "autopilot";
 
@@ -53,49 +53,43 @@ const NAV_GROUPS: { label?: string; items: { id: Module; label: string; icon: st
 
 const MOBILE_NAV: Module[] = ["chat", "crm", "calendar", "settings"];
 
-export default function Sidebar({ active, onChange, allowedModules, mobileOpen = false, onMobileClose, onMobileOpen }: SidebarProps) {
-  const [alertCount, setAlertCount] = useState(0);
-
-  useEffect(() => {
-    async function fetchAlerts() {
-      try {
-        const res = await fetch("/api/alerts");
-        if (res.ok) setAlertCount((await res.json() as { count: number }).count ?? 0);
-      } catch {}
-    }
-    fetchAlerts();
-    const iv = setInterval(fetchAlerts, 5000);
-    return () => clearInterval(iv);
-  }, []);
-
-  function handleClick(id: Module) { onChange(id); onMobileClose?.(); }
-
-  const NavItem = ({ id, label, icon, compact = false }: { id: Module; label: string; icon: string; compact?: boolean }) => {
-    const isActive = active === id;
-    const badge = id === "chat" ? alertCount : 0;
-    return (
-      <button
-        onClick={() => handleClick(id)}
-        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 relative group ${
-          isActive
-            ? "bg-[#0077b6] text-white font-medium"
-            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-        } ${compact ? "py-1.5" : ""}`}
-      >
-        <span className={`shrink-0 text-sm w-4 text-center ${isActive ? "opacity-100" : "opacity-75 group-hover:opacity-100"}`}>
-          {icon}
+// ── NavItem definido FUERA del componente para evitar remount en cada render ──
+function NavItem({ id, label, icon, active, alertCount, onClick }: {
+  id: Module; label: string; icon: string;
+  active: Module; alertCount: number; onClick: (id: Module) => void;
+}) {
+  const isActive = active === id;
+  const badge = id === "chat" ? alertCount : 0;
+  return (
+    <button
+      onClick={() => onClick(id)}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 relative group ${
+        isActive
+          ? "bg-[#0077b6] text-white font-medium"
+          : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+      }`}
+    >
+      <span className={`shrink-0 text-sm w-4 text-center ${isActive ? "opacity-100" : "opacity-75 group-hover:opacity-100"}`}>
+        {icon}
+      </span>
+      <span className="text-sm truncate">{label}</span>
+      {badge > 0 && (
+        <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1 shrink-0">
+          {badge > 99 ? "99+" : badge}
         </span>
-        <span className="text-sm truncate">{label}</span>
-        {badge > 0 && (
-          <span className="ml-auto bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1 shrink-0">
-            {badge > 99 ? "99+" : badge}
-          </span>
-        )}
-      </button>
-    );
-  };
+      )}
+    </button>
+  );
+}
 
-  const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
+// ── Nav content definido FUERA para evitar remount ────────────────────────────
+function SidebarNav({ active, allowedModules, alertCount, onItemClick, mobile = false, onMobileClose }: {
+  active: Module; allowedModules: Module[]; alertCount: number;
+  onItemClick: (id: Module) => void; mobile?: boolean; onMobileClose?: () => void;
+}) {
+  const scrollRef = useRef<HTMLElement>(null);
+
+  return (
     <>
       {/* Logo */}
       <div className={`flex items-center gap-2.5 px-4 ${mobile ? "py-4" : "py-5"} shrink-0`}
@@ -113,8 +107,8 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2">
+      {/* Nav — overflow-y aquí para que el scroll se mantenga */}
+      <nav ref={scrollRef} className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_GROUPS.map((group, gi) => {
           const visibleItems = group.items.filter(item => allowedModules.includes(item.id));
           if (visibleItems.length === 0) return null;
@@ -127,7 +121,15 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
               )}
               <div className="space-y-0.5">
                 {visibleItems.map(item => (
-                  <NavItem key={item.id} {...item} />
+                  <NavItem
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    icon={item.icon}
+                    active={active}
+                    alertCount={alertCount}
+                    onClick={onItemClick}
+                  />
                 ))}
               </div>
             </div>
@@ -136,12 +138,35 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
       </nav>
     </>
   );
+}
+
+export default function Sidebar({ active, onChange, allowedModules, mobileOpen = false, onMobileClose, onMobileOpen }: SidebarProps) {
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchAlerts() {
+      try {
+        const res = await fetch("/api/alerts");
+        if (res.ok) setAlertCount((await res.json() as { count: number }).count ?? 0);
+      } catch {}
+    }
+    fetchAlerts();
+    const iv = setInterval(fetchAlerts, 5000);
+    return () => clearInterval(iv);
+  }, []);
+
+  function handleClick(id: Module) { onChange(id); onMobileClose?.(); }
 
   return (
     <>
       {/* Desktop */}
       <aside className="hidden md:flex md:flex-col w-52 shrink-0 h-full" style={{ background: "#0f172a" }}>
-        <SidebarContent />
+        <SidebarNav
+          active={active}
+          allowedModules={allowedModules}
+          alertCount={alertCount}
+          onItemClick={handleClick}
+        />
       </aside>
 
       {/* Mobile overlay */}
@@ -152,7 +177,14 @@ export default function Sidebar({ active, onChange, allowedModules, mobileOpen =
       {/* Mobile drawer */}
       <div className={`fixed top-0 left-0 h-full w-60 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-out md:hidden ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
         style={{ background: "#0f172a" }}>
-        <SidebarContent mobile />
+        <SidebarNav
+          active={active}
+          allowedModules={allowedModules}
+          alertCount={alertCount}
+          onItemClick={handleClick}
+          mobile
+          onMobileClose={onMobileClose}
+        />
       </div>
 
       {/* Mobile bottom nav */}
