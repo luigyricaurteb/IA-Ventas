@@ -11,13 +11,12 @@ export function middleware(request: NextRequest) {
     || pathname.endsWith(".html") || pathname.endsWith(".pdf") || pathname.endsWith(".webmanifest");
   const isPublicApi   = pathname.startsWith("/api/public");
   const isWebhook     = pathname.startsWith("/api/whatsapp/webhook");
-  const isAdminDebug  = pathname.startsWith("/api/admin/debug");
   const isPublicPdf   = pathname.startsWith("/api/pdf/public");
   const isAutopilotImg = pathname.startsWith("/api/uploads/autopilot");
   const isResetPage    = pathname.startsWith("/reset-password");
   const isRegisterPage = pathname.startsWith("/register");
 
-  if (isPublicAsset || isAuthApi || isPublicApi || isWebhook || isPublicPdf || isResetPage || isRegisterPage || isAutopilotImg || isAdminDebug) return NextResponse.next();
+  if (isPublicAsset || isAuthApi || isPublicApi || isWebhook || isPublicPdf || isResetPage || isRegisterPage || isAutopilotImg) return NextResponse.next();
 
   if (!token && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
