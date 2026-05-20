@@ -197,6 +197,25 @@ async function main() {
     }
   }, 1000);
 
+  // ── Autopilot scheduler — revisa cada hora si hay posts programados ─────────
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const SCHEDULER_KEY = process.env.INTERNAL_SCHEDULER_KEY ?? "hivo-scheduler-2026";
+
+  async function runAutopilotScheduler() {
+    try {
+      await fetch(`${APP_URL}/api/autopilot/schedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-key": SCHEDULER_KEY },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(60000),
+      });
+    } catch {}
+  }
+
+  // Run immediately on startup, then every hour
+  setTimeout(runAutopilotScheduler, 30000); // 30s after start
+  setInterval(runAutopilotScheduler, 3600_000); // Every hour
+
   console.log("[bot] Sistema iniciado. Esperando mensajes...");
 }
 

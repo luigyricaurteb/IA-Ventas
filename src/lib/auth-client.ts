@@ -13,7 +13,7 @@ export function getAllowedModules(permissions: Record<string, boolean> | undefin
   if (isAdmin) {
     for (const m of ADMIN_ALWAYS) { if (!base.includes(m)) base.push(m); }
   }
-  return ([...base, "subscription", "flows", "help", "tickets", "autopilot"] as Module[]);
+  return ([...base, "subscription", "flows", "help", "tickets"] as Module[]);
 }
 
 export function canAccess(permissions: Record<string, boolean> | undefined, module: string, isMaster = false, isAdmin = false): boolean {

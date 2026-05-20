@@ -14,6 +14,47 @@ const BL: Record<string,string> = { monthly:"Mensual", yearly:"Anual", permanent
 
 function fmt(n: number) { return n.toLocaleString("es-CO"); }
 
+// ── Autopilot Toggle por empresa ──────────────────────────────────────────────
+function AutopilotTogglePanel({ companyId }: { companyId: number | null }) {
+  const [enabled, setEnabled] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/master/companies/${companyId}/autopilot`)
+      .then(r => r.json()).then(d => setEnabled(d.autopilot_enabled ?? false)).catch(() => {});
+  }, [companyId]);
+
+  async function toggle() {
+    setSaving(true);
+    const next = !enabled;
+    await fetch(`/api/master/companies/${companyId}/autopilot`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ autopilot_enabled: next }),
+    });
+    setEnabled(next);
+    setSaving(false);
+  }
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mt-4 flex items-center justify-between">
+      <div>
+        <p className="text-white font-medium">🤖 Extensión Autopilot</p>
+        <p className="text-gray-400 text-xs mt-0.5">Permite publicar en redes sociales con IA. Es un servicio adicional al plan.</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className={`text-xs font-medium ${enabled ? "text-emerald-400" : "text-gray-500"}`}>
+          {enabled ? "Activo" : "Inactivo"}
+        </span>
+        <button type="button" onClick={toggle} disabled={saving}
+          className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-emerald-500" : "bg-gray-600"}`}>
+          <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${enabled ? "translate-x-5" : ""}`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Admin Mode por empresa ────────────────────────────────────────────────────
 function AdminModePanel({ companyId }: { companyId: number | null }) {
   const [cfg, setCfg] = useState({ admin_wa_phone: "", admin_wa_keyword: "admin", admin_mode_enabled: false });
@@ -718,6 +759,8 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
               {companyUsers.length===0 && <p className="text-gray-500 text-center py-8">Sin usuarios en esta empresa.</p>}
             </div>
 
+            {/* Autopilot Extension */}
+            <AutopilotTogglePanel companyId={usersCompanyId} />
             {/* Admin Mode */}
             <AdminModePanel companyId={usersCompanyId} />
           </div>

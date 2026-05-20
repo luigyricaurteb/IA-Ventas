@@ -476,6 +476,9 @@ function initCompanySchema(db: Database.Database): void {
       error_msg TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch())
     )`,
+    // Autopilot extension (habilitado por master)
+    "ALTER TABLE company_config ADD COLUMN autopilot_enabled INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE company_config ADD COLUMN autopilot_next_post_at INTEGER",
     // Admin WhatsApp mode (configurado solo desde el master)
     "ALTER TABLE company_config ADD COLUMN admin_wa_phone TEXT",
     "ALTER TABLE company_config ADD COLUMN admin_wa_keyword TEXT NOT NULL DEFAULT 'admin'",

@@ -176,7 +176,7 @@ export default function AutopilotModule() {
       <div className="px-6 py-4 border-b bg-white flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">🤖 Autopilot</h1>
-          <p className="text-sm text-gray-400">Genera y publica contenido automáticamente en redes sociales</p>
+          <p className="text-sm text-gray-400">Sube imágenes, genera texto con IA y publica automáticamente en Facebook e Instagram — sin esfuerzo manual.</p>
         </div>
         <div className="flex items-center gap-3">
           {msg && (
@@ -398,9 +398,23 @@ export default function AutopilotModule() {
                 ))}
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 mb-4">
-                <p className="font-semibold mb-1">📌 Fase 1 — Publicación manual</p>
-                <p>En esta fase, el Autopilot genera el contenido y tú decides cuándo publicar. La publicación automática por calendario llega en la Fase 2.</p>
+              <div className="mb-4 space-y-2">
+                <label className="text-sm font-medium text-gray-700 block">Modo de publicación</label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <button type="button" onClick={() => setConfig({...config, auto_approve: config.auto_approve === 1 ? 0 : 1})}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${config.auto_approve === 1 ? "bg-blue-500" : "bg-gray-300"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${config.auto_approve === 1 ? "translate-x-5" : ""}`} />
+                  </button>
+                  <div>
+                    <span className="text-sm text-gray-700 font-medium">Publicación automática</span>
+                    <p className="text-xs text-gray-400">El sistema genera y publica solo, según la frecuencia configurada</p>
+                  </div>
+                </label>
+                {config.auto_approve === 0 && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    📋 Modo manual activo: el sistema genera el contenido y tú apruebas antes de publicar.
+                  </p>
+                )}
               </div>
 
               <button onClick={saveConfig} disabled={saving}

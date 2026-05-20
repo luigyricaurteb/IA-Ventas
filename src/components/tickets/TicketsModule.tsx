@@ -112,7 +112,7 @@ export default function TicketsModule({ isMaster }: { isMaster?: boolean }) {
         <div className="px-4 py-4 border-b flex items-center justify-between">
           <div>
             <h2 className="font-bold text-gray-800">Soporte & Tickets</h2>
-            <p className="text-xs text-gray-400">{totalOpen} en total</p>
+            <p className="text-xs text-gray-400">Reporta problemas o consultas al equipo de Hivo · {totalOpen} tickets</p>
           </div>
           <button onClick={() => setShowNew(true)}
             className="text-white text-sm px-3 py-1.5 rounded-lg font-medium" style={{ background: "#0077b6" }}>

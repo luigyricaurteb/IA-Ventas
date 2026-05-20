@@ -110,9 +110,53 @@ const SECTIONS: Section[] = [
     content: [
       { subtitle: "¿Qué es el panel Master?", text: "Si eres el administrador de la plataforma, accedes con el usuario Master. Desde aquí gestionas todas las empresas afiliadas, sus planes, suscripciones y usuarios." },
       { subtitle: "Crear una empresa", text: "Master → Empresas → + Nueva empresa. Define nombre, slug (identificador único), NIT, plan, y crea el usuario administrador de esa empresa." },
+      { subtitle: "Auto-registro de empresas", text: "Las empresas pueden registrarse solas en /register completando un formulario de 3 pasos: datos de empresa, plan e credenciales. Quedan en estado 'Pendiente' hasta que tú las actives desde el Master.", isNew: true },
       { subtitle: "Planes y módulos", text: "En Master → Planes defines qué módulos incluye cada plan. Ajustes y Suscripción siempre están disponibles para los admins sin importar el plan." },
-      { subtitle: "Aislamiento de datos", text: "Cada empresa tiene su propia base de datos completamente aislada. Una empresa nunca puede ver los datos de otra. Los archivos (comprobantes, imágenes) también están separados por empresa." },
-      { subtitle: "Suscripciones", text: "En Master → Pagos ves las solicitudes de suscripción. Aprueba el pago para activar la empresa o extender su plan." },
+      { subtitle: "Autopilot (extensión)", text: "Desde Master → Empresas → detalle de empresa → activa la extensión 🤖 Autopilot. Solo las empresas con esta extensión activa ven el módulo en su sidebar.", isNew: true },
+      { subtitle: "Modo Admin WhatsApp (extensión)", text: "Desde Master → Empresas → detalle → activa 🔧 Modo Admin. Configura el número de teléfono del dueño (con código de país) y la palabra clave secreta. Permite consultar datos del negocio desde WhatsApp.", isNew: true },
+      { subtitle: "Equipo IA interno", text: "En Master → 🧠 Equipo IA tienes 5 agentes especializados: Dev Lead, Project Manager, Marketing, Sales y Asistente. Cada uno tiene acceso a los datos de la plataforma para ayudarte a gestionar y crecer.", isNew: true },
+      { subtitle: "Pasarelas de pago", text: "En Master → 🔗 Pasarelas configuras Mercado Pago y Wompi. Solo ingresa las credenciales cuando estés listo para conectar el cobro online.", isNew: true },
+      { subtitle: "Aislamiento de datos", text: "Cada empresa tiene su propia base de datos completamente aislada. Una empresa nunca puede ver los datos de otra." },
+    ],
+  },
+  {
+    id: "autopilot", icon: "🤖", title: "Autopilot — Redes sociales",
+    content: [
+      { subtitle: "¿Qué es el Autopilot?", text: "Módulo de publicación automática en Facebook e Instagram. Genera contenido con IA basado en tus productos y servicios, y lo publica automáticamente según la frecuencia que configures.\n\nEs una extensión de pago — el administrador de la plataforma debe activarla para tu empresa.", isNew: true },
+      { subtitle: "Banco de imágenes", text: "Sube las fotos de tus servicios en Autopilot → 🖼️ Banco de imágenes. Puedes arrastrar para cambiar el orden. El sistema las usa en ese orden de forma rotativa en cada publicación.", isNew: true },
+      { subtitle: "Generar contenido con IA", text: "Clic en '✨ Generar post'. La IA crea el texto del post basado en:\n• Tu catálogo de productos con precios reales\n• Las instrucciones de Julieta (tono, personalidad)\n• El tono configurado (Profesional/Casual/Entretenido/Informativo)\n\nPuedes editar el texto antes de publicar.", isNew: true },
+      { subtitle: "Publicar", text: "Desde la cola de publicación:\n• Aprobar: marca el post como listo\n• 🚀 Publicar ahora: lo envía a Facebook e Instagram inmediatamente\n\nEl sistema usa las credenciales Meta ya configuradas en Ajustes → ☁️ Meta.", isNew: true },
+      { subtitle: "Publicación automática", text: "En Autopilot → ⚙️ Configuración activa 'Publicación automática'. El sistema generará y publicará solo según la frecuencia que elijas (diaria, 3 veces/semana, etc.) a la hora configurada.", isNew: true },
+      { subtitle: "Requerimientos", text: "Para publicar en Facebook: necesitas una Página de Facebook configurada en Ajustes → ☁️ Meta.\nPara Instagram: necesitas una cuenta Business conectada a esa Página.\nLas imágenes deben estar subidas al banco — sin imágenes, no hay publicación." },
+    ],
+  },
+  {
+    id: "tickets", icon: "🎫", title: "Soporte y Tickets",
+    content: [
+      { subtitle: "¿Para qué sirve?", text: "Sistema de soporte técnico entre tu empresa y el equipo de Hivo. Si tienes un problema, duda o sugerencia, crea un ticket y recibirás respuesta directa.", isNew: true },
+      { subtitle: "Crear un ticket", text: "Soporte → + Nuevo. Completa:\n• Asunto: descripción breve del problema\n• Categoría: Soporte técnico, Facturación, Configuración, etc.\n• Prioridad: Baja / Media / Alta / Crítica\n• Descripción: detalla el problema con todo el contexto posible", isNew: true },
+      { subtitle: "Estados del ticket", text: "Abierto → En revisión → Resuelto → Cerrado.\nTe notificaremos por email cuando el equipo responda." },
+      { subtitle: "Chat interno", text: "Dentro de cada ticket hay un chat. Puedes enviar mensajes adicionales, capturas o contexto. El equipo de Hivo responde directamente ahí.", isNew: true },
+    ],
+  },
+  {
+    id: "admin-mode", icon: "🔧", title: "Modo Admin por WhatsApp",
+    content: [
+      { subtitle: "¿Qué es?", text: "Función premium que permite al dueño consultar datos del negocio desde su WhatsApp personal usando una palabra clave secreta. Julieta responde con datos reales de la base de datos.", isNew: true },
+      { subtitle: "¿Cómo activarlo?", text: "El administrador de Hivo debe activarlo desde el panel Master → Empresas → tu empresa → 🔧 Modo Admin. Configura tu número (con código de país, ej: 573001234567) y una palabra clave secreta.", isNew: true },
+      { subtitle: "Usar el modo admin", text: "Escribe la palabra clave en tu WhatsApp al número de la empresa. Julieta responde confirmando que estás en modo admin.\n\nPuedes preguntar cualquier cosa en lenguaje natural:\n• '¿Cuánto ingresé este mes?'\n• '¿Hay reservas para mañana?'\n• '¿Qué clientes deben dinero?'\n• 'Dame un resumen del negocio'\n\nJulieta tiene acceso en tiempo real a reservas, contabilidad, CRM, conversaciones y productos.", isNew: true },
+      { subtitle: "Salir del modo admin", text: "Escribe la misma palabra clave de nuevo → Julieta desactiva el modo y vuelve a atender clientes normalmente." },
+      { subtitle: "Privacidad", text: "Las conversaciones en modo admin son completamente invisibles en el sistema. No aparecen en el módulo de Chat ni en el historial. Solo tú las ves en tu WhatsApp.", isNew: true },
+    ],
+  },
+  {
+    id: "reservations", icon: "📅", title: "Reservas y Pagos",
+    content: [
+      { subtitle: "Crear reserva manual", text: "Calendario → + Nueva reserva. Selecciona el servicio del catálogo y el precio se llena automáticamente. Calcula: precio × personas − descuento = total. Puedes registrar un abono inicial.", isNew: true },
+      { subtitle: "Registrar un pago", text: "En la vista de lista o calendario, las reservas con saldo pendiente muestran el botón '+ Pago'. Al hacer clic, ingresa el monto y la referencia. El pago se registra en contabilidad automáticamente.", isNew: true },
+      { subtitle: "Recibo PDF", text: "Cada reserva tiene su recibo PDF accesible desde el botón 'PDF'. El QR del recibo apunta a la URL pública del recibo — el cliente puede escanearlo para ver y compartir su comprobante.", isNew: true },
+      { subtitle: "Sincronización con Google Sheets", text: "Activa en Ajustes → 📊 Google Sheets. Cada reserva creada o actualizada se sincroniza automáticamente con tu hoja de cálculo.", isNew: true },
+      { subtitle: "Flujo automático con Julieta", text: "Cuando el cliente envía un comprobante por WhatsApp:\n1. Julieta extrae el monto con IA\n2. Confirma con el cliente\n3. Genera alerta para el admin\n4. Admin aprueba/rechaza\n5. Si aprueba: reserva confirmada + recibo PDF enviado al cliente automáticamente", isNew: true },
     ],
   },
 ];

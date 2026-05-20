@@ -124,6 +124,12 @@ export async function loginCompanyUser(companySlug: string, username: string, pa
     effectivePermissions['subscription'] = true;
   }
 
+  // Autopilot: solo si el master lo habilitó para esta empresa
+  try {
+    const autopilotCfg = db.prepare("SELECT autopilot_enabled FROM company_config WHERE id=1").get() as { autopilot_enabled: number } | null;
+    if (autopilotCfg?.autopilot_enabled === 1) effectivePermissions['autopilot'] = true;
+  } catch {}
+
   const token = createJWT({
     sub:         String(user.id),
     company:     companySlug,
