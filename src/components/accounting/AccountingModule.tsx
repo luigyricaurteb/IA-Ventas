@@ -138,6 +138,13 @@ export default function AccountingModule() {
           <h1 className="text-xl font-bold text-gray-800">Contabilidad</h1>
           <p className="text-xs text-gray-400 mt-0.5">Registro automático de ingresos y egresos del negocio</p>
         </div>
+        <button onClick={async () => {
+          const r = await fetch("/api/calendar/sync-accounting", { method: "POST" }).then(res => res.json()) as { synced: number; total: number };
+          if (r.synced > 0) { alert(`✅ ${r.synced} reserva(s) sincronizadas a contabilidad.`); window.location.reload(); }
+          else alert("Todo está al día — no hay reservas sin registrar.");
+        }} className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-1.5">
+          🔄 Sincronizar reservas
+        </button>
       </div>
 
       {/* KPIs */}

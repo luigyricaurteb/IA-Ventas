@@ -65,18 +65,22 @@ function DealModal({ deal, onClose, onStageChange }: DealModalProps) {
           <div className="flex justify-between items-start">
             <div className="flex-1 min-w-0">
               <h2 className="font-bold text-gray-800 text-lg">{deal.contact_name ?? deal.contact_phone ?? "Sin nombre"}</h2>
-              <div className="flex flex-wrap gap-3 mt-1">
-                {deal.contact_phone && (
+              <div className="flex flex-wrap gap-3 mt-2">
+                {deal.contact_phone ? (
                   <a href={`https://wa.me/${deal.contact_phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
                     className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                     📱 {deal.contact_phone}
                   </a>
+                ) : (
+                  <span className="text-sm text-gray-300 italic flex items-center gap-1">📱 Teléfono pendiente</span>
                 )}
-                {deal.contact_email && (
+                {deal.contact_email ? (
                   <a href={`mailto:${deal.contact_email}`}
                     className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                     📧 {deal.contact_email}
                   </a>
+                ) : (
+                  <span className="text-sm text-gray-300 italic flex items-center gap-1">📧 Email pendiente</span>
                 )}
               </div>
             </div>
