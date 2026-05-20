@@ -65,19 +65,24 @@ export default function WhatsAppConfigPanel() {
     setVerifying(false);
   }
 
-  async function handleSaveWa() {
+  async function handleSaveWa(force = false) {
     setSaving(true); setResult(null);
     const res = await fetch("/api/settings/whatsapp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", wa_access_token: waToken, wa_phone_number_id: phoneId }),
+      body: JSON.stringify({ action: "save", wa_access_token: waToken, wa_phone_number_id: phoneId, force: force ? "true" : "false" }),
     });
-    const d = await res.json() as { ok: boolean; phone?: string; name?: string; error?: string };
+    const d = await res.json() as { ok: boolean; phone?: string; name?: string; error?: string; canForce?: boolean; warning?: string };
     if (d.ok) {
-      setResult({ ok: true, msg: `✅ WhatsApp conectado: ${d.name} (${d.phone})` });
+      const msg = d.warning ? `⚠️ ${d.warning}` : `✅ WhatsApp conectado: ${d.name ?? "Número de prueba"} (${d.phone ?? phoneId})`;
+      setResult({ ok: true, msg });
       fetch("/api/settings/whatsapp").then(r => r.json()).then((c: WaConfig) => setCfg(c));
       setWaToken("");
-    } else setResult({ ok: false, msg: `❌ ${d.error}` });
+    } else if (d.canForce) {
+      setResult({ ok: false, msg: `❌ ${d.error} — ¿Es un número de prueba? Usa "Guardar sin verificar"` });
+    } else {
+      setResult({ ok: false, msg: `❌ ${d.error}` });
+    }
     setSaving(false);
   }
 
@@ -204,11 +209,15 @@ export default function WhatsAppConfigPanel() {
               className="flex-1 border border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
               {verifying ? "Verificando..." : "Verificar"}
             </button>
-            <button onClick={handleSaveWa} disabled={saving || !waToken || !phoneId}
+            <button onClick={() => handleSaveWa(false)} disabled={saving || !waToken || !phoneId}
               className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
+          <button onClick={() => handleSaveWa(true)} disabled={saving || !waToken || !phoneId}
+            className="w-full border border-orange-300 text-orange-600 hover:bg-orange-50 text-xs py-2 rounded-xl disabled:opacity-50">
+            ⚠️ Guardar sin verificar (número de prueba / test)
+          </button>
           {cfg?.provider === "meta" && cfg.has_token && (
             <button onClick={() => handleDisconnect("whatsapp")} className="w-full text-xs text-red-400 hover:text-red-600">Desconectar WhatsApp</button>
           )}

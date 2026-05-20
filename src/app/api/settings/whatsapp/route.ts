@@ -57,15 +57,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === "save") {
-    const { wa_access_token, wa_phone_number_id } = body;
+    const { wa_access_token, wa_phone_number_id, force } = body;
     if (!wa_access_token || !wa_phone_number_id) return NextResponse.json({ ok: false, error: "Faltan campos requeridos" }, { status: 400 });
     const verify = await verifyConnection(wa_access_token, wa_phone_number_id);
-    if (!verify.ok) return NextResponse.json({ ok: false, error: verify.error }, { status: 400 });
+    // Si la verificación falla pero el usuario fuerza el guardado (números de prueba), guardar igual
+    if (!verify.ok && force !== "true") return NextResponse.json({ ok: false, error: verify.error, canForce: true }, { status: 400 });
     db.prepare("UPDATE whatsapp_config SET provider='meta', wa_access_token=?, wa_phone_number_id=?, wa_phone_display=?, wa_verified_name=?, updated_at=unixepoch() WHERE id=1")
       .run(wa_access_token, wa_phone_number_id, verify.phone ?? null, verify.name ?? null);
     db.prepare("UPDATE connection_state SET status='connected', phone=?, qr_string=NULL, updated_at=unixepoch() WHERE id=1")
       .run(verify.phone ?? wa_phone_number_id);
-    return NextResponse.json({ ok: true, phone: verify.phone, name: verify.name });
+    return NextResponse.json({ ok: true, phone: verify.phone, name: verify.name, warning: !verify.ok ? "Guardado sin verificar — número de prueba" : undefined });
   }
 
   // ── Facebook Messenger ────────────────────────────────────────────────────
