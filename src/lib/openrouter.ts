@@ -16,19 +16,38 @@ type HistoryMsg = { role: string; content: string };
 
 function buildBaseSystemPrompt(slug: string): string {
   const db = getCompanyDb(slug);
-  const config = db.prepare("SELECT * FROM company_config WHERE id=1").get() as { ai_name: string | null; name: string | null; ai_general_instructions: string | null } | null;
+  const config = db.prepare("SELECT * FROM company_config WHERE id=1").get() as {
+    ai_name: string | null; name: string | null; ai_general_instructions: string | null;
+    nequi_phone: string | null; daviplata_phone: string | null;
+  } | null;
   const aiName = config?.ai_name ?? "Julieta";
   const company = config?.name ?? "nuestra empresa";
   const generalInstructions = config?.ai_general_instructions ?? "";
 
   const learnings = db.prepare("SELECT topic, content FROM ai_learnings ORDER BY created_at DESC LIMIT 30").all() as { topic: string; content: string }[];
 
+  // Cuentas bancarias reales — NUNCA inventar datos bancarios
+  const banks = db.prepare("SELECT bank_name, account_type, account_number, account_holder FROM bank_accounts WHERE active=1").all() as { bank_name: string; account_type: string; account_number: string; account_holder: string | null }[];
+
   let prompt = `Eres ${aiName}, la asistente virtual de *${company}*.\n`;
 
   if (generalInstructions.trim()) {
     prompt += `\n${generalInstructions.trim()}\n`;
   } else {
-    prompt += `Eres amable, profesional y eficiente. Responde en español neutro. Tus respuestas son breves (2-4 líneas máximo). No uses emojis en exceso.\n`;
+    prompt += `Eres amable, profesional y eficiente. Responde en español neutro. Tus respuestas son breves (2-4 líneas máximo).\n`;
+  }
+
+  // Inyectar cuentas bancarias reales para evitar alucinaciones
+  if (banks.length > 0 || config?.nequi_phone || config?.daviplata_phone) {
+    prompt += `\n\n--- MÉTODOS DE PAGO REALES (usa SOLO estos datos, NUNCA inventes otros) ---\n`;
+    for (const b of banks) {
+      prompt += `🏦 ${b.bank_name} — ${b.account_type === "corriente" ? "Cta. Corriente" : "Cta. Ahorros"}: ${b.account_number}${b.account_holder ? ` a nombre de ${b.account_holder}` : ""}\n`;
+    }
+    if (config?.nequi_phone) prompt += `📱 Nequi: ${config.nequi_phone}\n`;
+    if (config?.daviplata_phone) prompt += `📱 Daviplata: ${config.daviplata_phone}\n`;
+    prompt += `Si no hay métodos de pago arriba, di que un asesor enviará los datos. NUNCA inventes cuentas bancarias.\n--- FIN MÉTODOS DE PAGO ---\n`;
+  } else {
+    prompt += `\nIMPORTANTE: No tienes datos bancarios configurados. Si te preguntan cómo pagar, di: "Un asesor te enviará los datos de pago en breve." NUNCA inventes cuentas bancarias.\n`;
   }
 
   if (learnings.length > 0) {

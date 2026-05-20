@@ -52,9 +52,9 @@ export async function GET(req: NextRequest) {
     "SELECT c.full_name, c.email, conv.phone FROM reservations r LEFT JOIN contacts c ON r.contact_id = c.id LEFT JOIN conversations conv ON c.conversation_id = conv.id WHERE r.id = ?"
   ).get(res.id) as { full_name: string | null; email: string | null; phone: string | null } | null;
 
-  // QR
-  const paymentText = [`RESERVA: ${code}`, `Estado: ${res.status}`, res.total_value ? `Total: $${res.total_value.toLocaleString("es-CO")} COP` : ""].filter(Boolean).join("\n");
-  const qrDataUrl = await QRCode.toDataURL(paymentText, { width: 120, margin: 1 });
+  // QR apunta a este mismo recibo (el cliente puede compartirlo o verificarlo)
+  const selfUrl = `${req.nextUrl.origin}/api/pdf/public?code=${code}`;
+  const qrDataUrl = await QRCode.toDataURL(selfUrl, { width: 120, margin: 1 });
   const qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
 
   const logoPath = company.logo_filename

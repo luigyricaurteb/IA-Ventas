@@ -47,9 +47,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const desc = `Pago reserva ${res.reservation_code ?? `#${resId}`} — ${res.display_name ?? res.client_name ?? "Cliente"} — ${res.service_name ?? "Servicio"}${body.reference ? ` (Ref: ${body.reference})` : ""}`;
   try {
     db.prepare(`
-      INSERT INTO accounting_income (reservation_id, client_name, service_name, amount, currency, notes, income_date, created_at)
-      VALUES (?, ?, ?, ?, 'COP', ?, ?, ?)
-    `).run(resId, res.display_name ?? res.client_name, res.service_name, body.amount, desc, now, now);
+      INSERT INTO accounting_income (reservation_id, client_name, service_name, amount, currency, notes, reservation_code, income_date, created_at)
+      VALUES (?, ?, ?, ?, 'COP', ?, ?, ?, ?)
+    `).run(resId, res.display_name ?? res.client_name, res.service_name, body.amount, desc, res.reservation_code, now, now);
   } catch (e) {
     console.error("[payment] Error registrando ingreso:", (e as Error).message);
   }

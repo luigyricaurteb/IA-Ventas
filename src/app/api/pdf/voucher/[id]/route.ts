@@ -44,16 +44,10 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     "SELECT c.full_name, c.email, conv.phone FROM reservations r LEFT JOIN contacts c ON r.contact_id = c.id LEFT JOIN conversations conv ON c.conversation_id = conv.id WHERE r.id = ?"
   ).get(resId) as { full_name: string | null; email: string | null; phone: string | null } | null;
 
-  // Generar QR de pago
-  const paymentText = [
-    `RESERVA: ${code}`,
-    company.nequi_phone    ? `Nequi: ${company.nequi_phone}`       : "",
-    company.daviplata_phone ? `Daviplata: ${company.daviplata_phone}` : "",
-    reservation.total_value ? `Monto: $${reservation.total_value.toLocaleString("es-CO")} COP` : "",
-    `Referencia: ${code}`,
-  ].filter(Boolean).join("\n");
-
-  const qrDataUrl = await QRCode.toDataURL(paymentText, { width: 120, margin: 1 });
+  // QR apunta al recibo público (cliente puede escanearlo para ver su recibo)
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+  const receiptUrl = `${baseUrl}/api/pdf/public?code=${code}`;
+  const qrDataUrl = await QRCode.toDataURL(receiptUrl, { width: 120, margin: 1 });
   const qrBuffer  = Buffer.from(qrDataUrl.split(",")[1], "base64");
 
   // Logo de la empresa
@@ -125,7 +119,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       ["Servicio",   reservation.service_name ?? "—"],
       ["Fecha",      serviceDate],
       ["Personas",   String(reservation.people_count)],
-      ["Estado",     reservation.status === "confirmed" ? "Confirmada ✓" : reservation.status],
+      ["Estado",     reservation.status === "confirmed" ? "Confirmada" : reservation.status],
     ];
     for (const [label, value] of details) {
       doc.rect(50, y - 2, W, 18).fillColor("#f9fafb").fill();
@@ -173,7 +167,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
 
       if (amountPaid > 0) {
         doc.rect(50, y - 2, W, 18).fillColor("#d1fae5").fill();
-        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("✓ Pagado:", 55, y, { width: 200 });
+        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("Pagado:", 55, y, { width: 200 });
         doc.text(`$${amountPaid.toLocaleString("es-CO")} COP`, 55, y, { width: W - 10, align: "right" });
         y += 22;
       }
@@ -185,7 +179,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
         y += 28;
       } else if (amountPaid > 0 && total > 0) {
         doc.rect(50, y - 2, W, 18).fillColor("#d1fae5").fill();
-        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("✅ PAGADO EN SU TOTALIDAD", 55, y, { width: W - 10, align: "center" });
+        doc.font("Helvetica-Bold").fillColor("#065f46").fontSize(9).text("PAGADO EN SU TOTALIDAD", 55, y, { width: W - 10, align: "center" });
         y += 22;
       }
     }

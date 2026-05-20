@@ -176,6 +176,10 @@ function wantsCatalog(text: string): boolean {
     "pasadía","pasadia","tour","excursión","excursion","actividades",
     "cuánto cobran","cuánto cobras","cuánto sale","cuanto sale",
     "hay disponible","tienen disponible","qué incluye","qué tiene",
+    // Fotos / imágenes
+    "tienes foto","tienen foto","tienes imagen","manda foto","manda imagen",
+    "puedes enviar foto","puedo ver foto","ver imagen","ver foto",
+    "fotos del lugar","fotos del servicio","imágenes","foto del",
   ];
   return keywords.some(kw => lower.includes(kw));
 }
