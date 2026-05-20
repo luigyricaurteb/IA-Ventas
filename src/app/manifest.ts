@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Hivo",
+    name: "Aivox",
     short_name: "Agente",
     description: "Dashboard de ventas y atención al cliente por WhatsApp",
     start_url: "/",

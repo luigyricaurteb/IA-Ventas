@@ -1095,7 +1095,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
 
           {/* Paso 1: Compartir la hoja */}
           <div className="bg-white border rounded-xl p-4 space-y-3">
-            <h4 className="font-semibold text-gray-800">Paso 1 — Comparte tu hoja con Hivo</h4>
+            <h4 className="font-semibold text-gray-800">Paso 1 — Comparte tu hoja con Aivox</h4>
             <p className="text-sm text-gray-600">Abre tu Google Sheet → botón <strong>Compartir</strong> → agrega este correo como <strong>Editor</strong>:</p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
               <code className="text-sm text-emerald-700 font-mono flex-1 break-all">{sheetsConfig.service_account_email || "cargando..."}</code>

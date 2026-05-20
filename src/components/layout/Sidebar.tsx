@@ -99,7 +99,7 @@ function SidebarNav({ active, allowedModules, alertCount, onItemClick, mobile = 
           H
         </div>
         <div>
-          <span className="font-bold text-sm text-white tracking-wide">Hivo</span>
+          <span className="font-bold text-sm text-white tracking-wide">Aivox</span>
           <span className="block text-[10px] text-slate-500 leading-none -mt-0.5">Business Platform</span>
         </div>
         {mobile && (

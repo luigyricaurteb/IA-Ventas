@@ -67,7 +67,7 @@ export default function RegisterPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center font-black text-white text-xl mx-auto mb-4" style={{ background: "#0077b6" }}>H</div>
-          <h1 className="text-3xl font-bold text-white">Crear cuenta en Hivo</h1>
+          <h1 className="text-3xl font-bold text-white">Crear cuenta en Aivox</h1>
           <p className="text-slate-400 mt-2">Tu plataforma de ventas y atención al cliente con IA</p>
         </div>
 
@@ -111,7 +111,7 @@ export default function RegisterPage() {
                 <div>
                   <label className="text-gray-300 text-sm block mb-1">Identificador único (URL) *</label>
                   <div className="flex items-center bg-gray-700 border border-gray-600 rounded-xl overflow-hidden">
-                    <span className="px-3 text-gray-500 text-sm border-r border-gray-600 py-2.5 shrink-0">hivo.app/</span>
+                    <span className="px-3 text-gray-500 text-sm border-r border-gray-600 py-2.5 shrink-0">aivoxgroup.com/</span>
                     <input value={form.slug} onChange={e => setForm({...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")})}
                       placeholder="mi-empresa" required
                       className="flex-1 bg-transparent px-3 py-2.5 text-white text-sm focus:outline-none" />
@@ -145,7 +145,7 @@ export default function RegisterPage() {
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 text-center">Los pagos se coordinan con el equipo de Hivo tras el registro.</p>
+                <p className="text-xs text-gray-500 text-center">Los pagos se coordinan con el equipo de Aivox tras el registro.</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStep(1)} className="flex-1 border border-gray-600 text-gray-300 py-3 rounded-xl text-sm">← Atrás</button>
                   <button type="button" onClick={() => { setError(""); setStep(3); }} className="flex-1 text-white py-3 rounded-xl font-semibold" style={{ background: "#0077b6" }}>Siguiente →</button>

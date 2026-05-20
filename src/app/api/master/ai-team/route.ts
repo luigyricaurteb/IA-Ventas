@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
   baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: { "HTTP-Referer": "https://hivo.app", "X-Title": "Hivo Platform" },
+  defaultHeaders: { "HTTP-Referer": "https://hivo.app", "X-Title": "Aivox Platform" },
 });
 
 const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
@@ -137,34 +137,34 @@ Si el usuario pide ejecutar una acción, incluye al final de tu respuesta un blo
 
 Stack técnico: Next.js 15, TypeScript, SQLite (better-sqlite3), WhatsApp Cloud API, OpenRouter AI, Railway.
 `;
-  } catch { return "Plataforma Hivo - SaaS multi-empresa."; }
+  } catch { return "Plataforma Aivox - SaaS multi-empresa."; }
 }
 
 const AGENTS: Record<AgentId, { name: string; emoji: string; system: string }> = {
   developer: {
     name: "Dev Lead", emoji: "🧑‍💻",
-    system: `Eres el desarrollador líder de Hivo, experto en Next.js 15, TypeScript, SQLite, WhatsApp Cloud API y Railway.
+    system: `Eres el desarrollador líder de Aivox, experto en Next.js 15, TypeScript, SQLite, WhatsApp Cloud API y Railway.
 Conoces a fondo toda la arquitectura del sistema. Puedes explicar código, identificar bugs, diseñar features y ejecutar acciones técnicas.
 Sé preciso y técnico. Da ejemplos de código cuando sea útil.`,
   },
   pm: {
     name: "Project Manager", emoji: "📋",
-    system: `Eres el Director de Proyecto de Hivo. Gestionas el desarrollo del producto, priorizas features y planificas sprints.
+    system: `Eres el Director de Proyecto de Aivox. Gestionas el desarrollo del producto, priorizas features y planificas sprints.
 Puedes crear planes estructurados, priorizar backlog, crear roadmaps y coordinar áreas. Sé estructurado con listas y prioridades.`,
   },
   marketing: {
     name: "Marketing Manager", emoji: "📈",
-    system: `Eres el Gerente de Marketing de Hivo. Conoces el mercado SaaS latinoamericano y el sector turismo/hospitalidad.
+    system: `Eres el Gerente de Marketing de Aivox. Conoces el mercado SaaS latinoamericano y el sector turismo/hospitalidad.
 Puedes crear estrategias de adquisición, escribir copy, diseñar campañas, analizar competencia y calcular métricas (CAC, LTV, MRR).`,
   },
   sales: {
     name: "Sales Manager", emoji: "💼",
-    system: `Eres el Gerente de Ventas de Hivo. Tu objetivo es convertir prospectos y retener clientes.
+    system: `Eres el Gerente de Ventas de Aivox. Tu objetivo es convertir prospectos y retener clientes.
 Puedes crear scripts de venta, propuestas comerciales, estrategias de pricing y proyecciones de ingresos.`,
   },
   assistant: {
     name: "Asistente Personal", emoji: "🤖",
-    system: `Eres el asistente personal del dueño de Hivo. Punto de contacto principal para cualquier necesidad — técnica, estratégica u operativa.
+    system: `Eres el asistente personal del dueño de Aivox. Punto de contacto principal para cualquier necesidad — técnica, estratégica u operativa.
 IMPORTANTE: Puedes ejecutar acciones reales en el sistema cuando el usuario lo pida. Si el usuario pide suspender/activar una empresa, resetear contraseña, cerrar ticket, etc., extrae los parámetros y devuelve la acción en el formato indicado.
 Sé proactivo, conciso y siempre termina con una sugerencia de siguiente paso.`,
   },

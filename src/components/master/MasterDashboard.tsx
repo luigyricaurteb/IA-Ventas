@@ -220,9 +220,9 @@ function AITeamPanel() {
                   </button>
                 ))}
                 {agent === "marketing" && [
-                  "Crea copy para landing page de Hivo",
+                  "Crea copy para landing page de Aivox",
                   "Estrategia para conseguir 10 clientes",
-                  "¿Cómo compite Hivo vs ManyChat?",
+                  "¿Cómo compite Aivox vs ManyChat?",
                   "Ideas de contenido para LinkedIn"
                 ].map(s => (
                   <button key={s} onClick={() => setInput(s)}
@@ -231,7 +231,7 @@ function AITeamPanel() {
                   </button>
                 ))}
                 {agent === "sales" && [
-                  "Script para vender Hivo a un restaurante",
+                  "Script para vender Aivox a un restaurante",
                   "¿Cómo manejar la objeción del precio?",
                   "Propuesta comercial para una agencia",
                   "Proyección de ingresos a 12 meses"
@@ -422,7 +422,7 @@ function MetricsPanel() {
     <div className="space-y-6 max-w-5xl">
       <div>
         <h2 className="text-white font-bold text-lg">📊 Métricas del Negocio</h2>
-        <p className="text-gray-400 text-sm">Resumen ejecutivo de la plataforma Hivo</p>
+        <p className="text-gray-400 text-sm">Resumen ejecutivo de la plataforma Aivox</p>
       </div>
 
       {/* KPI cards */}
@@ -711,7 +711,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center text-white font-black text-base">H</div>
             <div>
-              <p className="text-white font-bold text-sm tracking-wide">Hivo Platform</p>
+              <p className="text-white font-bold text-sm tracking-wide">Aivox Platform</p>
               <p className="text-indigo-300 text-xs">{companies.filter(c=>c.status==="active").length} activas · {companies.length} totales · {plans.filter(p=>p.active).length} planes</p>
             </div>
           </div>

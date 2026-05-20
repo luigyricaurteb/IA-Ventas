@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const isResend = smtp?.provider === "resend";
     const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
       <h2 style="color:#10b981;margin:0 0 8px">¡Email funcionando!</h2>
-      <p style="color:#374151;margin:0 0 12px">Correo de prueba enviado desde <strong>${company.name ?? "tu empresa"}</strong> vía Hivo.</p>
+      <p style="color:#374151;margin:0 0 12px">Correo de prueba enviado desde <strong>${company.name ?? "tu empresa"}</strong> vía Aivox.</p>
       <p style="color:#6b7280;font-size:13px;margin:0">Las alertas de nuevas conversaciones, pagos y reservas llegarán correctamente.</p>
     </div>`;
 
@@ -54,9 +54,9 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "api-key": smtp.resend_api_key, "Content-Type": "application/json" },
         body: JSON.stringify({
-          sender: { name: smtp.from_name ?? company.name ?? "Hivo", email: fromEmail },
+          sender: { name: smtp.from_name ?? company.name ?? "Aivox", email: fromEmail },
           to: [{ email: company.email }],
-          subject: "✅ Prueba Brevo — Hivo",
+          subject: "✅ Prueba Brevo — Aivox",
           htmlContent: html,
         }),
         signal: AbortSignal.timeout(15000),
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { "Authorization": `Bearer ${smtp.resend_api_key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: `"${smtp.from_name ?? company.name ?? "Hivo"}" <${fromAddr}>`, to: [company.email], subject: "✅ Prueba Resend — Hivo", html }),
+        body: JSON.stringify({ from: `"${smtp.from_name ?? company.name ?? "Aivox"}" <${fromAddr}>`, to: [company.email], subject: "✅ Prueba Resend — Aivox", html }),
         signal: AbortSignal.timeout(15000),
       });
       const d = await res.json() as { id?: string; name?: string; message?: string };
@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
     });
     await transporter.verify();
     await transporter.sendMail({
-      from: `"${smtp.from_name ?? company.name ?? "Hivo"}" <${smtp.from_email ?? smtp.user}>`,
-      to: company.email, subject: "✅ Prueba SMTP — Hivo", html,
+      from: `"${smtp.from_name ?? company.name ?? "Aivox"}" <${smtp.from_email ?? smtp.user}>`,
+      to: company.email, subject: "✅ Prueba SMTP — Aivox", html,
     });
     return NextResponse.json({ ok: true, sentTo: company.email, provider: "smtp" });
 

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
       doc.image(logoPath, 50, 40, { height: 50, fit: [150, 50] });
     }
     doc.fillColor(accentColor).fontSize(22).font("Helvetica-Bold")
-       .text(company.name ?? "Hivo", logoPath ? 210 : 50, 45, { align: logoPath ? "left" : "right", width: W });
+       .text(company.name ?? "Aivox", logoPath ? 210 : 50, 45, { align: logoPath ? "left" : "right", width: W });
     doc.fillColor("#6b7280").fontSize(9).font("Helvetica")
        .text([company.phone, company.email].filter(Boolean).join("  ·  "), 50, 100, { align: "right", width: W });
 
@@ -195,7 +195,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     // ── Footer ───────────────────────────────────────────────────────
     doc.moveTo(50, 730).lineTo(545, 730).strokeColor("#e5e7eb").lineWidth(1).stroke();
     doc.fillColor("#9ca3af").fontSize(8).font("Helvetica")
-       .text(`Generado el ${new Date().toLocaleDateString("es-CO")} · ${company.name ?? "Hivo"} · ${code}`, 50, 738, { align: "center", width: W });
+       .text(`Generado el ${new Date().toLocaleDateString("es-CO")} · ${company.name ?? "Aivox"} · ${code}`, 50, 738, { align: "center", width: W });
 
     doc.end();
   });

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
     const email = user.email ?? process.env.MASTER_EMAIL;
     if (email) {
-      await sendEmail(email, "Restablecer contraseña — Hivo",
+      await sendEmail(email, "Restablecer contraseña — Aivox",
         `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
           <h2 style="color:#0077b6">Restablecer contraseña</h2>
           <p>Hola <strong>${user.username}</strong>, recibimos una solicitud para restablecer tu contraseña.</p>
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     `).run(token, company, username, expiresAt);
 
     const resetUrl = `${baseUrl}/reset-password?token=${token}&company=${company}`;
-    await sendEmail(recipientEmail, "Restablecer contraseña — Hivo",
+    await sendEmail(recipientEmail, "Restablecer contraseña — Aivox",
       `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
         <h2 style="color:#0077b6">Restablecer contraseña</h2>
         <p>Hola <strong>${user.username}</strong> de <strong>${cfg?.name ?? company}</strong>, recibimos una solicitud para restablecer tu contraseña.</p>

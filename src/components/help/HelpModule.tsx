@@ -12,7 +12,7 @@ const INSTALL_SECTIONS: InstallSection[] = [
     id: "meta-wa", icon: "💬", title: "WhatsApp Cloud API (Meta)", tag: "Ajustes → ☁️ Meta",
     steps: [
       { title: "1. Crear App en Meta Developers",
-        text: "Ve a developers.facebook.com → Mis Apps → Crear App.\nTipo: Negocios → Siguiente.\nNombre: Hivo-[tuempresa] → crear app.",
+        text: "Ve a developers.facebook.com → Mis Apps → Crear App.\nTipo: Negocios → Siguiente.\nNombre: Aivox-[tuempresa] → crear app.",
         tip: "Usa el mismo correo de tu cuenta Meta Business." },
       { title: "2. Agregar producto WhatsApp",
         text: "Dentro del App → panel izquierdo → Agregar producto → WhatsApp → Configurar.\nSelecciona tu Cuenta de Meta Business." },
@@ -282,10 +282,10 @@ const SECTIONS: Section[] = [
   {
     id: "tickets", icon: "🎫", title: "Soporte y Tickets",
     content: [
-      { subtitle: "¿Para qué sirve?", text: "Sistema de soporte técnico entre tu empresa y el equipo de Hivo. Si tienes un problema, duda o sugerencia, crea un ticket y recibirás respuesta directa.", isNew: true },
+      { subtitle: "¿Para qué sirve?", text: "Sistema de soporte técnico entre tu empresa y el equipo de Aivox. Si tienes un problema, duda o sugerencia, crea un ticket y recibirás respuesta directa.", isNew: true },
       { subtitle: "Crear un ticket", text: "Soporte → + Nuevo. Completa:\n• Asunto: descripción breve del problema\n• Categoría: Soporte técnico, Facturación, Configuración, etc.\n• Prioridad: Baja / Media / Alta / Crítica\n• Descripción: detalla el problema con todo el contexto posible", isNew: true },
       { subtitle: "Estados del ticket", text: "Abierto → En revisión → Resuelto → Cerrado.\nTe notificaremos por email cuando el equipo responda." },
-      { subtitle: "Chat interno", text: "Dentro de cada ticket hay un chat. Puedes enviar mensajes adicionales, capturas o contexto. El equipo de Hivo responde directamente ahí.", isNew: true },
+      { subtitle: "Chat interno", text: "Dentro de cada ticket hay un chat. Puedes enviar mensajes adicionales, capturas o contexto. El equipo de Aivox responde directamente ahí.", isNew: true },
     ],
   },
   {

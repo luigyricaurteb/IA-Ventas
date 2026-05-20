@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!body.content?.trim()) return NextResponse.json({ error: "Mensaje vacío" }, { status: 400 });
 
   const authorRole = ctx.me.role === "master" ? "master" : "company";
-  const authorName = ctx.me.role === "master" ? "Soporte Hivo" : (body.author_name ?? "Empresa");
+  const authorName = ctx.me.role === "master" ? "Soporte Aivox" : (body.author_name ?? "Empresa");
 
   masterDb.prepare(`
     INSERT INTO ticket_messages (ticket_id, author_role, author_name, content) VALUES (?,?,?,?)

@@ -65,7 +65,7 @@ export default function LoginPage() {
             </div>
           )}
           <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
-            {selectedInfo ? selectedInfo.name : "Hivo"}
+            {selectedInfo ? selectedInfo.name : "Aivox"}
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
             {selectedCompany === "__master__" ? "Administración de Plataforma" : "Plataforma de ventas inteligente"}
