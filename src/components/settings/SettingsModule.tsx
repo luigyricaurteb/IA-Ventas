@@ -405,43 +405,6 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
           </div>
 
-          {/* Admin WhatsApp */}
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">🔧</span>
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Modo Admin por WhatsApp</p>
-                <p className="text-xs text-gray-400">Escribe desde tu número con la palabra clave y consulta reservas, pagos y reportes en tiempo real</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="text-sm font-medium text-gray-700">Tu número de WhatsApp</label>
-                <div className="flex gap-2 mt-1">
-                  <span className="border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 shrink-0 flex items-center">+</span>
-                  <input value={company.admin_wa_phone ?? ""} onChange={e => setCompany({...company, admin_wa_phone: e.target.value})}
-                    placeholder="573001234567 (LADA + número)"
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono" />
-                </div>
-                <p className="text-xs text-orange-600 mt-1 font-medium">⚠️ Obligatorio incluir el código de país: Colombia = 57, USA = 1, México = 52</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Palabra clave secreta</label>
-                <input value={company.admin_wa_keyword ?? "admin"} onChange={e => setCompany({...company, admin_wa_keyword: e.target.value})}
-                  placeholder="admin"
-                  className="w-full border rounded-lg px-3 py-2 mt-1 text-sm" />
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
-                <p className="font-semibold mb-1">¿Cómo usarlo?</p>
-                <p>Escribe tu palabra clave desde tu WhatsApp y consulta:</p>
-                <p className="mt-1">• <strong>reservas hoy</strong></p>
-                <p>• <strong>cobros pendientes</strong></p>
-                <p>• <strong>reserva RES-xxx</strong></p>
-                <p>• <strong>resumen</strong></p>
-              </div>
-            </div>
-          </div>
-
           <button onClick={saveCompany} disabled={saving} className="bg-emerald-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
             {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar empresa"}
           </button>

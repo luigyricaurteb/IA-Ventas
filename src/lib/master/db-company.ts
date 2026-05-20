@@ -440,9 +440,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN sheets_url TEXT",
     "ALTER TABLE company_config ADD COLUMN sheets_enabled INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE company_config ADD COLUMN sheets_last_sync INTEGER",
-    // Admin WhatsApp mode
+    // Admin WhatsApp mode (configurado solo desde el master)
     "ALTER TABLE company_config ADD COLUMN admin_wa_phone TEXT",
     "ALTER TABLE company_config ADD COLUMN admin_wa_keyword TEXT NOT NULL DEFAULT 'admin'",
+    "ALTER TABLE company_config ADD COLUMN admin_mode_enabled INTEGER NOT NULL DEFAULT 0",
     // User email for password reset
     "ALTER TABLE users ADD COLUMN email TEXT",
     // Products: type (producto/servicio) and main image flag

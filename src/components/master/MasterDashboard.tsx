@@ -14,6 +14,79 @@ const BL: Record<string,string> = { monthly:"Mensual", yearly:"Anual", permanent
 
 function fmt(n: number) { return n.toLocaleString("es-CO"); }
 
+// ── Admin Mode por empresa ────────────────────────────────────────────────────
+function AdminModePanel({ companyId }: { companyId: number | null }) {
+  const [cfg, setCfg] = useState({ admin_wa_phone: "", admin_wa_keyword: "admin", admin_mode_enabled: false });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/master/companies/${companyId}/admin-mode`)
+      .then(r => r.json())
+      .then(d => setCfg(d))
+      .catch(() => {});
+  }, [companyId]);
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    await fetch(`/api/master/companies/${companyId}/admin-mode`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cfg),
+    });
+    setSaving(false);
+    setMsg(cfg.admin_mode_enabled ? "✅ Modo Admin activado para esta empresa" : "Modo Admin desactivado");
+    setTimeout(() => setMsg(null), 3000);
+  }
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mt-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-white font-semibold">🔧 Modo Admin por WhatsApp</h3>
+          <p className="text-gray-400 text-xs mt-0.5">Permite al dueño consultar datos del negocio desde WhatsApp con una palabra clave secreta</p>
+        </div>
+        <button type="button" onClick={() => setCfg(p => ({ ...p, admin_mode_enabled: !p.admin_mode_enabled }))}
+          className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${cfg.admin_mode_enabled ? "bg-emerald-500" : "bg-gray-600"}`}>
+          <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${cfg.admin_mode_enabled ? "translate-x-6" : ""}`} />
+        </button>
+      </div>
+
+      {cfg.admin_mode_enabled && (
+        <div className="space-y-3">
+          <div>
+            <label className="text-gray-400 text-xs block mb-1">Número de WhatsApp del admin (con código de país) *</label>
+            <input value={cfg.admin_wa_phone} onChange={e => setCfg(p => ({ ...p, admin_wa_phone: e.target.value }))}
+              placeholder="573001234567"
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-emerald-500" />
+            <p className="text-orange-400 text-xs mt-1">⚠️ Incluir código de país: Colombia = 57</p>
+          </div>
+          <div>
+            <label className="text-gray-400 text-xs block mb-1">Palabra clave secreta</label>
+            <input value={cfg.admin_wa_keyword} onChange={e => setCfg(p => ({ ...p, admin_wa_keyword: e.target.value }))}
+              placeholder="mi-clave-secreta"
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" />
+            <p className="text-gray-500 text-xs mt-1">La escribe en WhatsApp para activar/desactivar el modo. Es sensible a mayúsculas.</p>
+          </div>
+          <div className="bg-gray-700/50 rounded-xl p-3 text-xs text-gray-400">
+            <p className="font-semibold text-gray-300 mb-1">¿Cómo funciona?</p>
+            <p>El admin escribe la palabra clave → Julieta entra en modo admin con acceso total a datos del negocio.</p>
+            <p className="mt-1">Misma clave → desactiva. La conversación es invisible en el sistema.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-4">
+        <button onClick={save} disabled={saving}
+          className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 disabled:opacity-50">
+          {saving ? "Guardando..." : "Guardar"}
+        </button>
+        {msg && <p className="text-sm text-emerald-400">{msg}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ── Equipo IA interno ────────────────────────────────────────────────────────
 type AgentId = "developer"|"pm"|"marketing"|"sales"|"assistant";
 const AGENTS: { id: AgentId; name: string; emoji: string; desc: string }[] = [
@@ -644,6 +717,9 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
               })}
               {companyUsers.length===0 && <p className="text-gray-500 text-center py-8">Sin usuarios en esta empresa.</p>}
             </div>
+
+            {/* Admin Mode */}
+            <AdminModePanel companyId={usersCompanyId} />
           </div>
         )}
 

@@ -22,8 +22,9 @@ const MODEL = process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini";
 // ── Verificación de acceso ────────────────────────────────────────────────────
 
 export function isAdminPhone(db: Database.Database, phone: string): boolean {
-  const cfg = db.prepare("SELECT admin_wa_phone FROM company_config WHERE id=1").get() as { admin_wa_phone: string | null } | null;
-  if (!cfg?.admin_wa_phone) return false;
+  const cfg = db.prepare("SELECT admin_wa_phone, admin_mode_enabled FROM company_config WHERE id=1").get() as { admin_wa_phone: string | null; admin_mode_enabled: number } | null;
+  // Feature must be enabled from master AND phone must match
+  if (!cfg?.admin_mode_enabled || !cfg?.admin_wa_phone) return false;
   const clean = (p: string) => p.replace(/\D/g, "");
   const stored = clean(cfg.admin_wa_phone);
   const incoming = clean(phone);
