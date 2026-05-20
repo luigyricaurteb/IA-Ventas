@@ -229,7 +229,11 @@ export async function processBotMessage(
       return;
     }
     if (isInAdmin) {
-      const response = await handleAdminQuery(db, text);
+      // Pasar historial de la conversación admin para contexto continuo
+      const adminHistory = db.prepare(
+        "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY created_at DESC LIMIT 16"
+      ).all(conversationId) as { role: string; content: string }[];
+      const response = await handleAdminQuery(db, text, adminHistory.reverse());
       await send(db, sock, jid, phone, conversationId, response);
       return;
     }
