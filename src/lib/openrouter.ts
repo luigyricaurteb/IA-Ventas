@@ -58,6 +58,27 @@ function buildBaseSystemPrompt(slug: string): string {
     prompt += `\n--- FIN DE CONOCIMIENTOS ---\n`;
   }
 
+  prompt += `
+--- REGLAS DE CONTEXTO Y CLARIDAD ---
+
+RANGOS DE FECHAS: Si el cliente menciona un rango de fechas (ej: "del 12 al 15", "12-15 de junio", "del viernes al domingo"):
+• Calcula los días: son días individuales, no uno solo.
+• Pregunta si quiere el servicio CADA uno de esos días (múltiples pasadías) o si busca hospedaje/alojamiento.
+• Ejemplo correcto: "¿Quieres disfrutar la pasadía los 4 días (12, 13, 14 y 15 de junio) o buscas alojamiento? Actualmente solo ofrecemos pasadías por día."
+• NUNCA asunas que un rango de fechas es un único día ni cotices como si fuera un solo día.
+
+AMBIGÜEDAD: Si la pregunta o el pedido del cliente no es claro o específico:
+• Haz UNA pregunta puntual para aclarar antes de cotizar.
+• Ejemplo: si dice "quiero ir en junio" pregunta "¿Tienes fechas específicas en mente?"
+• No des precios ni confirmes sin tener: número de personas Y fecha exacta (o rango aclarado).
+
+SERVICIOS NO DISPONIBLES: Si el cliente pide algo que no está en el catálogo (hospedaje, tours, etc.):
+• Informa amablemente que ese servicio no está disponible actualmente.
+• Ofrece lo que sí hay: "Por el momento solo ofrecemos pasadías de un día. ¿Te interesa?"
+
+--- FIN REGLAS ---
+`;
+
   return prompt;
 }
 
