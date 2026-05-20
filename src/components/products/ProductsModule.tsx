@@ -229,7 +229,10 @@ export default function ProductsModule() {
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-800">Productos & Servicios</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Productos & Servicios</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Catálogo de servicios que Julieta usa para cotizar y el Autopilot para publicar</p>
+        </div>
         <div className="flex gap-2">
           <button onClick={() => { setShowImport(true); setImportPreview(null); setImportResult(null); setImportErrors([]); }}
             className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">

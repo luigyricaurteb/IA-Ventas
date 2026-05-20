@@ -418,7 +418,7 @@ export default function CalendarModule() {
       <div className="px-6 py-4 border-b bg-white flex items-center justify-between shrink-0 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Calendario de Reservas</h1>
-          <p className="text-sm text-gray-400">{listData.total || reservations.length} reservas</p>
+          <p className="text-xs text-gray-400">Gestiona reservas, pagos y recordatorios automáticos · {listData.total || reservations.length} reservas</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <div className="flex bg-gray-100 rounded-lg p-1">

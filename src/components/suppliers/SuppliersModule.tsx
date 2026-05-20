@@ -62,7 +62,10 @@ export default function SuppliersModule() {
       {/* Lista */}
       <div className="w-72 shrink-0 border-r bg-white flex flex-col">
         <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Proveedores</h2>
+          <div>
+            <h2 className="font-semibold text-gray-800">Proveedores</h2>
+            <p className="text-xs text-gray-400">Registro de aliados y costos operativos</p>
+          </div>
           <button onClick={openNew} className="bg-emerald-500 text-white px-3 py-1 rounded-lg text-xs font-medium">+ Nuevo</button>
         </div>
         <div className="flex-1 overflow-y-auto">

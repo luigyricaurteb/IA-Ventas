@@ -134,7 +134,10 @@ export default function AccountingModule() {
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-bold text-gray-800">Contabilidad</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Contabilidad</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Registro automático de ingresos y egresos del negocio</p>
+        </div>
       </div>
 
       {/* KPIs */}

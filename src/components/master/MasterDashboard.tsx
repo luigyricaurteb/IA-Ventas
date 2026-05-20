@@ -541,7 +541,7 @@ const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0,
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways"|"aiteam"|"metrics">("companies");
+  const [tab, setTab] = useState<"metrics"|"companies"|"plans"|"subscriptions"|"config"|"aiteam">("metrics");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [plans, setPlans]         = useState<Plan[]>([]);
   const [subs, setSubs]           = useState<Subscription[]>([]);
@@ -717,10 +717,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
       </header>
 
       <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0 overflow-x-auto">
-        {(["companies","plans","subscriptions","gateways","metrics","aiteam"] as const).map(id=>(
+        {(["metrics","companies","plans","subscriptions","config","aiteam"] as const).map(id=>(
           <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
-            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="gateways"?"🔗 Pasarelas":id==="metrics"?"📊 Métricas":"🧠 Equipo IA"}
+            {id==="metrics"?"📊 Métricas":id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="config"?"⚙️ Ajustes":"🧠 Equipo IA"}
           </button>
         ))}
       </div>
@@ -1020,8 +1020,16 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
           </div>
         )}
 
-        {tab==="gateways" && <GatewayPanel />}
         {tab==="metrics"  && <MetricsPanel />}
+        {tab==="config"   && (
+          <div className="space-y-2 max-w-2xl">
+            <div className="mb-6">
+              <h2 className="text-white font-bold text-lg">⚙️ Ajustes de plataforma</h2>
+              <p className="text-gray-400 text-sm mt-1">Configuración global: pasarelas de pago y credenciales del sistema.</p>
+            </div>
+            <GatewayPanel />
+          </div>
+        )}
         {tab==="aiteam"   && <AITeamPanel />}
       </div>
 

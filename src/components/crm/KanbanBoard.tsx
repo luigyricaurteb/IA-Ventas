@@ -170,7 +170,7 @@ export default function KanbanBoard() {
     <div className="flex-1 overflow-hidden flex flex-col">
       <div className="px-4 md:px-6 py-3 border-b bg-white">
         <h1 className="text-lg md:text-xl font-bold text-gray-800">CRM — Pipeline</h1>
-        <p className="text-xs md:text-sm text-gray-400">{deals.length} negocios</p>
+        <p className="text-xs text-gray-400">Seguimiento visual de leads desde el primer contacto hasta el cierre · {deals.length} negocios</p>
       </div>
       <div className="flex-1 overflow-x-auto p-2 md:p-4">
         <div className="flex gap-2 md:gap-3 h-full" style={{ minWidth: `${STAGES.length * 180}px` }}>
