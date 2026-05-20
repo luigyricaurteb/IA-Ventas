@@ -210,22 +210,25 @@ export async function processBotMessage(
 
   // ── Modo Admin ───────────────────────────────────────────────────────────
   if (isAdminPhone(db, phone)) {
-    // Activar modo admin con la palabra clave
-    if (checkAdminKeyword(db, text) || bs?.state === "ADMIN") {
-      if (bs?.state !== "ADMIN") {
+    const isInAdmin = bs?.state === "ADMIN";
+    const keywordSent = checkAdminKeyword(db, text);
+
+    // Toggle: misma keyword entra Y sale del modo admin
+    if (keywordSent) {
+      if (!isInAdmin) {
         setState(db, conversationId, "ADMIN" as BotState);
         await send(db, sock, jid, phone, conversationId,
-          `🔧 *Modo Admin activado*\n\nHola! Estoy lista para ayudarte con la gestión. ¿Qué necesitas?\n\nEscribe *ayuda* para ver los comandos disponibles.`
+          `🔧 *Modo Admin activado*\n\nEscribe *ayuda* para ver los comandos disponibles.`
         );
-        return;
+      } else {
+        setState(db, conversationId, "ACTIVE");
+        await send(db, sock, jid, phone, conversationId,
+          `✅ *Modo Admin desactivado*\n\nVolviendo al modo normal. El bot atenderá a los clientes normalmente.`
+        );
       }
-      // Si escribe la keyword de nuevo estando en admin, confirmar
-      if (checkAdminKeyword(db, text) && bs?.state === "ADMIN") {
-        await send(db, sock, jid, phone, conversationId, `✅ Ya estás en modo admin. Escribe *ayuda* para ver comandos.`);
-        return;
-      }
+      return;
     }
-    if (bs?.state === "ADMIN") {
+    if (isInAdmin) {
       const response = await handleAdminQuery(db, text);
       await send(db, sock, jid, phone, conversationId, response);
       return;
