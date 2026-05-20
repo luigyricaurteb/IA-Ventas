@@ -9,17 +9,18 @@ export async function GET(req: NextRequest) {
   const { db } = ctx;
 
   const { searchParams } = new URL(req.url);
+  // Summary siempre muestra el total acumulado (sin filtro de fechas en KPIs)
   const now   = Math.floor(Date.now() / 1000);
-  const start = Number(searchParams.get("start") ?? now - 30 * 86400);
+  const start = Number(searchParams.get("start") ?? 0); // 0 = desde el inicio
   const end   = Number(searchParams.get("end")   ?? now);
 
   const totalIncome = (db.prepare(
-    "SELECT COALESCE(SUM(amount), 0) as total FROM accounting_income WHERE income_date BETWEEN ? AND ?"
-  ).get(start, end) as { total: number }).total;
+    "SELECT COALESCE(SUM(amount), 0) as total FROM accounting_income"
+  ).get() as { total: number }).total;
 
   const totalExpenses = (db.prepare(
-    "SELECT COALESCE(SUM(amount), 0) as total FROM accounting_expense WHERE expense_date BETWEEN ? AND ?"
-  ).get(start, end) as { total: number }).total;
+    "SELECT COALESCE(SUM(amount), 0) as total FROM accounting_expense"
+  ).get() as { total: number }).total;
 
   const incomeByMonth = db.prepare(`
     SELECT strftime('%Y-%m', datetime(income_date, 'unixepoch')) as month,
