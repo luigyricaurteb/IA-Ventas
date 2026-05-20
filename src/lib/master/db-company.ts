@@ -440,6 +440,42 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE company_config ADD COLUMN sheets_url TEXT",
     "ALTER TABLE company_config ADD COLUMN sheets_enabled INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE company_config ADD COLUMN sheets_last_sync INTEGER",
+    // Autopilot
+    `CREATE TABLE IF NOT EXISTS autopilot_config (
+      id INTEGER PRIMARY KEY CHECK(id=1),
+      enabled INTEGER NOT NULL DEFAULT 0,
+      tone TEXT NOT NULL DEFAULT 'profesional',
+      frequency TEXT NOT NULL DEFAULT '3week',
+      posting_hour INTEGER NOT NULL DEFAULT 9,
+      publish_facebook INTEGER NOT NULL DEFAULT 1,
+      publish_instagram INTEGER NOT NULL DEFAULT 1,
+      auto_approve INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS autopilot_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      original_name TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
+    `CREATE TABLE IF NOT EXISTS autopilot_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      image_id INTEGER REFERENCES autopilot_images(id),
+      caption TEXT NOT NULL,
+      hashtags TEXT,
+      platform TEXT NOT NULL DEFAULT 'both',
+      status TEXT CHECK(status IN ('draft','approved','published','failed')) NOT NULL DEFAULT 'draft',
+      scheduled_at INTEGER,
+      published_at INTEGER,
+      fb_post_id TEXT,
+      ig_post_id TEXT,
+      fb_likes INTEGER DEFAULT 0,
+      ig_likes INTEGER DEFAULT 0,
+      error_msg TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`,
     // Admin WhatsApp mode (configurado solo desde el master)
     "ALTER TABLE company_config ADD COLUMN admin_wa_phone TEXT",
     "ALTER TABLE company_config ADD COLUMN admin_wa_keyword TEXT NOT NULL DEFAULT 'admin'",

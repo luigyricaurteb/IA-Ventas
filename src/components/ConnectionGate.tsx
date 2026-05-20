@@ -21,6 +21,7 @@ import HelpModule from "./help/HelpModule";
 import FlowBuilder from "./chat/FlowBuilder";
 import SubscriptionModule from "./subscription/SubscriptionModule";
 import TicketsModule from "./tickets/TicketsModule";
+import AutopilotModule from "./autopilot/AutopilotModule";
 import { getAllowedModules, canAccess } from "@/lib/auth-client";
 
 interface Conversation {
@@ -266,6 +267,7 @@ export default function ConnectionGate() {
           {activeModule === "subscription" && <SubscriptionModule />}
           {activeModule === "help"         && <HelpModule />}
           {activeModule === "tickets"      && <TicketsModule isMaster={currentUser?.role === "master" || currentUser?.isMaster} />}
+          {activeModule === "autopilot"    && <AutopilotModule />}
         </div>
       </div>
     </div>
