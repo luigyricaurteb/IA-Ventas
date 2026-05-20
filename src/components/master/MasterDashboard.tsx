@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface Company { id: number; slug: string; name: string; nit: string | null; email: string | null; phone: string | null; address: string | null; logo_filename: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null }
 interface Plan { id: number; name: string; description: string | null; price_monthly: number; price_usd: number; billing_cycle: string; modules: string; max_users: number; max_wa_numbers: number; active: number }
@@ -428,10 +428,10 @@ function MetricsPanel() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "MRR", value: `$${mrr.cop.toLocaleString("es-CO")}`, sub: "COP / mes", color: "text-emerald-400" },
-          { label: "ARR", value: `$${mrr.arr.toLocaleString("es-CO")}`, sub: "COP / año", color: "text-blue-400" },
-          { label: "Empresas activas", value: String(summary.active), sub: `${summary.newThisMonth} nuevas este mes`, color: "text-white" },
-          { label: "Churn mensual", value: `${churnRate}%`, sub: `${summary.churnThisMonth} bajas`, color: summary.churnThisMonth > 0 ? "text-red-400" : "text-emerald-400" },
+          { label: "MRR", value: `$${mrr.cop.toLocaleString("es-CO")}`, sub: "Ingresos Recurrentes Mensuales · suma de suscripciones activas", color: "text-emerald-400" },
+          { label: "ARR", value: `$${mrr.arr.toLocaleString("es-CO")}`, sub: "Ingresos Anualizados · MRR × 12", color: "text-blue-400" },
+          { label: "Empresas activas", value: String(summary.active), sub: `${summary.newThisMonth} nuevas este mes · ${summary.suspended} suspendidas`, color: "text-white" },
+          { label: "Churn mensual", value: `${churnRate}%`, sub: `Tasa de cancelación · ${summary.churnThisMonth} bajas este mes`, color: summary.churnThisMonth > 0 ? "text-red-400" : "text-emerald-400" },
         ].map(k => (
           <div key={k.label} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
             <p className="text-gray-400 text-xs font-medium">{k.label}</p>
@@ -541,7 +541,7 @@ const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0,
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"metrics"|"companies"|"plans"|"subscriptions"|"config"|"aiteam">("metrics");
+  const [tab, setTab] = useState<"metrics"|"companies"|"plans"|"subscriptions"|"aiteam">("metrics");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [plans, setPlans]         = useState<Plan[]>([]);
   const [subs, setSubs]           = useState<Subscription[]>([]);
@@ -704,26 +704,30 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
 
   // ────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-gray-900">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
-          <div>
-            <p className="text-white font-semibold text-sm">Administración de Plataforma</p>
-            <p className="text-gray-400 text-xs">{companies.length} empresas · {plans.filter(p=>p.active).length} planes activos</p>
+    <div className="flex-1 flex flex-col min-h-0 bg-gray-900 relative">
+      {/* Header estilo Stripe */}
+      <header className="shrink-0 px-6 pt-5 pb-0" style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #1e3a5f 100%)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center text-white font-black text-base">H</div>
+            <div>
+              <p className="text-white font-bold text-sm tracking-wide">Hivo Platform</p>
+              <p className="text-indigo-300 text-xs">{companies.filter(c=>c.status==="active").length} activas · {companies.length} totales · {plans.filter(p=>p.active).length} planes</p>
+            </div>
           </div>
+          <button onClick={onLogout} className="text-indigo-300 hover:text-white text-sm transition-colors">Salir →</button>
         </div>
-        <button onClick={onLogout} className="text-gray-400 hover:text-red-400 text-sm">Salir</button>
-      </header>
 
-      <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0 overflow-x-auto">
-        {(["metrics","companies","plans","subscriptions","config","aiteam"] as const).map(id=>(
-          <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
-            {id==="metrics"?"📊 Métricas":id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="config"?"⚙️ Ajustes":"🧠 Equipo IA"}
-          </button>
-        ))}
-      </div>
+        {/* Tabs dentro del header gradiente */}
+        <div className="flex gap-1 overflow-x-auto">
+          {(["metrics","companies","plans","subscriptions","aiteam"] as const).map(id=>(
+            <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg ${tab===id ? "border-white text-white bg-white/10" : "border-transparent text-indigo-300 hover:text-white hover:bg-white/5"}`}>
+              {id==="metrics"?"📊 Métricas":id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":"🧠 Equipo IA"}
+            </button>
+          ))}
+        </div>
+      </header>
 
       <div className="flex-1 overflow-auto p-6">
 
@@ -1021,15 +1025,6 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         )}
 
         {tab==="metrics"  && <MetricsPanel />}
-        {tab==="config"   && (
-          <div className="space-y-2 max-w-2xl">
-            <div className="mb-6">
-              <h2 className="text-white font-bold text-lg">⚙️ Ajustes de plataforma</h2>
-              <p className="text-gray-400 text-sm mt-1">Configuración global: pasarelas de pago y credenciales del sistema.</p>
-            </div>
-            <GatewayPanel />
-          </div>
-        )}
         {tab==="aiteam"   && <AITeamPanel />}
       </div>
 
@@ -1258,6 +1253,125 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
           </div>
         </div>
       )}
+
+      {/* ── Julieta Master — chat flotante ── */}
+      <JulietaMasterChat />
     </div>
+  );
+}
+
+// ── Julieta Master — asistente interno flotante ───────────────────────────────
+function JulietaMasterChat() {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<{ role: "user"|"assistant"; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, open]);
+
+  async function send() {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput("");
+    const newMsgs = [...messages, { role: "user" as const, content: userMsg }];
+    setMessages(newMsgs);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/master/ai-team", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent: "assistant", messages: newMsgs }),
+      });
+      const d = await res.json() as { reply?: string; error?: string };
+      setMessages([...newMsgs, { role: "assistant", content: d.reply ?? d.error ?? "Error" }]);
+    } catch { setMessages([...newMsgs, { role: "assistant", content: "Error de conexión. Intenta de nuevo." }]); }
+    setLoading(false);
+  }
+
+  const suggestions = [
+    "¿Cuántas empresas activas tenemos?",
+    "Dame un resumen del negocio hoy",
+    "¿Qué tickets están abiertos?",
+    "Stats de beachland",
+  ];
+
+  return (
+    <>
+      {/* Botón flotante */}
+      <button onClick={() => setOpen(o => !o)}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl transition-all hover:scale-110"
+        style={{ background: "linear-gradient(135deg, #312e81, #1e3a5f)" }}
+        title="Julieta — Asistente Master">
+        {open ? "✕" : "🤖"}
+      </button>
+
+      {/* Panel de chat */}
+      {open && (
+        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] h-[520px] flex flex-col rounded-2xl shadow-2xl overflow-hidden border border-indigo-500/30"
+          style={{ background: "#0f172a" }}>
+          {/* Header */}
+          <div className="px-4 py-3 flex items-center gap-3 border-b border-white/10"
+            style={{ background: "linear-gradient(135deg, #1e1b4b, #312e81)" }}>
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-lg">🤖</div>
+            <div>
+              <p className="text-white font-semibold text-sm">Julieta Master</p>
+              <p className="text-indigo-300 text-xs">Asistente interno · acceso total a la plataforma</p>
+            </div>
+            <button onClick={() => setMessages([])} className="ml-auto text-indigo-400 hover:text-white text-xs">🗑</button>
+          </div>
+
+          {/* Mensajes */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && (
+              <div className="space-y-2">
+                <p className="text-gray-500 text-xs text-center mb-3">Pregúntame cualquier cosa sobre la plataforma o pídeme que ejecute una acción</p>
+                {suggestions.map(s => (
+                  <button key={s} onClick={() => setInput(s)}
+                    className="w-full text-left text-xs text-indigo-300 border border-indigo-500/30 rounded-xl px-3 py-2 hover:bg-indigo-900/30 transition-colors">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
+                  m.role === "user"
+                    ? "text-white rounded-br-sm"
+                    : "bg-gray-800 text-gray-100 rounded-bl-sm"
+                }`} style={m.role === "user" ? { background: "linear-gradient(135deg, #312e81, #1e3a5f)" } : {}}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1">
+                  {[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: `${i*0.15}s` }} />)}
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-3 border-t border-white/10">
+            <div className="flex gap-2">
+              <input value={input} onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="Pregunta o pide una acción..."
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
+              <button onClick={send} disabled={loading || !input.trim()}
+                className="px-4 rounded-xl text-white text-sm font-medium disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg, #312e81, #1e3a5f)" }}>
+                →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

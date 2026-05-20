@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import WhatsAppConfigPanel from "./WhatsAppConfigPanel";
 
-type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla" | "sheets";
+type Tab = "company" | "whatsapp" | "banks" | "smtp" | "learning" | "users" | "drive" | "templates" | "sla" | "sheets" | "gateways";
 
 const MODULE_LIST: { id: string; label: string; icon: string }[] = [
   { id: "chat",       label: "Chat",         icon: "💬" },
@@ -43,7 +43,7 @@ function ModuleToggle({ id, label, icon, checked, onChange }: { id: string; labe
   );
 }
 
-export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean; company?: string } | null }) {
+export default function SettingsModule({ currentUser }: { currentUser?: { role?: string; is_admin?: boolean; company?: string; isMaster?: boolean } | null }) {
   const [tab, setTab] = useState<Tab>("company");
   const companySlug = (currentUser as { company?: string } | null | undefined)?.company ?? "";
   const [company, setCompany] = useState<CompanyConfig>({ name: "", phone: "", email: "", logo_filename: null, business_hours_start: 8, business_hours_end: 18, business_days: "1,2,3,4,5", ai_name: "Julieta", ai_general_instructions: "", nequi_phone: "", daviplata_phone: "", notify_new_conversation: 1, notify_new_payment: 1, notify_new_reservation: 1, admin_wa_phone: "", admin_wa_keyword: "admin" });
@@ -82,6 +82,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [saved, setSaved] = useState(false);
 
   const isAdmin = currentUser?.is_admin || currentUser?.role === "master";
+  const isMaster = currentUser?.role === "master" || currentUser?.isMaster === true;
 
   // ── WhatsApp polling (solo cuando el tab está activo) ─────────────────────
   useEffect(() => {
@@ -295,19 +296,24 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
     showSaved();
   }
 
-  const ALL_TABS: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
-    { id: "company",   label: "Empresa",          icon: "🏢" },
-    { id: "whatsapp",  label: "Meta / WhatsApp",  icon: "☁️" },
-    { id: "banks",     label: "Cuentas bancarias", icon: "🏦" },
-    { id: "smtp",      label: "Email",             icon: "📧" },
-    { id: "learning",  label: `${aiName} IA`,      icon: "🤖" },
-    { id: "templates", label: "Plantillas",        icon: "📝" },
-    { id: "sheets",    label: "Google Sheets",     icon: "📊" },
-    { id: "sla",       label: "SLA",               icon: "⏱️", adminOnly: true },
-    { id: "drive",     label: "Google Drive",      icon: "🗂️", adminOnly: true },
-    { id: "users",     label: "Usuarios",          icon: "👥", adminOnly: true },
+  const ALL_TABS: { id: Tab; label: string; icon: string; desc: string; adminOnly?: boolean; masterOnly?: boolean }[] = [
+    { id: "company",   label: "Empresa",           icon: "🏢", desc: "Nombre, logo, horarios y datos de contacto" },
+    { id: "whatsapp",  label: "Meta / WhatsApp",   icon: "☁️", desc: "Conexión WhatsApp, Facebook e Instagram" },
+    { id: "banks",     label: "Cuentas bancarias", icon: "🏦", desc: "Datos que Julieta usa para cobros" },
+    { id: "smtp",      label: "Email",             icon: "📧", desc: "Configuración para envío de correos y alertas" },
+    { id: "learning",  label: `${aiName} IA`,      icon: "🤖", desc: "Personalidad, instrucciones y aprendizajes de la IA" },
+    { id: "templates", label: "Plantillas",        icon: "📝", desc: "Respuestas rápidas reutilizables en el chat" },
+    { id: "sheets",    label: "Google Sheets",     icon: "📊", desc: "Sincronización de reservas con tu hoja de cálculo" },
+    { id: "sla",       label: "SLA",               icon: "⏱️", desc: "Tiempo máximo de respuesta del equipo", adminOnly: true },
+    { id: "drive",     label: "Google Drive",      icon: "🗂️", desc: "Fuentes de datos dinámicos para Julieta", adminOnly: true },
+    { id: "users",     label: "Usuarios",          icon: "👥", desc: "Gestión de usuarios y permisos del equipo", adminOnly: true },
+    { id: "gateways",  label: "Pasarelas de pago", icon: "🔗", desc: "Mercado Pago y Wompi para cobros en línea", masterOnly: true },
   ];
-  const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin);
+  const TABS = ALL_TABS.filter((t) => {
+    if (t.masterOnly) return isMaster;
+    if (t.adminOnly) return isAdmin;
+    return true;
+  });
   const activeTab = TABS.find(t => t.id === tab);
 
   return (
@@ -348,6 +354,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
           <span className="text-xl">{activeTab?.icon}</span>
           <div>
             <h2 className="font-semibold text-gray-800">{activeTab?.label}</h2>
+            {activeTab?.desc && <p className="text-xs text-gray-400 mt-0.5">{activeTab.desc}</p>}
           </div>
           {saved && <span className="ml-auto text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-1 rounded-full">✓ Guardado</span>}
         </div>
@@ -1195,10 +1202,96 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
         </div>
       )}
 
+      {/* ── PASARELAS DE PAGO (solo master) ── */}
+      {tab === "gateways" && (
+        <GatewaySettingsPanel />
+      )}
+
         </div>{/* fin p-6 */}
         {/* padding bottom móvil para el select fijo */}
         <div className="h-16 md:h-0" />
       </div>{/* fin panel contenido */}
+    </div>
+  );
+}
+
+// ── Pasarelas en Ajustes — consume misma API que master ──────────────────────
+function GatewaySettingsPanel() {
+  const [cfg, setCfg] = useState({ mercadopago_public_key:"", mercadopago_access_token:"", mercadopago_active:false, wompi_public_key:"", wompi_private_key:"", wompi_events_key:"", wompi_active:false });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/master/gateways").then(r=>r.json()).then(d => setCfg(d)).catch(()=>{});
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    await fetch("/api/master/gateways", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(cfg) });
+    setSaving(false); setSaved(true); setTimeout(()=>setSaved(false), 2000);
+  }
+
+  const F = ({ label, field, placeholder="", type="text" }: { label:string; field:keyof typeof cfg; placeholder?:string; type?:string }) => (
+    <div>
+      <label className="text-sm font-medium text-gray-700 block mb-1">{label}</label>
+      <input type={type} value={String(cfg[field])} placeholder={placeholder}
+        onChange={e => setCfg({...cfg, [field]: e.target.value})}
+        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
+    </div>
+  );
+
+  const Toggle = ({ field, label }: { field:"mercadopago_active"|"wompi_active"; label:string }) => (
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <button type="button" onClick={() => setCfg({...cfg, [field]: !cfg[field]})}
+        className={`relative w-10 h-6 rounded-full transition-colors ${cfg[field] ? "bg-emerald-500" : "bg-gray-300"}`}>
+        <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg[field] ? "translate-x-4" : ""}`} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        <p className="font-medium">⚠️ Configuración avanzada</p>
+        <p className="mt-1 text-xs">Solo activa una pasarela cuando tengas las credenciales de producción y hayas probado la integración. Un error aquí afecta los cobros en línea.</p>
+      </div>
+
+      {/* Mercado Pago */}
+      <div className="border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-9 h-9 bg-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">MP</div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-800">Mercado Pago</p>
+            <p className="text-xs text-gray-400">Plataforma líder en Latinoamérica · checkout.mercadopago.com</p>
+          </div>
+          <Toggle field="mercadopago_active" label="Activo" />
+        </div>
+        <F label="Public Key" field="mercadopago_public_key" placeholder="APP_USR-..." />
+        <F label="Access Token" field="mercadopago_access_token" placeholder="APP_USR-..." type="password" />
+        <p className="text-xs text-gray-400">Credenciales en mercadopago.com.co → Tu negocio → Credenciales de producción</p>
+      </div>
+
+      {/* Wompi */}
+      <div className="border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-9 h-9 bg-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">W</div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-800">Wompi</p>
+            <p className="text-xs text-gray-400">Pasarela colombiana · wompi.co</p>
+          </div>
+          <Toggle field="wompi_active" label="Activo" />
+        </div>
+        <F label="Llave pública" field="wompi_public_key" placeholder="pub_prod_..." />
+        <F label="Llave privada" field="wompi_private_key" placeholder="prv_prod_..." type="password" />
+        <F label="Llave de eventos" field="wompi_events_key" placeholder="prod_integrity_..." type="password" />
+        <p className="text-xs text-gray-400">Llaves en dashboard.wompi.co → Desarrolladores → Llaves de API</p>
+      </div>
+
+      <button onClick={save} disabled={saving}
+        className="w-full bg-gray-900 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+        {saved ? "✓ Guardado" : saving ? "Guardando..." : "Guardar credenciales"}
+      </button>
     </div>
   );
 }
