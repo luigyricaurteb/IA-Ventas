@@ -410,15 +410,15 @@ export async function processBotMessage(
         await send(db, sock, jid, phone, conversationId, `Por favor dime tu nombre completo para continuar.`);
         return;
       }
-      // Guardar nombre en conversación y contacto
+      // Guardar nombre en conversación y contacto (incluyendo teléfono)
       db.prepare("UPDATE conversations SET name=? WHERE id=?").run(name, conversationId);
       const existing = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
       let contactId: number;
       if (existing) {
-        db.prepare("UPDATE contacts SET full_name=? WHERE id=?").run(name, existing.id);
+        db.prepare("UPDATE contacts SET full_name=?, phone=? WHERE id=?").run(name, phone, existing.id);
         contactId = existing.id;
       } else {
-        const ins = db.prepare("INSERT INTO contacts (conversation_id, full_name) VALUES (?,?) RETURNING id").get(conversationId, name) as { id: number };
+        const ins = db.prepare("INSERT INTO contacts (conversation_id, full_name, phone) VALUES (?,?,?) RETURNING id").get(conversationId, name, phone) as { id: number };
         contactId = ins.id;
       }
       // Actualizar el deal con el contact_id para que el CRM muestre el nombre
@@ -438,10 +438,14 @@ export async function processBotMessage(
       if (isEmail) {
         const existingC = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
         if (existingC) {
-          db.prepare("UPDATE contacts SET email=? WHERE id=?").run(emailInput, existingC.id);
+          db.prepare("UPDATE contacts SET email=?, phone=?, email_collected_at=unixepoch() WHERE id=?").run(emailInput, phone, existingC.id);
         } else {
-          db.prepare("INSERT INTO contacts (conversation_id, full_name, email) VALUES (?,?,?)").run(conversationId, name, emailInput);
+          db.prepare("INSERT INTO contacts (conversation_id, full_name, email, phone, email_collected_at) VALUES (?,?,?,?,unixepoch())").run(conversationId, name, emailInput, phone);
         }
+      } else {
+        // Save phone even if email is skipped
+        const existingC = db.prepare("SELECT id FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number } | null;
+        if (existingC) db.prepare("UPDATE contacts SET phone=? WHERE id=?").run(phone, existingC.id);
       }
 
       // Ir a ACTIVE — con o sin email
@@ -511,6 +515,20 @@ export async function processBotMessage(
         );
         return;
       }
+    }
+
+    // ¿El mensaje contiene un email no registrado? Guardarlo silenciosamente
+    const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) {
+      try {
+        const existC = db.prepare("SELECT id, email FROM contacts WHERE conversation_id=? LIMIT 1").get(conversationId) as { id: number; email: string | null } | null;
+        if (existC && !existC.email) {
+          db.prepare("UPDATE contacts SET email=?, phone=?, email_collected_at=unixepoch() WHERE id=?").run(emailMatch[0].toLowerCase(), phone, existC.id);
+        } else if (!existC) {
+          const convName = (db.prepare("SELECT name FROM conversations WHERE id=?").get(conversationId) as { name: string | null } | null)?.name ?? null;
+          db.prepare("INSERT OR IGNORE INTO contacts (conversation_id, full_name, email, phone, email_collected_at) VALUES (?,?,?,?,unixepoch())").run(conversationId, convName, emailMatch[0].toLowerCase(), phone);
+        }
+      } catch {}
     }
 
     // Respuesta libre de la IA
@@ -768,6 +786,7 @@ async function aiReply(
   aiName: string,
   products?: { id: number; name: string; price_per_person: number; description: string | null }[]
 ): Promise<string> {
+  void sock; void jid; void phone;
   // Actualizar CRM con señal de interés
   try {
     const did = getOrCreateDeal(db, convId);
@@ -781,10 +800,23 @@ async function aiReply(
     "SELECT id, name, price_per_person, description FROM products WHERE active=1"
   ).all() as { id: number; name: string; price_per_person: number; description: string | null }[];
 
+  // Check if contact has email — if not and ≥3 user messages, hint Julieta to ask organically
+  const collectedData: Record<string, unknown> = { text };
+  try {
+    const contact = db.prepare("SELECT email, full_name FROM contacts WHERE conversation_id=? LIMIT 1")
+      .get(convId) as { email: string | null; full_name: string | null } | null;
+    const msgCount = (db.prepare("SELECT COUNT(*) as c FROM messages WHERE conversation_id=? AND role='user'").get(convId) as { c: number }).c;
+    if (!contact?.email && msgCount >= 3) {
+      collectedData._needEmail = true;
+      collectedData._hint = `Si surge de forma natural, pide el correo electrónico del cliente de manera amable (sin interrumpir la conversación). Si ya lo pediste antes, omite esto.`;
+    }
+    if (contact?.full_name) collectedData.clientName = contact.full_name;
+  } catch {}
+
   try {
     const reply = await generateStructuredReply(
       history, "ACTIVE",
-      { products: productList, companyName, collectedData: { text } },
+      { products: productList, companyName, collectedData },
       slug
     );
     if (isUncertainResponse(reply)) {

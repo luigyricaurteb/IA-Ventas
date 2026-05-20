@@ -50,7 +50,21 @@ export default function AnalyticsModule() {
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-4 md:space-y-6">
-      <h1 className="text-xl font-bold text-gray-800">Analytics</h1>
+      {/* Header resumen */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 text-white">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-xl font-bold">Analytics</h1>
+            <p className="text-blue-200 text-sm mt-0.5">
+              {data.totalConversations} conversaciones · {data.wonDeals} ventas cerradas · {data.reservations?.total ?? 0} reservas
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-blue-200 text-xs uppercase tracking-wide">Ingresos este mes</p>
+            <p className="text-2xl font-bold">{fmt(data.thisMonthIncome)}</p>
+          </div>
+        </div>
+      </div>
 
       <div>
         <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider mb-3">Ingresos y ventas</p>

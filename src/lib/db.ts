@@ -450,6 +450,7 @@ export interface CrmDeal {
 export interface CrmDealWithDetails extends CrmDeal {
   contact_name: string | null; contact_email: string | null;
   contact_phone: string | null; product_name: string | null;
+  lead_score: number | null; paid_amount: number | null;
 }
 export interface CrmActivity {
   id: number; deal_id: number; type: string;

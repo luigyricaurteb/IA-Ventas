@@ -296,36 +296,55 @@ function ReservationCard({ r, onEdit, onDelete, onPay, onChange }: {
   const total = r.total_value ?? 0;
   const paid = r.amount_paid ?? 0;
   const saldo = Math.max(0, total - paid);
+  const pctPaid = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   return (
-    <div className={`border rounded-xl p-3 ${STATUS_COLOR[r.status]}`}>
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{r.client_name}</p>
-          {r.service_name && <p className="text-xs opacity-75 truncate">{r.service_name}</p>}
-          <p className="text-xs opacity-60 mt-0.5">{formatDateTime(r.service_date)} · {r.people_count} pax</p>
-          {total > 0 && (
-            <div className="mt-1 space-y-0.5">
-              <p className="text-xs font-bold">Total: {fmt(total)}</p>
-              {paid > 0 && <p className="text-xs text-emerald-700">Pagado: {fmt(paid)}</p>}
-              {saldo > 0 && <p className="text-xs font-bold text-orange-600">Saldo: {fmt(saldo)}</p>}
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Status stripe */}
+      <div className={`h-1 w-full ${r.status === "confirmed" ? "bg-emerald-400" : r.status === "pending" ? "bg-yellow-400" : r.status === "completed" ? "bg-gray-400" : "bg-red-400"}`} />
+      <div className="p-3">
+        <div className="flex justify-between items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <p className="font-semibold text-sm text-gray-800 truncate">{r.client_name}</p>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border shrink-0 font-medium ${STATUS_COLOR[r.status]}`}>{STATUS_LABEL[r.status]}</span>
             </div>
-          )}
+            {r.service_name && <p className="text-xs text-blue-600 truncate font-medium">🛍️ {r.service_name}</p>}
+            <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(r.service_date)} · {r.people_count} pax</p>
+            {r.reservation_code && <p className="text-[10px] text-gray-300 font-mono mt-0.5">{r.reservation_code}</p>}
+          </div>
+          <div className="flex flex-col gap-1 shrink-0 items-end">
+            <button onClick={onEdit} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Editar</button>
+            <a href={`/api/pdf/voucher/${r.id}`} target="_blank" rel="noopener" className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">PDF</a>
+            {saldo > 0 && <button onClick={onPay} className="text-xs text-orange-500 hover:text-orange-700 font-medium">+ Pago</button>}
+            <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600">Borrar</button>
+          </div>
         </div>
-        <div className="flex flex-col gap-1 shrink-0 text-right">
-          <button onClick={onEdit} className="text-xs text-blue-500 hover:text-blue-700">Editar</button>
-          <a href={`/api/pdf/voucher/${r.id}`} target="_blank" rel="noopener" className="text-xs text-emerald-600 hover:text-emerald-800">PDF</a>
-          {saldo > 0 && <button onClick={onPay} className="text-xs text-orange-500 hover:text-orange-700 font-medium">+ Pago</button>}
-          <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600">Eliminar</button>
+
+        {total > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-gray-500">Total: <strong className="text-gray-800">{fmt(total)}</strong></span>
+              {saldo > 0 ? (
+                <span className="text-orange-600 font-semibold">Saldo: {fmt(saldo)}</span>
+              ) : (
+                <span className="text-emerald-600 font-semibold">Pagado completo</span>
+              )}
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5">
+              <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${pctPaid}%` }} />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2">
+          <select value={r.status} onChange={e => onChange(e.target.value)}
+            className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-gray-50 focus:outline-none focus:border-blue-300">
+            <option value="pending">Pendiente pago</option>
+            <option value="confirmed">Confirmada</option>
+            <option value="completed">Completada</option>
+            <option value="cancelled">Cancelada</option>
+          </select>
         </div>
-      </div>
-      <div className="mt-2">
-        <select value={r.status} onChange={e => onChange(e.target.value)}
-          className="w-full text-xs border rounded px-2 py-1 bg-white/50">
-          <option value="pending">Pendiente pago</option>
-          <option value="confirmed">Confirmada</option>
-          <option value="completed">Completada</option>
-          <option value="cancelled">Cancelada</option>
-        </select>
       </div>
     </div>
   );
@@ -492,31 +511,32 @@ export default function CalendarModule() {
               const saldo = Math.max(0, total - paid);
               const isPast = r.service_date < Math.floor(Date.now() / 1000);
               return (
-                <div key={r.id} className={`bg-white border rounded-xl p-4 flex items-center gap-4 ${isPast && r.status !== "completed" ? "opacity-60" : ""}`}>
-                  <div className="text-center shrink-0 w-14">
-                    <p className="text-xs text-gray-400">{new Date(r.service_date * 1000).toLocaleDateString("es-CO", { month: "short" })}</p>
-                    <p className="text-2xl font-bold text-gray-800 leading-none">{new Date(r.service_date * 1000).getDate()}</p>
-                    <p className="text-xs text-gray-400">{new Date(r.service_date * 1000).getFullYear()}</p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-800 truncate">{r.client_name}</p>
-                    <p className="text-sm text-gray-500 truncate">{r.service_name} · {r.people_count} pax</p>
-                    {total > 0 && (
-                      <div className="flex gap-3 mt-0.5 flex-wrap">
-                        <span className="text-sm font-semibold text-gray-700">Total: {fmt(total)}</span>
-                        {paid > 0 && <span className="text-sm text-emerald-600">Pagado: {fmt(paid)}</span>}
-                        {saldo > 0 && <span className="text-sm font-bold text-orange-600">Saldo: {fmt(saldo)}</span>}
+                <div key={r.id} className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-opacity ${isPast && r.status !== "completed" ? "opacity-50" : ""}`}>
+                  <div className={`h-1 w-full ${r.status === "confirmed" ? "bg-emerald-400" : r.status === "pending" ? "bg-yellow-400" : r.status === "completed" ? "bg-gray-400" : "bg-red-400"}`} />
+                  <div className="p-4 flex items-center gap-4">
+                    <div className="text-center shrink-0 w-14 bg-gray-50 rounded-xl py-2">
+                      <p className="text-[10px] text-gray-400 uppercase">{new Date(r.service_date * 1000).toLocaleDateString("es-CO", { month: "short" })}</p>
+                      <p className="text-2xl font-bold text-gray-800 leading-none">{new Date(r.service_date * 1000).getDate()}</p>
+                      <p className="text-[10px] text-gray-400">{new Date(r.service_date * 1000).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}</p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-semibold text-gray-800 truncate">{r.client_name}</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_COLOR[r.status]}`}>{STATUS_LABEL[r.status]}</span>
                       </div>
-                    )}
-                    {r.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{r.notes}</p>}
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className={`text-xs px-2 py-1 rounded-full border font-medium ${STATUS_COLOR[r.status]}`}>
-                      {STATUS_LABEL[r.status]}
-                    </span>
-                    <div className="flex gap-2 flex-wrap justify-end">
-                      <button onClick={() => { setEditing(r); setShowForm(true); }} className="text-xs text-blue-500 hover:text-blue-700">Editar</button>
-                      <a href={`/api/pdf/voucher/${r.id}`} target="_blank" rel="noopener" className="text-xs text-emerald-600 hover:text-emerald-800">PDF</a>
+                      {r.service_name && <p className="text-sm text-blue-600 truncate font-medium">🛍️ {r.service_name} · {r.people_count} pax</p>}
+                      {total > 0 && (
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-sm font-bold text-gray-800">{fmt(total)}</span>
+                          {paid > 0 && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Pagado: {fmt(paid)}</span>}
+                          {saldo > 0 && <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full font-bold">Saldo: {fmt(saldo)}</span>}
+                        </div>
+                      )}
+                      {r.reservation_code && <p className="text-[10px] text-gray-300 font-mono mt-0.5">{r.reservation_code}</p>}
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <button onClick={() => { setEditing(r); setShowForm(true); }} className="text-xs text-blue-500 hover:text-blue-700 font-medium">Editar</button>
+                      <a href={`/api/pdf/voucher/${r.id}`} target="_blank" rel="noopener" className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">PDF</a>
                       {saldo > 0 && <button onClick={() => setPaying(r)} className="text-xs text-orange-500 hover:text-orange-700 font-bold">+ Pago</button>}
                       <button onClick={() => deleteRes(r.id)} className="text-xs text-red-400 hover:text-red-600">Eliminar</button>
                     </div>

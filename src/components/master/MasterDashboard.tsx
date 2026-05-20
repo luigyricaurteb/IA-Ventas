@@ -158,7 +158,7 @@ function AITeamPanel() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agent, messages: newMessages }),
     });
-    const d = await res.json() as { reply?: string; error?: string };
+    const d = await res.json() as { reply?: string; error?: string; actionResult?: { ok: boolean; result: string } };
     setMessages([...newMessages, { role: "assistant", content: d.reply ?? d.error ?? "Error", agent }]);
     setLoading(false);
   }
@@ -254,9 +254,9 @@ function AITeamPanel() {
                 ))}
                 {agent === "assistant" && [
                   "¿Cuántas empresas activas tenemos?",
-                  "Resumen del estado de la plataforma",
-                  "¿Qué tickets están pendientes?",
-                  "¿Qué debería hacer hoy?"
+                  "Dame las stats de beachland",
+                  "Cierra el ticket #1",
+                  "Suspende la empresa test123"
                 ].map(s => (
                   <button key={s} onClick={() => setInput(s)}
                     className="text-xs text-gray-400 border border-gray-600 rounded-lg p-2 text-left hover:border-emerald-500 hover:text-gray-200 transition-colors">
@@ -394,6 +394,138 @@ function GatewayPanel() {
   );
 }
 
+// ── Panel de Métricas ─────────────────────────────────────────────────────────
+interface MetricsData {
+  summary: { total: number; active: number; suspended: number; trial: number; pending: number; newThisMonth: number; newLastMonth: number; churnThisMonth: number; openTickets: number; resolvedThisMonth: number };
+  mrr: { cop: number; usd: number; arr: number };
+  revenuePerPlan: { name: string; price_monthly: number; subscribers: number }[];
+  topCompanies: { name: string; slug: string; plan_name: string | null; price_monthly: number | null; payment_amount: number | null; ends_at: number | null }[];
+  companyActivity: { name: string; slug: string; conversations: number; messagesThisMonth: number }[];
+}
+
+function MetricsPanel() {
+  const [data, setData] = useState<MetricsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/master/metrics").then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center py-24 text-gray-400">Cargando métricas...</div>;
+  if (!data) return <div className="text-red-400 text-center py-12">Error cargando métricas</div>;
+
+  const { summary, mrr, revenuePerPlan, topCompanies, companyActivity } = data;
+  const churnRate = summary.active > 0 ? ((summary.churnThisMonth / summary.active) * 100).toFixed(1) : "0";
+  const growth = summary.newLastMonth > 0 ? (((summary.newThisMonth - summary.newLastMonth) / summary.newLastMonth) * 100).toFixed(0) : "—";
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div>
+        <h2 className="text-white font-bold text-lg">📊 Métricas del Negocio</h2>
+        <p className="text-gray-400 text-sm">Resumen ejecutivo de la plataforma Hivo</p>
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "MRR", value: `$${mrr.cop.toLocaleString("es-CO")}`, sub: "COP / mes", color: "text-emerald-400" },
+          { label: "ARR", value: `$${mrr.arr.toLocaleString("es-CO")}`, sub: "COP / año", color: "text-blue-400" },
+          { label: "Empresas activas", value: String(summary.active), sub: `${summary.newThisMonth} nuevas este mes`, color: "text-white" },
+          { label: "Churn mensual", value: `${churnRate}%`, sub: `${summary.churnThisMonth} bajas`, color: summary.churnThisMonth > 0 ? "text-red-400" : "text-emerald-400" },
+        ].map(k => (
+          <div key={k.label} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+            <p className="text-gray-400 text-xs font-medium">{k.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${k.color}`}>{k.value}</p>
+            <p className="text-gray-500 text-xs mt-0.5">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Secondary metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Total empresas", value: summary.total },
+          { label: "En prueba", value: summary.trial },
+          { label: "Suspendidas", value: summary.suspended },
+          { label: "Pendientes", value: summary.pending },
+          { label: "Tickets abiertos", value: summary.openTickets },
+          { label: "Resueltos este mes", value: summary.resolvedThisMonth },
+          { label: "Nuevas este mes", value: summary.newThisMonth },
+          { label: "Crecimiento", value: `${growth}%` },
+        ].map(m => (
+          <div key={m.label} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-3 flex items-center justify-between">
+            <p className="text-gray-400 text-xs">{m.label}</p>
+            <p className="text-white font-semibold text-sm">{m.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Revenue per plan */}
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+        <h3 className="text-white font-semibold mb-4">💼 Ingresos por plan</h3>
+        <div className="space-y-3">
+          {revenuePerPlan.map(p => {
+            const revenue = p.subscribers * p.price_monthly;
+            const pct = mrr.cop > 0 ? Math.round((revenue / mrr.cop) * 100) : 0;
+            return (
+              <div key={p.name} className="flex items-center gap-3">
+                <div className="w-28 shrink-0">
+                  <p className="text-white text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-gray-500 text-xs">{p.subscribers} empresa{p.subscribers !== 1 ? "s" : ""}</p>
+                </div>
+                <div className="flex-1 bg-gray-700 rounded-full h-2">
+                  <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-emerald-400 text-sm font-medium shrink-0">${revenue.toLocaleString("es-CO")}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Top companies + Activity */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+          <h3 className="text-white font-semibold mb-4">🏆 Top empresas por valor</h3>
+          <div className="space-y-2">
+            {topCompanies.slice(0, 8).map((c, i) => (
+              <div key={c.slug} className="flex items-center gap-3 py-1">
+                <span className="text-gray-500 text-xs w-4">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm truncate">{c.name}</p>
+                  <p className="text-gray-500 text-xs">{c.plan_name ?? "Sin plan"}</p>
+                </div>
+                <p className="text-emerald-400 text-xs shrink-0">
+                  ${(c.payment_amount ?? c.price_monthly ?? 0).toLocaleString("es-CO")}/mes
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+          <h3 className="text-white font-semibold mb-4">💬 Actividad este mes</h3>
+          <div className="space-y-2">
+            {companyActivity.map(c => (
+              <div key={c.slug} className="flex items-center gap-3 py-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm truncate">{c.name}</p>
+                  <p className="text-gray-500 text-xs">{c.conversations} conversaciones</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-400 text-sm font-medium">{c.messagesThisMonth}</p>
+                  <p className="text-gray-500 text-xs">mensajes</p>
+                </div>
+              </div>
+            ))}
+            {companyActivity.length === 0 && <p className="text-gray-500 text-sm text-center py-4">Sin datos de actividad</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <div className="flex items-center gap-2 cursor-pointer" onClick={() => onChange(!checked)}>
@@ -409,7 +541,7 @@ const EMPTY_PLAN = { name:"", description:"", price_monthly:120000, price_usd:0,
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function MasterDashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways"|"aiteam">("companies");
+  const [tab, setTab] = useState<"companies"|"plans"|"subscriptions"|"gateways"|"aiteam"|"metrics">("companies");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [plans, setPlans]         = useState<Plan[]>([]);
   const [subs, setSubs]           = useState<Subscription[]>([]);
@@ -585,10 +717,10 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
       </header>
 
       <div className="flex gap-1 bg-gray-800 px-6 border-b border-gray-700 shrink-0 overflow-x-auto">
-        {(["companies","plans","subscriptions","gateways","aiteam"] as const).map(id=>(
+        {(["companies","plans","subscriptions","gateways","metrics","aiteam"] as const).map(id=>(
           <button key={id} onClick={()=>{ setTab(id as typeof tab); setUsersCompanyId(null); }}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab===id?"border-emerald-500 text-emerald-400":"border-transparent text-gray-400 hover:text-gray-200"}`}>
-            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="gateways"?"🔗 Pasarelas":"🧠 Equipo IA"}
+            {id==="companies"?"🏢 Empresas":id==="plans"?"📋 Planes":id==="subscriptions"?"💳 Pagos":id==="gateways"?"🔗 Pasarelas":id==="metrics"?"📊 Métricas":"🧠 Equipo IA"}
           </button>
         ))}
       </div>
@@ -889,6 +1021,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         )}
 
         {tab==="gateways" && <GatewayPanel />}
+        {tab==="metrics"  && <MetricsPanel />}
         {tab==="aiteam"   && <AITeamPanel />}
       </div>
 

@@ -6,6 +6,7 @@ interface AutoPost {
   id: number; caption: string; hashtags: string | null; platform: string;
   status: string; image_filename: string | null; image_name: string | null;
   published_at: number | null; fb_post_id: string | null; ig_post_id: string | null;
+  fb_likes: number; ig_likes: number;
   error_msg: string | null; created_at: number;
 }
 interface AutoConfig {
@@ -325,7 +326,19 @@ export default function AutopilotModule() {
         {/* ── PUBLICADOS ── */}
         {tab === "published" && (
           <div className="space-y-3 max-w-3xl">
-            <h3 className="font-semibold text-gray-700">Historial de publicaciones ({posts.length})</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-700">Historial de publicaciones ({posts.length})</h3>
+              <button onClick={async () => {
+                setMsg(null);
+                try {
+                  const r = await fetch("/api/autopilot/analytics", { method: "POST" }).then(res => res.json()) as { ok: boolean; updated: number };
+                  showMsg(true, `Estadísticas actualizadas (${r.updated} posts)`);
+                  loadPosts("published");
+                } catch { showMsg(false, "Error actualizando estadísticas"); }
+              }} className="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50">
+                🔄 Actualizar stats
+              </button>
+            </div>
             {posts.map(p => (
               <PostCard key={p.id} post={p} images={images} onDelete={() => deletePost(p.id)} publishing={false} />
             ))}
@@ -333,6 +346,12 @@ export default function AutopilotModule() {
               <div className="text-center py-8 text-gray-400">
                 <p className="text-2xl mb-2">📊</p>
                 <p className="text-sm">Aún no hay publicaciones.</p>
+              </div>
+            )}
+            {posts.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <p className="text-orange-800 font-medium text-sm">🚀 Fase 3 — Impulsar con Meta Ads</p>
+                <p className="text-orange-700 text-xs mt-1">Para impulsar un post con presupuesto publicitario, usa el botón <strong>Impulsar</strong> en cada publicación. Te llevará directamente a Meta Ads Manager — tu empresa maneja el presupuesto directamente con Meta, Hivo no toca dinero.</p>
               </div>
             )}
           </div>
@@ -473,11 +492,29 @@ function PostCard({ post, images, onApprove, onPublish, onDelete, publishing }: 
               {publishing ? "Publicando..." : "🚀 Publicar ahora"}
             </button>
           )}
-          {post.fb_post_id && (
+            {post.fb_post_id && (
             <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">✓ FB</span>
           )}
           {post.ig_post_id && (
             <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg">✓ IG</span>
+          )}
+          {/* Likes */}
+          {post.status === "published" && (post.fb_likes > 0 || post.ig_likes > 0) && (
+            <span className="text-xs text-gray-500 px-1">
+              {post.fb_likes > 0 && `👍 ${post.fb_likes} FB`}
+              {post.fb_likes > 0 && post.ig_likes > 0 && " · "}
+              {post.ig_likes > 0 && `❤️ ${post.ig_likes} IG`}
+            </span>
+          )}
+          {/* Boost button — only for published posts with fb_post_id */}
+          {post.status === "published" && post.fb_post_id && (
+            <button onClick={() => {
+              const adsUrl = `https://www.facebook.com/ads/create?objective=POST_ENGAGEMENT&source_post_id=${post.fb_post_id}`;
+              window.open(adsUrl, "_blank", "noopener,noreferrer");
+            }}
+              className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-1 rounded-lg hover:bg-orange-100 font-medium">
+              🚀 Impulsar
+            </button>
           )}
           <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 ml-auto">
             Eliminar

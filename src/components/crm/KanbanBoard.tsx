@@ -61,13 +61,26 @@ function DealModal({ deal, onClose, onStageChange }: DealModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b">
+        <div className="p-6 border-b bg-gradient-to-r from-gray-50 to-white">
           <div className="flex justify-between items-start">
-            <div>
+            <div className="flex-1 min-w-0">
               <h2 className="font-bold text-gray-800 text-lg">{deal.contact_name ?? deal.contact_phone ?? "Sin nombre"}</h2>
-              <p className="text-sm text-gray-400">{deal.contact_email ?? ""}</p>
+              <div className="flex flex-wrap gap-3 mt-1">
+                {deal.contact_phone && (
+                  <a href={`https://wa.me/${deal.contact_phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                    className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    📱 {deal.contact_phone}
+                  </a>
+                )}
+                {deal.contact_email && (
+                  <a href={`mailto:${deal.contact_email}`}
+                    className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                    📧 {deal.contact_email}
+                  </a>
+                )}
+              </div>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none ml-2">×</button>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -174,22 +187,34 @@ export default function KanbanBoard() {
                     <div
                       key={deal.id}
                       onClick={() => setSelectedDeal(deal)}
-                      className="bg-white rounded-lg p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                      className="bg-white rounded-xl p-3 shadow-sm cursor-pointer hover:shadow-md transition-all border border-gray-100 hover:border-blue-200"
                     >
-                      <p className="font-medium text-gray-800 text-sm truncate">
-                        {deal.contact_name ?? deal.contact_phone ?? "Sin nombre"}
-                      </p>
-                      {deal.product_name && (
-                        <p className="text-xs text-gray-400 truncate mt-0.5">{deal.product_name}</p>
-                      )}
-                      {deal.total_value && (
-                        <p className="text-xs text-emerald-600 font-semibold mt-1">
-                          ${deal.total_value.toLocaleString("es-CO")}
+                      <div className="flex items-start justify-between gap-1 mb-1">
+                        <p className="font-semibold text-gray-800 text-sm truncate leading-snug">
+                          {deal.contact_name ?? deal.contact_phone ?? "Sin nombre"}
                         </p>
+                        {(deal.lead_score ?? 0) > 0 && (
+                          <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0 font-medium">
+                            {deal.lead_score}pts
+                          </span>
+                        )}
+                      </div>
+                      {deal.contact_email && (
+                        <p className="text-[11px] text-gray-400 truncate">📧 {deal.contact_email}</p>
+                      )}
+                      {deal.contact_phone && !deal.contact_name && (
+                        <p className="text-[11px] text-gray-400">📱 {deal.contact_phone}</p>
+                      )}
+                      {deal.product_name && (
+                        <p className="text-[11px] text-blue-600 truncate mt-1 font-medium">🛍️ {deal.product_name}</p>
                       )}
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-300">{timeInStage(deal.stage_changed_at)} en esta etapa</span>
-                        <span className="text-xs text-gray-300">{deal.contact_phone}</span>
+                        {deal.total_value ? (
+                          <span className="text-xs text-emerald-600 font-bold">${deal.total_value.toLocaleString("es-CO")}</span>
+                        ) : (
+                          <span className="text-[10px] text-gray-300">sin valor</span>
+                        )}
+                        <span className="text-[10px] text-gray-300">{timeInStage(deal.stage_changed_at)}</span>
                       </div>
                     </div>
                   ))}

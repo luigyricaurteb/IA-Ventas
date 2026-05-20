@@ -493,6 +493,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE reservations ADD COLUMN discount REAL NOT NULL DEFAULT 0",
     "ALTER TABLE reservations ADD COLUMN amount_paid REAL NOT NULL DEFAULT 0",
     "ALTER TABLE reservations ADD COLUMN reservation_date INTEGER",
+    // Contacts: phone number (copied from conversation on creation)
+    "ALTER TABLE contacts ADD COLUMN phone TEXT",
+    // Contacts: collect email/interest organically (tracking)
+    "ALTER TABLE contacts ADD COLUMN email_collected_at INTEGER",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)
