@@ -44,10 +44,6 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    // Si ya tiene sesión → ir al dashboard
-    fetch("/api/auth/me").then(r => {
-      if (r.ok) window.location.href = "/dashboard";
-    }).catch(() => {});
     fetch("/api/public/plans").then(r => r.json()).then(d => setPlans(d.plans ?? [])).catch(() => {});
     const onScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", onScroll);
@@ -253,7 +249,8 @@ export default function LandingPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {plans.filter(p => p.billing_cycle !== "permanent").map((plan, i) => {
-                const mods = JSON.parse(plan.modules || "{}");
+                let mods: Record<string, unknown> = {};
+                try { mods = JSON.parse(plan.modules || "{}"); } catch {}
                 const isPopular = i === 1;
                 const price = billing === "cop" ? plan.price_monthly : (plan.price_usd || Math.round(plan.price_monthly / 4200));
                 return (
