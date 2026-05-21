@@ -44,6 +44,10 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    // Si ya tiene sesión → ir al dashboard
+    fetch("/api/auth/me").then(r => {
+      if (r.ok) window.location.href = "/dashboard";
+    }).catch(() => {});
     fetch("/api/public/plans").then(r => r.json()).then(d => setPlans(d.plans ?? [])).catch(() => {});
     const onScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", onScroll);
