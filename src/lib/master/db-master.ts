@@ -149,6 +149,8 @@ for (const sql of [
     wompi_active INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL DEFAULT (unixepoch())
   )`,
+  // Modelo de costos: aivox_pays = Aivox absorbe costos variables, company_pays = empresa los paga
+  "ALTER TABLE companies ADD COLUMN cost_model TEXT NOT NULL DEFAULT 'aivox_pays'",
 ]) { try { masterDb.exec(sql); } catch {} }
 
 // Init gateway config row

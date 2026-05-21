@@ -14,16 +14,32 @@ function requireMaster(req: NextRequest) {
   return auth?.role === "master";
 }
 
+export async function GET(req: NextRequest, { params }: Ctx) {
+  if (!requireMaster(req)) return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
+  const { id } = await params;
+  const company = masterDb.prepare("SELECT * FROM companies WHERE id=?").get(Number(id));
+  if (!company) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  return NextResponse.json({ company });
+}
+
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!requireMaster(req)) return NextResponse.json({ error: "Sin acceso" }, { status: 403 });
   const { id } = await params;
   const body = await req.json() as Record<string, unknown>;
   // Filtrar solo campos válidos
-  const allowed = ["name","email","phone","plan_id","status","logo_filename"];
+  const allowed = ["name","email","phone","plan_id","status","logo_filename","cost_model"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
-  if (Object.keys(update).length) updateCompany(Number(id), update);
-  return NextResponse.json({ ok: true });
+  if (Object.keys(update).length) {
+    // cost_model se guarda directo en master DB
+    if (update.cost_model !== undefined) {
+      masterDb.prepare("UPDATE companies SET cost_model=?, updated_at=unixepoch() WHERE id=?").run(update.cost_model, Number(id));
+      delete update.cost_model;
+    }
+    if (Object.keys(update).length) updateCompany(Number(id), update);
+  }
+  const company = masterDb.prepare("SELECT * FROM companies WHERE id=?").get(Number(id));
+  return NextResponse.json({ ok: true, company });
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 
-interface Company { id: number; slug: string; name: string; nit: string | null; email: string | null; phone: string | null; address: string | null; logo_filename: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null }
+interface Company { id: number; slug: string; name: string; nit: string | null; email: string | null; phone: string | null; address: string | null; logo_filename: string | null; plan_name: string | null; plan_id: number | null; status: string; sub_status: string | null; sub_ends_at: number | null; cost_model: string | null }
 interface Plan { id: number; name: string; description: string | null; price_monthly: number; price_usd: number; billing_cycle: string; modules: string; max_users: number; max_wa_numbers: number; active: number }
 interface Subscription { id: number; company_id: number; plan_id: number; billing_cycle: string; status: string; payment_amount: number | null; payment_proof_file: string | null; notes: string | null; created_at: number }
 interface CompanyUser { id: number; username: string; name: string; permissions: string; is_admin: number; active: number }
@@ -91,6 +91,56 @@ function AudioTranscriptionPanel({ companyId, price }: { companyId: number | nul
           className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${enabled ? "bg-emerald-500" : "bg-gray-600"}`}>
           <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${enabled ? "translate-x-5" : ""}`} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Modelo de costos por empresa ─────────────────────────────────────────────
+function CostModelPanel({ companyId }: { companyId: number | null }) {
+  const [model, setModel] = useState<"aivox_pays"|"company_pays">("aivox_pays");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/master/companies/${companyId}`)
+      .then(r => r.json()).then(d => setModel(d.company?.cost_model ?? "aivox_pays")).catch(() => {});
+  }, [companyId]);
+
+  async function save() {
+    setSaving(true);
+    await fetch(`/api/master/companies/${companyId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cost_model: model }),
+    });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mt-4">
+      <div className="mb-3">
+        <p className="text-white font-medium">💰 Modelo de costos variables</p>
+        <p className="text-gray-400 text-xs mt-0.5">Define quién paga cuando la empresa supera los límites del plan (WhatsApp +1.000 conv, IA extra, etc.)</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button type="button" onClick={() => setModel("aivox_pays")}
+          className={`p-3 rounded-xl border text-left transition-colors ${model === "aivox_pays" ? "border-emerald-500 bg-emerald-900/30" : "border-gray-600 hover:border-gray-500"}`}>
+          <p className={`text-sm font-medium ${model === "aivox_pays" ? "text-emerald-400" : "text-gray-300"}`}>🟢 Aivox absorbe</p>
+          <p className="text-xs text-gray-500 mt-0.5">Recomendado en lanzamiento. Aivox paga el consumo extra.</p>
+        </button>
+        <button type="button" onClick={() => setModel("company_pays")}
+          className={`p-3 rounded-xl border text-left transition-colors ${model === "company_pays" ? "border-amber-500 bg-amber-900/30" : "border-gray-600 hover:border-gray-500"}`}>
+          <p className={`text-sm font-medium ${model === "company_pays" ? "text-amber-400" : "text-gray-300"}`}>🟡 Empresa paga</p>
+          <p className="text-xs text-gray-500 mt-0.5">La empresa paga su consumo real. Para clientes de alto volumen.</p>
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving}
+          className="bg-gray-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-500 disabled:opacity-50">
+          {saved ? "✓ Guardado" : saving ? "..." : "Guardar"}
+        </button>
+        {saved && <p className="text-xs text-emerald-400">Modelo actualizado</p>}
       </div>
     </div>
   );
@@ -942,6 +992,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
               <AutopilotTogglePanel companyId={usersCompanyId} />
               <AudioTranscriptionPanel companyId={usersCompanyId} />
               <AdminModePanel companyId={usersCompanyId} />
+              <CostModelPanel companyId={usersCompanyId} />
             </div>
           </div>
         )}
