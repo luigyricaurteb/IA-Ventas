@@ -39,7 +39,7 @@ export default function LoginPage() {
     });
 
     if (res.ok) {
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } else {
       const d = await res.json() as { error?: string };
