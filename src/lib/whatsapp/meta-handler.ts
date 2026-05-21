@@ -53,7 +53,11 @@ export async function handleMetaMessage(
       const waCfg = db.prepare("SELECT wa_access_token FROM whatsapp_config WHERE id=1").get() as { wa_access_token: string | null } | null;
       const metaToken = waCfg?.wa_access_token ?? "";
 
-      if (!isAudioTranscriptionEnabled()) {
+      // Verificar si la empresa tiene la extensión de audio activa
+      const audioCfg = db.prepare("SELECT audio_transcription_enabled FROM company_config WHERE id=1").get() as { audio_transcription_enabled: number } | null;
+      const audioEnabled = (audioCfg?.audio_transcription_enabled ?? 0) === 1;
+
+      if (!isAudioTranscriptionEnabled() || !audioEnabled) {
         // Sin WHISPER_API_KEY en Railway — pedir que escriban
         await sendText(db, phone, "🎤 Recibí tu mensaje de voz. Por favor escribe tu mensaje para poder ayudarte mejor. 😊");
         db.prepare("INSERT INTO messages (conversation_id, role, content, wa_message_id, created_at) VALUES (?,?,?,?,?)").run(conv.id, "user", "[Mensaje de voz]", msg.id, parseInt(msg.timestamp));

@@ -497,8 +497,8 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE contacts ADD COLUMN phone TEXT",
     // Contacts: collect email/interest organically (tracking)
     "ALTER TABLE contacts ADD COLUMN email_collected_at INTEGER",
-    // Audio transcription: Groq API key por empresa
-    "ALTER TABLE company_config ADD COLUMN groq_api_key TEXT",
+    // Audio transcription: extensión paga por empresa (activa desde master)
+    "ALTER TABLE company_config ADD COLUMN audio_transcription_enabled INTEGER NOT NULL DEFAULT 0",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)
