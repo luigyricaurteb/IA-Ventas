@@ -1,90 +1,154 @@
 /**
- * Transcripción de audio con OpenAI Whisper — nivel plataforma
- * Una sola clave en Railway (WHISPER_API_KEY o OPENAI_API_KEY)
- * Aivox incluye el costo en el plan — las empresas no necesitan configurar nada
+ * Transcripción de audio 100% autónoma — sin APIs externas
+ * Usa OpenAI Whisper corriendo LOCALMENTE en nuestro servidor Railway
+ * El modelo se descarga una vez desde HuggingFace (open-source, gratis)
+ * y queda cacheado en DATA_DIR. Sin costos adicionales.
  */
 
-import type Database from "better-sqlite3";
+import path from "node:path";
+import fs from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
-const WHISPER_ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
+const execFileAsync = promisify(execFile);
 
-function getWhisperKey(): string | null {
-  return process.env.WHISPER_API_KEY ?? process.env.OPENAI_API_KEY ?? null;
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
+const AUDIO_TMP = path.join(DATA_DIR, "audio_tmp");
+
+// Caché del pipeline de Whisper (se inicializa una vez)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let whisperPipeline: any = null;
+let initializingWhisper = false;
+let whisperReady = false;
+
+async function getWhisperPipeline() {
+  if (whisperPipeline) return whisperPipeline;
+  if (initializingWhisper) {
+    // Esperar a que termine la inicialización
+    await new Promise(r => setTimeout(r, 5000));
+    return whisperPipeline;
+  }
+
+  initializingWhisper = true;
+  try {
+    console.log("[audio] Cargando modelo Whisper local (primera vez ~250MB)...");
+    const { pipeline, env } = await import("@xenova/transformers");
+
+    // Guardar modelo en DATA_DIR para que persista entre deploys
+    env.cacheDir = path.join(DATA_DIR, "models");
+    env.allowLocalModels = true;
+
+    whisperPipeline = await pipeline(
+      "automatic-speech-recognition",
+      "Xenova/whisper-small",  // Buen español, 250MB, corre en CPU
+      { quantized: true }       // Versión cuantizada: más rápida y liviana
+    );
+
+    whisperReady = true;
+    console.log("[audio] ✅ Modelo Whisper listo");
+    return whisperPipeline;
+  } catch (e) {
+    console.error("[audio] Error cargando Whisper:", (e as Error).message);
+    initializingWhisper = false;
+    return null;
+  }
 }
 
 export function isAudioTranscriptionEnabled(): boolean {
-  return !!getWhisperKey();
+  return true; // Siempre activo — corre localmente
 }
 
 /**
- * Descarga el audio de Meta y lo transcribe con OpenAI Whisper
- * @returns texto transcrito o null si falla
+ * Convierte OGG/Opus a WAV usando ffmpeg (disponible en Railway)
+ * Si ffmpeg no está disponible, retorna el buffer original
+ */
+async function convertToWav(inputPath: string, outputPath: string): Promise<boolean> {
+  try {
+    await execFileAsync("ffmpeg", [
+      "-i", inputPath,
+      "-ar", "16000",   // 16kHz requerido por Whisper
+      "-ac", "1",        // mono
+      "-f", "wav",
+      "-y", outputPath,
+    ]);
+    return true;
+  } catch {
+    // ffmpeg no disponible — intentar con el archivo original
+    return false;
+  }
+}
+
+/**
+ * Descarga audio de Meta y lo transcribe con Whisper local
  */
 export async function transcribeMetaAudio(
   mediaId: string,
   metaToken: string,
 ): Promise<string | null> {
-  const apiKey = getWhisperKey();
-  if (!apiKey) {
-    console.warn("[audio] Sin WHISPER_API_KEY configurada en Railway");
-    return null;
+  if (!fs.existsSync(AUDIO_TMP)) {
+    fs.mkdirSync(AUDIO_TMP, { recursive: true });
   }
 
+  const tmpOgg = path.join(AUDIO_TMP, `${mediaId}.ogg`);
+  const tmpWav = path.join(AUDIO_TMP, `${mediaId}.wav`);
+
   try {
-    // 1. Obtener URL de descarga desde Meta Graph API
+    // 1. Obtener URL de descarga desde Meta
     const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${metaToken}` },
       signal: AbortSignal.timeout(10000),
     });
-    if (!metaRes.ok) {
-      console.error("[audio] Error obteniendo URL de media:", metaRes.status);
-      return null;
-    }
-    const metaData = await metaRes.json() as { url?: string; error?: unknown };
-    if (!metaData.url) {
-      console.error("[audio] URL de media no encontrada");
-      return null;
-    }
+    if (!metaRes.ok) { console.error("[audio] Error Meta URL:", metaRes.status); return null; }
 
-    // 2. Descargar el archivo de audio
+    const metaData = await metaRes.json() as { url?: string };
+    if (!metaData.url) { console.error("[audio] Sin URL de media"); return null; }
+
+    // 2. Descargar el audio
     const audioRes = await fetch(metaData.url, {
       headers: { Authorization: `Bearer ${metaToken}` },
       signal: AbortSignal.timeout(30000),
     });
-    if (!audioRes.ok) {
-      console.error("[audio] Error descargando audio:", audioRes.status);
-      return null;
-    }
-    const audioBuffer = await audioRes.arrayBuffer();
+    if (!audioRes.ok) { console.error("[audio] Error descarga:", audioRes.status); return null; }
 
-    // 3. Enviar a OpenAI Whisper para transcripción
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: "audio/ogg" });
-    formData.append("file", audioBlob, "audio.ogg");
-    formData.append("model", "whisper-1");
-    formData.append("language", "es");
-    formData.append("response_format", "text");
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    fs.writeFileSync(tmpOgg, audioBuffer);
 
-    const whisperRes = await fetch(WHISPER_ENDPOINT, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: formData,
-      signal: AbortSignal.timeout(60000),
+    // 3. Convertir a WAV con ffmpeg
+    const converted = await convertToWav(tmpOgg, tmpWav);
+    const audioPath = converted ? tmpWav : tmpOgg;
+
+    // 4. Transcribir con Whisper local
+    const pipe = await getWhisperPipeline();
+    if (!pipe) { console.error("[audio] Whisper no disponible"); return null; }
+
+    console.log(`[audio] Transcribiendo ${mediaId}...`);
+    const result = await pipe(audioPath, {
+      language: "spanish",
+      task: "transcribe",
+      chunk_length_s: 30,
     });
 
-    if (!whisperRes.ok) {
-      const err = await whisperRes.text();
-      console.error("[audio] Error Whisper:", whisperRes.status, err);
-      return null;
-    }
-
-    const transcription = await whisperRes.text();
-    return transcription.trim() || null;
+    const transcription = result?.text?.trim() ?? null;
+    console.log(`[audio] ✅ Transcripción: "${transcription?.slice(0, 80)}"`);
+    return transcription;
 
   } catch (e) {
-    console.error("[audio] Error en transcripción:", (e as Error).message);
+    console.error("[audio] Error transcripción:", (e as Error).message);
     return null;
+  } finally {
+    // Limpiar archivos temporales
+    try { if (fs.existsSync(tmpOgg)) fs.unlinkSync(tmpOgg); } catch {}
+    try { if (fs.existsSync(tmpWav)) fs.unlinkSync(tmpWav); } catch {}
   }
+}
+
+/**
+ * Precalentar el modelo Whisper al arrancar el bot
+ * (evita demora en el primer audio)
+ */
+export async function warmupWhisper(): Promise<void> {
+  if (whisperReady || initializingWhisper) return;
+  getWhisperPipeline().catch(() => {});
 }
 
 /**

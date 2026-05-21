@@ -216,6 +216,14 @@ async function main() {
   setTimeout(runAutopilotScheduler, 30000); // 30s after start
   setInterval(runAutopilotScheduler, 3600_000); // Every hour
 
+  // Precalentar modelo Whisper local (transcripción de audios sin API externa)
+  setTimeout(async () => {
+    try {
+      const { warmupWhisper } = await import("../src/lib/audio/transcribe");
+      await warmupWhisper();
+    } catch {}
+  }, 60_000); // 1 minuto después del arranque
+
   console.log("[bot] Sistema iniciado. Esperando mensajes...");
 }
 
