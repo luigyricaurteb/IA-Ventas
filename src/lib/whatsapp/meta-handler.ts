@@ -7,6 +7,7 @@ import type { MetaMessage } from "./meta-api";
 import { sendText, markAsRead, extractText } from "./meta-api";
 import { processBotMessage } from "../bot/state-machine";
 import { sendAlert } from "../email";
+import { getGroqApiKey, transcribeMetaAudio, buildConfirmationMessage } from "../audio/transcribe";
 
 const HUMAN_RESUME_SECS = 5 * 60;
 
@@ -45,6 +46,53 @@ export async function handleMetaMessage(
     }
 
     if (!conv) return;
+
+    // ── Manejo de mensajes de audio/voz ──────────────────────────────────
+    if (msg.type === "audio" || (msg.type as string) === "voice") {
+      const mediaId = msg.audio?.id ?? (msg as unknown as { voice?: { id: string } }).voice?.id;
+      const groqKey = getGroqApiKey(db);
+      const waCfg = db.prepare("SELECT wa_access_token FROM whatsapp_config WHERE id=1").get() as { wa_access_token: string | null } | null;
+      const metaToken = waCfg?.wa_access_token ?? "";
+
+      if (!groqKey) {
+        // Sin API key configurada — pedir que escriban
+        await sendText(db, phone, "🎤 Recibí tu mensaje de voz, pero aún no tengo configurada la transcripción de audio. Por favor escribe tu mensaje. 😊");
+        db.prepare("INSERT INTO messages (conversation_id, role, content, wa_message_id, created_at) VALUES (?,?,?,?,?)").run(conv.id, "user", "[Mensaje de voz — sin transcripción configurada]", msg.id, parseInt(msg.timestamp));
+        db.prepare("UPDATE conversations SET last_message_at=? WHERE id=?").run(now, conv.id);
+        return;
+      }
+
+      if (!metaToken) {
+        console.error(`[meta:${slug}] Sin token Meta para descargar audio`);
+        return;
+      }
+
+      console.log(`[meta:${slug}] 🎤 Transcribiendo audio de ${phone}...`);
+      await sendText(db, phone, "🎤 Escuché tu mensaje de voz, déjame procesarlo...");
+
+      const transcription = await transcribeMetaAudio(mediaId ?? "", metaToken, groqKey);
+
+      if (!transcription) {
+        await sendText(db, phone, "Lo siento, no pude entender el audio. ¿Puedes escribir tu mensaje? 😊");
+        db.prepare("INSERT INTO messages (conversation_id, role, content, wa_message_id, created_at) VALUES (?,?,?,?,?)").run(conv.id, "user", "[Audio no transcrito]", msg.id, parseInt(msg.timestamp));
+        db.prepare("UPDATE conversations SET last_message_at=? WHERE id=?").run(now, conv.id);
+        return;
+      }
+
+      // Guardar transcripción como mensaje del usuario
+      db.prepare("INSERT INTO messages (conversation_id, role, content, wa_message_id, created_at) VALUES (?,?,?,?,?)").run(conv.id, "user", `[Audio]: ${transcription}`, msg.id, parseInt(msg.timestamp));
+      db.prepare("UPDATE conversations SET last_message_at=? WHERE id=?").run(now, conv.id);
+
+      // Guardar en estado para confirmación
+      const { setState } = await import("../bot/state-machine");
+      setState(db, conv.id, "CONFIRMING_AUDIO" as Parameters<typeof setState>[2], { transcription, originalMediaId: mediaId });
+
+      const aiName = (db.prepare("SELECT ai_name FROM company_config WHERE id=1").get() as { ai_name: string | null } | null)?.ai_name ?? "Julieta";
+      const confirmMsg = buildConfirmationMessage(transcription, aiName);
+      await sendText(db, phone, confirmMsg);
+      db.prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?,?,?)").run(conv.id, "assistant", confirmMsg);
+      return;
+    }
 
     // Extraer texto / contenido del mensaje
     const text = extractText(msg);

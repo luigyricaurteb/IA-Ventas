@@ -71,6 +71,10 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   const [driveMsg, setDriveMsg] = useState<string | null>(null);
   const [sheetsConfig, setSheetsConfig] = useState<{ sheets_url: string; sheets_enabled: boolean; sheets_last_sync: number | null; service_account_email: string }>({ sheets_url: "", sheets_enabled: false, sheets_last_sync: null, service_account_email: "" });
   const [showAutoLearnings, setShowAutoLearnings] = useState(false);
+  const [groqApiKey, setGroqApiKey] = useState("");
+  const [groqSaving, setGroqSaving] = useState(false);
+  const [groqSaved, setGroqSaved] = useState(false);
+  const [groqHasKey, setGroqHasKey] = useState(false);
   const [sheetsSaving, setSheetsSaving] = useState(false);
   const [sheetsTesting, setSheetsTesting] = useState(false);
   const [sheetsSyncing, setSheetsSyncing] = useState(false);
@@ -141,7 +145,7 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
   }
 
   useEffect(() => {
-    fetch("/api/settings/company").then((r) => r.json()).then((d) => setCompany(d.config));
+    fetch("/api/settings/company").then((r) => r.json()).then((d) => { setCompany(d.config); setGroqHasKey(!!d.config?.groq_api_key); });
     fetch("/api/settings/banks").then((r) => r.json()).then((d) => setBanks(d.banks));
     fetch("/api/settings/smtp").then((r) => r.json()).then((d) => setSmtp(d.config));
     fetch("/api/settings/learnings").then((r) => r.json()).then((d) => setLearnings(d.learnings));
@@ -655,6 +659,49 @@ export default function SettingsModule({ currentUser }: { currentUser?: { role?:
             </div>
             <button onClick={saveCompany} disabled={saving} className="bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
               {saved ? "✓ Guardado" : saving ? "Guardando..." : `Guardar configuración de ${aiName}`}
+            </button>
+          </div>
+
+          {/* Transcripción de audio con Groq Whisper */}
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">🎤</span>
+              <div>
+                <h2 className="font-semibold text-orange-800">Transcripción de audios de WhatsApp</h2>
+                <p className="text-xs text-orange-600 mt-0.5">Julieta entiende mensajes de voz, los transcribe y confirma con el cliente antes de procesar</p>
+              </div>
+            </div>
+            {groqHasKey && (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                <span>✅</span> API Key configurada — la transcripción de audio está activa
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Groq API Key</label>
+              <p className="text-xs text-gray-400 mb-1">Obtén tu clave gratis en <strong>groq.com</strong> → API Keys → Create API Key. Cada empresa usa su propia clave.</p>
+              <input
+                type="password"
+                value={groqApiKey}
+                onChange={e => setGroqApiKey(e.target.value)}
+                placeholder={groqHasKey ? "••••••••••••••••• (ya configurada)" : "gsk_..."}
+                className="w-full border rounded-lg px-3 py-2 mt-1 text-sm font-mono"
+              />
+            </div>
+            <div className="bg-white border border-orange-100 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+              <p className="font-semibold text-gray-700">¿Cómo funciona?</p>
+              <p>1. Cliente envía audio por WhatsApp</p>
+              <p>2. Julieta transcribe el audio con Groq Whisper (gratis, muy rápido)</p>
+              <p>3. Julieta le dice al cliente lo que entendió y pide confirmación</p>
+              <p>4. Cliente confirma → Julieta procesa como texto normal</p>
+            </div>
+            <button onClick={async () => {
+              if (!groqApiKey.trim()) return;
+              setGroqSaving(true);
+              await fetch("/api/settings/company", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groq_api_key: groqApiKey }) });
+              setGroqSaving(false); setGroqSaved(true); setGroqHasKey(true); setGroqApiKey("");
+              setTimeout(() => setGroqSaved(false), 2000);
+            }} disabled={groqSaving || !groqApiKey.trim()} className="bg-orange-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50">
+              {groqSaved ? "✓ Guardado" : groqSaving ? "Guardando..." : "Guardar API Key"}
             </button>
           </div>
 

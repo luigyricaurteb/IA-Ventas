@@ -29,7 +29,8 @@ type BotState =
   | "INIT" | "CONSENT_PENDING" | "CONSENT_REJECTED"
   | "COLLECTING_CONTACT"
   | "ACTIVE" | "COLLECTING_PEOPLE"
-  | "QUOTE_SENT" | "AWAITING_PAYMENT" | "CONFIRMING_PAYMENT" | "DONE";
+  | "QUOTE_SENT" | "AWAITING_PAYMENT" | "CONFIRMING_PAYMENT" | "DONE"
+  | "CONFIRMING_AUDIO";
 
 const YES_KW    = ["si","sí","acepto","ok","yes","claro","dale","de acuerdo","correcto","adelante","afirmativo","exacto","confirmado","así es","eso es"];
 const NO_KW     = ["no","rechazo","no acepto","nope","negativo","para nada","en absoluto"];
@@ -58,7 +59,7 @@ function getBotState(db: Database.Database, convId: number) {
     .get(convId) as { state: string; data: string; selected_product_id: number | null; opted_out: number } | null;
 }
 
-function setState(
+export function setState(
   db: Database.Database, convId: number, state: BotState,
   data: Record<string, unknown> = {}, productId: number | null = null
 ) {
@@ -276,6 +277,29 @@ export async function processBotMessage(
   const stateData: Record<string, unknown> = (() => {
     try { return bs?.data ? JSON.parse(bs.data) : {}; } catch { return {}; }
   })();
+
+  // ── CONFIRMING_AUDIO — confirmación de transcripción de voz ──────────
+  if (currentState === "CONFIRMING_AUDIO") {
+    const transcription = (stateData.transcription as string) ?? "";
+    if (isYes(text)) {
+      // Cliente confirmó — procesar la transcripción como texto normal
+      setState(db, conversationId, "ACTIVE");
+      const reply = await aiReply(db, sock, jid, phone, conversationId, transcription, history, slug, companyName, aiName);
+      await send(db, sock, jid, phone, conversationId, reply);
+      autoLearn(db, conversationId).catch(() => {});
+    } else if (isNo(text)) {
+      setState(db, conversationId, "ACTIVE");
+      await send(db, sock, jid, phone, conversationId,
+        `Entendido, no fue lo que dijiste. Por favor escribe tu mensaje o envía otro audio. 😊`
+      );
+    } else {
+      // Respuesta ambigua — pedir confirmación de nuevo
+      await send(db, sock, jid, phone, conversationId,
+        `Por favor responde *Sí* si entendí bien tu mensaje, o *No* si quieres repetirlo.`
+      );
+    }
+    return;
+  }
 
   // ── Detección global de cancelación ──────────────────────────────────
   const FLOW_STATES: BotState[] = ["COLLECTING_PEOPLE","QUOTE_SENT","AWAITING_PAYMENT","CONFIRMING_PAYMENT"];
