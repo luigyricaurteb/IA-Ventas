@@ -105,9 +105,13 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section className="relative min-h-screen flex items-center overflow-hidden" style={{ background: "linear-gradient(135deg,#0a0818 0%,#1e1b4b 50%,#0c2a4a 100%)" }}>
         <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
+          {[
+            {w:180,h:180,l:10,t:20,d:0},{w:80,h:80,l:85,t:10,d:1},{w:220,h:220,l:70,t:60,d:0.5},
+            {w:100,h:100,l:20,t:75,d:1.5},{w:150,h:150,l:50,t:40,d:0.3},{w:60,h:60,l:5,t:50,d:2},
+            {w:200,h:200,l:40,t:80,d:0.8},{w:90,h:90,l:90,t:40,d:1.2},{w:120,h:120,l:30,t:5,d:0.2},
+          ].map((c, i) => (
             <div key={i} className="absolute rounded-full opacity-10 animate-pulse"
-              style={{ width: Math.random()*200+50, height: Math.random()*200+50, left: `${Math.random()*100}%`, top: `${Math.random()*100}%`, background: "#0077b6", animationDelay: `${Math.random()*3}s` }} />
+              style={{ width: c.w, height: c.h, left: `${c.l}%`, top: `${c.t}%`, background: "#0077b6", animationDelay: `${c.d}s` }} />
           ))}
         </div>
         <div className="relative max-w-6xl mx-auto px-6 py-32 text-center">
