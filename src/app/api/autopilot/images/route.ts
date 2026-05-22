@@ -20,13 +20,24 @@ export async function POST(req: NextRequest) {
   if (!ctx) return unauthorized();
   const { db } = ctx;
 
+  const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const formData = await req.formData();
   const file = formData.get("image") as File | null;
   if (!file) return NextResponse.json({ error: "No se envió imagen" }, { status: 400 });
 
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    return NextResponse.json({ error: "Tipo de archivo no permitido. Usa JPG, PNG o WebP." }, { status: 400 });
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return NextResponse.json({ error: "La imagen no debe superar 10 MB." }, { status: 400 });
+  }
+
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+  const ext = extMap[file.type] ?? "jpg";
   const filename = `ap_${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
   const uploadDir = path.join(DATA_DIR, "uploads", "autopilot");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });

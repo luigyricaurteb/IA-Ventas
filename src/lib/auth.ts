@@ -3,9 +3,18 @@ import { getMasterUser, checkRateLimit, recordLoginAttempt } from "./master/db-m
 import { getCompanyDb } from "./master/db-company";
 import { getCompanyBySlug } from "./master/db-master";
 
+const INSECURE_JWT_SECRETS = new Set([
+  "agente-dmc-secret-2026-changeme", "", undefined,
+]);
+if (process.env.NODE_ENV === "production" && INSECURE_JWT_SECRETS.has(process.env.JWT_SECRET)) {
+  throw new Error("CRÍTICO: JWT_SECRET debe ser un valor aleatorio seguro en producción. Configúralo en Railway → Variables.");
+}
+if (process.env.NODE_ENV === "production" && (!process.env.MASTER_PASSWORD || process.env.MASTER_PASSWORD === "master123")) {
+  throw new Error("CRÍTICO: MASTER_PASSWORD debe configurarse en Railway → Variables antes de iniciar en producción.");
+}
+
 const JWT_SECRET     = process.env.JWT_SECRET     || "agente-dmc-secret-2026-changeme";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || "admin123";
-const ADMIN_SALT     = process.env.ADMIN_SALT      || "agente-dmc-fixed-salt-2026";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || crypto.randomBytes(24).toString("hex");
 const MASTER_PASS    = process.env.MASTER_PASSWORD || "master123";
 const MASTER_SALT_V  = process.env.MASTER_SALT     || "master-fixed-salt-2026";
 
@@ -154,14 +163,12 @@ function getPlanModules(planId: number | null): Record<string, boolean> {
 function ensureCompanyAdmin(db: import("better-sqlite3").Database): void {
   const count = (db.prepare("SELECT COUNT(*) as c FROM users WHERE is_admin=1").get() as { c: number }).c;
   if (count === 0) {
-    const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
+    // Use random salt so each company's admin hash is unique
+    const { hash, salt } = hashPassword(ADMIN_PASSWORD);
     db.prepare("INSERT OR IGNORE INTO users (username, name, password_hash, salt, permissions, is_admin) VALUES ('admin', 'Administrador', ?, ?, ?, 1)")
       .run(hash, salt, JSON.stringify({ chat:true,crm:true,calendar:true,products:true,campaigns:true,documents:true,analytics:true,suppliers:true,accounting:true,settings:true }));
-  } else {
-    // Actualizar hash si cambió ADMIN_PASSWORD
-    const { hash, salt } = hashPassword(ADMIN_PASSWORD, ADMIN_SALT);
-    db.prepare("UPDATE users SET password_hash=?, salt=? WHERE username='admin'").run(hash, salt);
   }
+  // Never overwrite existing admin passwords — admins manage their own credentials
 }
 
 // ── Verificar token y obtener usuario ─────────────────────────────────────
