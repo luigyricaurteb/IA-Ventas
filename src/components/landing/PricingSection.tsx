@@ -52,12 +52,12 @@ export default function PricingSection({ plans, moduleList }: { plans: Plan[]; m
             let mods: Record<string, unknown> = {};
             try { mods = JSON.parse(plan.modules || "{}"); } catch {}
             const isPopular = i === 1;
-            const price = billing === "cop"
-              ? plan.price_monthly
-              : (plan.price_usd > 0 ? plan.price_usd : Math.round(plan.price_monthly / 4200));
+            const priceCOP = plan.price_monthly;
+            const priceUSD = plan.price_usd;
+            const price = billing === "cop" ? priceCOP : priceUSD;
             const priceStr = billing === "cop"
-              ? `$${price.toLocaleString("es-CO")}`
-              : `$${price}`;
+              ? `$${priceCOP.toLocaleString("es-CO")}`
+              : priceUSD > 0 ? `$${priceUSD}` : "—";
 
             return (
               <div key={plan.id} className={`plan-card ${isPopular ? "popular" : ""}`}>
@@ -66,7 +66,12 @@ export default function PricingSection({ plans, moduleList }: { plans: Plan[]; m
                 <div className="plan-desc">{plan.description ?? "Perfecto para tu negocio"}</div>
                 <div>
                   <span className="plan-price">{priceStr}</span>
-                  <span className="plan-cycle"> /{billing === "cop" ? "mes" : "mo"}</span>
+                  {(billing === "cop" || priceUSD > 0) && (
+                    <span className="plan-cycle"> /{billing === "cop" ? "mes" : "mo"}</span>
+                  )}
+                  {billing === "usd" && priceUSD === 0 && (
+                    <span className="plan-cycle" style={{fontSize:".85rem"}}> Consultar</span>
+                  )}
                 </div>
                 <div className="plan-features">
                   {Object.entries(mods).filter(([, v]) => v).map(([k]) => (
