@@ -48,10 +48,11 @@ export async function middleware(request: NextRequest) {
   const isAutopilotImg = pathname.startsWith("/api/uploads/autopilot");
   const isResetPage    = pathname.startsWith("/reset-password");
   const isRegisterPage = pathname.startsWith("/register");
+  const isPaymentApi   = pathname.startsWith("/api/public/payment");
 
   // Always allow public paths (no token needed)
   if (isPublicAsset || isAuthApi || isPublicApi || isWebhook || isPublicPdf
-      || isResetPage || isRegisterPage || isAutopilotImg || isLandingPage) {
+      || isResetPage || isRegisterPage || isAutopilotImg || isLandingPage || isPaymentApi) {
     return NextResponse.next();
   }
 

@@ -151,6 +151,9 @@ for (const sql of [
   )`,
   // Modelo de costos: aivox_pays = Aivox absorbe costos variables, company_pays = empresa los paga
   "ALTER TABLE companies ADD COLUMN cost_model TEXT NOT NULL DEFAULT 'aivox_pays'",
+  // Pago en línea: método y referencia de transacción (Wompi)
+  "ALTER TABLE subscriptions ADD COLUMN payment_method TEXT NOT NULL DEFAULT 'transfer'",
+  "ALTER TABLE subscriptions ADD COLUMN payment_reference TEXT",
 ]) { try { masterDb.exec(sql); } catch {} }
 
 // Init gateway config row
