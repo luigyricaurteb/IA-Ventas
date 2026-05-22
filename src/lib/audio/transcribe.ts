@@ -24,24 +24,28 @@ let whisperReady = false;
 async function getWhisperPipeline() {
   if (whisperPipeline) return whisperPipeline;
   if (initializingWhisper) {
-    // Esperar a que termine la inicialización
-    await new Promise(r => setTimeout(r, 5000));
+    // Esperar hasta 30s a que termine la inicialización
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      if (whisperPipeline || !initializingWhisper) break;
+    }
     return whisperPipeline;
   }
 
   initializingWhisper = true;
   try {
-    console.log("[audio] Cargando modelo Whisper local (primera vez ~250MB)...");
+    console.log("[audio] Cargando modelo Whisper local (primera vez ~150MB)...");
     const { pipeline, env } = await import("@xenova/transformers");
 
     // Guardar modelo en DATA_DIR para que persista entre deploys
     env.cacheDir = path.join(DATA_DIR, "models");
     env.allowLocalModels = true;
 
+    // Usar whisper-tiny para menor uso de RAM en Railway (~75MB vs 250MB)
     whisperPipeline = await pipeline(
       "automatic-speech-recognition",
-      "Xenova/whisper-small",  // Buen español, 250MB, corre en CPU
-      { quantized: true }       // Versión cuantizada: más rápida y liviana
+      "Xenova/whisper-tiny",
+      { quantized: true }
     );
 
     whisperReady = true;
