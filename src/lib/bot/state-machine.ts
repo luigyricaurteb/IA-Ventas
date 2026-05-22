@@ -165,7 +165,20 @@ function detectProduct(text: string, products: { id: number; name: string; price
   return products.find(p => lower.includes(p.name.toLowerCase().substring(0, 6))) ?? null;
 }
 
-// Detecta si el cliente quiere VER el catálogo completo
+// Detecta si el cliente pide fotos/imágenes específicamente
+function wantsPhotos(text: string): boolean {
+  const lower = text.toLowerCase();
+  return [
+    "tienes foto","tienen foto","tienes imagen","manda foto","manda imagen",
+    "puedes enviar foto","puedo ver foto","ver imagen","ver foto",
+    "fotos del lugar","fotos del servicio","foto del","imágenes del",
+    "envíame foto","envíame imagen","quiero ver foto","quiero ver imagen",
+    "muestrame foto","muéstrame foto","comparte foto","comparte imagen",
+    "send photo","send image","show photo","have photos","see photos",
+  ].some(kw => lower.includes(kw));
+}
+
+// Detecta si el cliente quiere VER el catálogo completo (sin fotos — eso lo maneja wantsPhotos)
 function wantsCatalog(text: string): boolean {
   const lower = text.toLowerCase();
   const keywords = [
@@ -182,10 +195,6 @@ function wantsCatalog(text: string): boolean {
     "pasadía","pasadia","tour","excursión","excursion","actividades",
     "cuánto cobran","cuánto cobras","cuánto sale","cuanto sale",
     "hay disponible","tienen disponible","qué incluye","qué tiene",
-    // Fotos / imágenes
-    "tienes foto","tienen foto","tienes imagen","manda foto","manda imagen",
-    "puedes enviar foto","puedo ver foto","ver imagen","ver foto",
-    "fotos del lugar","fotos del servicio","imágenes","foto del",
   ];
   return keywords.some(kw => lower.includes(kw));
 }
@@ -308,6 +317,34 @@ export async function processBotMessage(
     const reply = await aiReply(db, sock, jid, phone, conversationId, text, history, slug, companyName, aiName);
     await send(db, sock, jid, phone, conversationId, reply);
     autoLearn(db, conversationId).catch(() => {});
+    return;
+  }
+
+  // ── Interceptor universal de FOTOS — funciona en CUALQUIER estado ──────
+  // Evita que la IA invente links o álbumes externos que no existen
+  const NON_PHOTO_STATES: BotState[] = ["INIT","CONSENT_PENDING","CONSENT_REJECTED","CONFIRMING_AUDIO"];
+  if (!NON_PHOTO_STATES.includes(currentState) && wantsPhotos(text)) {
+    const products = db.prepare("SELECT id, name FROM products WHERE active=1 ORDER BY id ASC").all() as { id: number; name: string }[];
+    if (products.length > 0) {
+      // Priorizar el producto ya seleccionado en el flujo actual
+      const selectedId = bs?.selected_product_id ?? products[0].id;
+      const targetProduct = products.find(p => p.id === selectedId) ?? products[0];
+      const hasImg = db.prepare("SELECT id FROM product_images WHERE product_id=? LIMIT 1").get(targetProduct.id);
+      if (hasImg) {
+        await sendProductImages(db, sock, jid, phone, conversationId, targetProduct.id, `📸 *${targetProduct.name}*`);
+        await send(db, sock, jid, phone, conversationId,
+          `¡Aquí tienes! ¿Tienes alguna pregunta sobre el servicio o quieres hacer una reserva? 😊`
+        );
+      } else {
+        await send(db, sock, jid, phone, conversationId,
+          `¡Con gusto! Un asesor te enviará las fotos del lugar directamente por aquí 📸\n\n¿Mientras tanto tienes alguna pregunta sobre el servicio?`
+        );
+      }
+    } else {
+      await send(db, sock, jid, phone, conversationId,
+        `En un momento un asesor te comparte imágenes del lugar 📸 ¿Puedo ayudarte con algo más?`
+      );
+    }
     return;
   }
 

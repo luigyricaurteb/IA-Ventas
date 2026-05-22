@@ -169,12 +169,18 @@ if (planCount === 0) {
   `).run();
 }
 
-// Usuario master por defecto
+// Usuario master — sincroniza contraseña desde env var en cada arranque
+// El master es un usuario de infraestructura controlado vía Railway Variables
 {
   const MASTER_PASS = process.env.MASTER_PASSWORD || "master123";
   const MASTER_SALT_ENV = process.env.MASTER_SALT || "master-fixed-salt-2026";
   const hash = crypto.pbkdf2Sync(MASTER_PASS, MASTER_SALT_ENV, 100000, 64, "sha512").toString("hex");
-  masterDb.prepare("INSERT OR IGNORE INTO master_users (username, name, password_hash, salt) VALUES ('master', 'Administrador Plataforma', ?, ?)").run(hash, MASTER_SALT_ENV);
+  const existing = masterDb.prepare("SELECT id FROM master_users WHERE username='master'").get();
+  if (existing) {
+    masterDb.prepare("UPDATE master_users SET password_hash=?, salt=? WHERE username='master'").run(hash, MASTER_SALT_ENV);
+  } else {
+    masterDb.prepare("INSERT INTO master_users (username, name, password_hash, salt) VALUES ('master', 'Administrador Plataforma', ?, ?)").run(hash, MASTER_SALT_ENV);
+  }
 }
 
 // Empresa "platform" — empresa del master (auto-creada)
