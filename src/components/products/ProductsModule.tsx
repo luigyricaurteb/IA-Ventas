@@ -7,6 +7,7 @@ interface Product {
   id: number; name: string; description: string | null;
   price_per_person: number; ai_instructions: string | null;
   active: number; product_type: string; images: ProductImage[];
+  slug: string | null;
 }
 interface ImportPreview {
   name: string; description: string | null;
@@ -14,7 +15,7 @@ interface ImportPreview {
 }
 
 const EMPTY: Omit<Product, "id" | "images"> = {
-  name: "", description: "", price_per_person: 0, ai_instructions: "", active: 1, product_type: "servicio",
+  name: "", description: "", price_per_person: 0, ai_instructions: "", active: 1, product_type: "servicio", slug: null,
 };
 
 function PreviewTable({ rows, total, errors }: { rows: ImportPreview[]; total: number; errors: string[] }) {
@@ -58,6 +59,7 @@ function PreviewTable({ rows, total, errors }: { rows: ImportPreview[]; total: n
 
 export default function ProductsModule() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [companySlug, setCompanySlug] = useState<string>("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState({ ...EMPTY });
   const [showForm, setShowForm] = useState(false);
@@ -86,12 +88,15 @@ export default function ProductsModule() {
     const res = await fetch("/api/products");
     if (res.ok) setProducts((await res.json()).products);
   }
-  useEffect(() => { fetch_(); }, []);
+  useEffect(() => {
+    fetch_();
+    fetch("/api/auth/me").then(r => r.json()).then(d => setCompanySlug(d?.user?.company ?? "")).catch(() => {});
+  }, []);
 
   function openNew() { setEditing(null); setForm({ ...EMPTY }); setShowForm(true); }
   function openEdit(p: Product) {
     setEditing(p);
-    setForm({ name: p.name, description: p.description ?? "", price_per_person: p.price_per_person, ai_instructions: p.ai_instructions ?? "", active: p.active, product_type: p.product_type ?? "servicio" });
+    setForm({ name: p.name, description: p.description ?? "", price_per_person: p.price_per_person, ai_instructions: p.ai_instructions ?? "", active: p.active, product_type: p.product_type ?? "servicio", slug: p.slug ?? null });
     setShowForm(true);
   }
 
@@ -278,7 +283,17 @@ export default function ProductsModule() {
                 <h3 className="font-semibold text-gray-800 truncate">{p.name}</h3>
                 {p.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{p.description}</p>}
                 <p className="text-emerald-600 font-bold mt-2">${p.price_per_person.toLocaleString("es-CO")} / persona</p>
-                <div className="flex gap-2 mt-3">
+                {p.slug && companySlug && (
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/tienda/${companySlug}/${p.slug}`;
+                      navigator.clipboard.writeText(url).then(() => alert("Link copiado: " + url)).catch(() => prompt("Copia este link:", url));
+                    }}
+                    className="mt-2 w-full text-xs text-emerald-600 border border-emerald-200 rounded-lg py-1.5 hover:bg-emerald-50 transition-colors px-2">
+                    🔗 Copiar link de pago
+                  </button>
+                )}
+                <div className="flex gap-2 mt-2">
                   <button onClick={() => openEdit(p)} className="flex-1 text-sm border rounded-lg py-1.5 hover:bg-gray-50">✏️ Editar</button>
                   <button onClick={() => remove(p.id)} className="text-sm text-red-400 hover:text-red-600 px-3 border rounded-lg py-1.5">🗑</button>
                 </div>

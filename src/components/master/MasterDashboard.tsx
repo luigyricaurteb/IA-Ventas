@@ -660,6 +660,7 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
   const [newUserForm, setNewUserForm]         = useState({ username:"", name:"", password:"", is_admin:false, permissions: Object.fromEntries(MODULES.map(m=>[m,false])) });
   const [pwModal, setPwModal]                 = useState<{ id: number; name: string; pw: string } | null>(null);
   const [pwSaving, setPwSaving]               = useState(false);
+  const [floatChatOpen, setFloatChatOpen]     = useState(false);
 
   const fetchAll = useCallback(() => {
     Promise.all([
@@ -1069,7 +1070,15 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
                       <span className="text-emerald-400 font-bold text-lg">${fmt(p.price_monthly)}</span>
                       <span className="text-gray-400 text-xs">COP / {BL[p.billing_cycle]||p.billing_cycle}</span>
                     </div>
-                    <p className="text-gray-500 text-xs mb-3">Hasta {p.max_users===999?"∞":p.max_users} usuarios · {p.max_wa_numbers} WA</p>
+                    <p className="text-gray-500 text-xs mb-2">Hasta {p.max_users===999?"∞":p.max_users} usuarios · {p.max_wa_numbers} WA</p>
+                    <button
+                      onClick={() => {
+                        const url = `${BASE_URL}/plan/${p.id}`;
+                        navigator.clipboard.writeText(url).then(() => alert("Link copiado: " + url)).catch(() => prompt("Link del plan:", url));
+                      }}
+                      className="w-full text-xs text-indigo-400 border border-indigo-500/30 rounded-lg py-1 mb-2 hover:bg-indigo-900/30 transition-colors">
+                      🔗 Copiar link de registro
+                    </button>
                     <div className="grid grid-cols-1 gap-1">
                       {MODULES.map(m=>(
                         <div key={m} className={`text-xs flex items-center gap-1.5 ${mods[m]?"text-emerald-400":"text-gray-600"}`}>
@@ -1349,14 +1358,12 @@ export default function MasterDashboard({ onLogout }: { onLogout: () => void }) 
         </div>
       )}
 
-      {/* ── Julieta Master — chat flotante ── */}
-      <JulietaMasterChat />
     </div>
   );
 }
 
 // ── Julieta Master — asistente interno flotante ───────────────────────────────
-function JulietaMasterChat() {
+export function JulietaMasterChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: "user"|"assistant"; content: string }[]>([]);
   const [input, setInput] = useState("");

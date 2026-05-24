@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface Plan { id: number; name: string; description: string | null; price_monthly: number }
 interface BankAccount { bank_name: string; account_type: string; account_number: string; account_holder: string | null }
@@ -9,7 +10,9 @@ interface PaymentOptions {
 }
 interface WompiData { reference: string; integrity: string; amount_in_cents: number; redirect_url: string }
 
-export default function RegisterPage() {
+function RegisterPageInner() {
+  const searchParams = useSearchParams();
+  const preselectedPlan = searchParams.get("plan");
   const [plans, setPlans]     = useState<Plan[]>([]);
   const [payOpts, setPayOpts] = useState<PaymentOptions>({ wompi_active: false, wompi_public_key: null, banks: [], nequi_phone: null, daviplata_phone: null });
   const [step, setStep]       = useState<1 | 2 | 3 | 4>(1);
@@ -25,11 +28,14 @@ export default function RegisterPage() {
   useEffect(() => {
     fetch("/api/public/register").then(r => r.json()).then((d: { plans: Plan[] } & PaymentOptions) => {
       setPlans(d.plans ?? []);
-      if (d.plans?.[0]) setForm(f => ({ ...f, plan_id: d.plans[0].id }));
+      const defaultPlan = preselectedPlan
+        ? d.plans.find(p => String(p.id) === preselectedPlan) ?? d.plans[0]
+        : d.plans[0];
+      if (defaultPlan) setForm(f => ({ ...f, plan_id: defaultPlan.id }));
       setPayOpts({ wompi_active: d.wompi_active, wompi_public_key: d.wompi_public_key, banks: d.banks ?? [], nequi_phone: d.nequi_phone, daviplata_phone: d.daviplata_phone });
       setPayMethod(d.wompi_active ? "card" : "transfer");
     });
-  }, []);
+  }, [preselectedPlan]);
 
   function handleCompanyName(name: string) {
     const slug = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -322,5 +328,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center"><div className="w-8 h-8 border-2 border-gray-600 border-t-emerald-500 rounded-full animate-spin" /></div>}>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

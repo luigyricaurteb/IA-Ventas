@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { playNotification } from "@/lib/notification-sound";
 import QRScreen from "./QRScreen";
 import DashboardHeader from "./DashboardHeader";
 import Sidebar from "./layout/Sidebar";
@@ -16,7 +17,7 @@ import SuppliersModule from "./suppliers/SuppliersModule";
 import AccountingModule from "./accounting/AccountingModule";
 import AnalyticsModule from "./analytics/AnalyticsModule";
 import JulietaAlertsPanel from "./chat/JulietaAlertsPanel";
-import MasterDashboard from "./master/MasterDashboard";
+import MasterDashboard, { JulietaMasterChat } from "./master/MasterDashboard";
 import HelpModule from "./help/HelpModule";
 import FlowBuilder from "./chat/FlowBuilder";
 import SubscriptionModule from "./subscription/SubscriptionModule";
@@ -47,6 +48,8 @@ export default function ConnectionGate() {
   const [scanning, setScanning]           = useState(false);
   const [scanResult, setScanResult]       = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen]     = useState(false); // móvil drawer
+  const prevConvCountRef = useRef<number>(0);
+  const prevAlertCountRef = useRef<number>(0);
 
   useEffect(() => {
     fetch("/api/auth/me").then(r => {
@@ -75,7 +78,15 @@ export default function ConnectionGate() {
     try {
       const res = await fetch("/api/conversations");
       if (!res.ok) return;
-      setConversations((await res.json()).conversations);
+      const data = await res.json();
+      const convs: Conversation[] = data.conversations ?? [];
+      setConversations(prev => {
+        if (prevConvCountRef.current > 0 && convs.length > prevConvCountRef.current) {
+          playNotification("bell");
+        }
+        prevConvCountRef.current = convs.length;
+        return convs;
+      });
     } catch {}
   }, []);
 
@@ -85,6 +96,25 @@ export default function ConnectionGate() {
     const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
   }, [fetchConversations]);
+
+  // Polling de alertas de pago — sonido cuando llega uno nuevo
+  useEffect(() => {
+    async function pollAlerts() {
+      try {
+        const res = await fetch("/api/alerts");
+        if (!res.ok) return;
+        const d = await res.json() as { proofs?: { id: number }[] };
+        const count = d.proofs?.length ?? 0;
+        if (prevAlertCountRef.current > 0 && count > prevAlertCountRef.current) {
+          playNotification("payment");
+        }
+        prevAlertCountRef.current = count;
+      } catch {}
+    }
+    pollAlerts();
+    const iv = setInterval(pollAlerts, 5000);
+    return () => clearInterval(iv);
+  }, []);
 
   function handleConnected(p: string) { setPhone(p); setConnected(true); }
   function handleDisconnect() { setConnected(false); setPhone(null); setSelectedId(null); setConversations([]); }
@@ -270,6 +300,9 @@ export default function ConnectionGate() {
           {activeModule === "autopilot"    && <AutopilotModule />}
         </div>
       </div>
+
+      {/* Julieta Master chat flotante — persiste en todos los módulos */}
+      {isMaster && <JulietaMasterChat />}
     </div>
   );
 }

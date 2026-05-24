@@ -613,25 +613,39 @@ export async function processBotMessage(
     const productId = getBotState(db, conversationId)?.selected_product_id;
     if (!productId) { setState(db, conversationId, "ACTIVE"); return; }
 
-    const product = db.prepare("SELECT id, name, price_per_person FROM products WHERE id=?").get(productId) as { id: number; name: string; price_per_person: number } | null;
+    const product = db.prepare("SELECT id, name, price_per_person, slug FROM products WHERE id=?").get(productId) as { id: number; name: string; price_per_person: number; slug: string | null } | null;
     if (!product) { setState(db, conversationId, "ACTIVE"); return; }
     const total = product.price_per_person * people;
 
     const did = getOrCreateDeal(db, conversationId);
     if (did) db.prepare("UPDATE crm_deals SET product_id=?, people_count=?, total_value=?, stage='PROPUESTA' WHERE id=?").run(productId, people, total, did);
 
-    const banks = db.prepare("SELECT * FROM bank_accounts WHERE active=1").all() as { bank_name: string; account_type: string; account_number: string; account_holder: string | null }[];
-    const bankInfo = banks.length > 0
-      ? banks.map(b =>
-          `🏦 *${b.bank_name}*\n  ${b.account_type === "corriente" ? "Cta. Corriente" : "Cta. Ahorros"}: ${b.account_number}${b.account_holder ? `\n  A nombre de: ${b.account_holder}` : ""}`
-        ).join("\n\n")
-      : "_Configura tus datos bancarios en Ajustes → Cuentas bancarias_";
+    const cfg2 = db.prepare("SELECT payment_method_default FROM company_config WHERE id=1").get() as { payment_method_default: string | null } | null;
+    const payMethod = cfg2?.payment_method_default ?? "bank_transfer";
 
     setState(db, conversationId, "QUOTE_SENT", { ...stateData, people_count: people, total }, productId);
-    await sendMany(db, sock, jid, phone, conversationId, [
-      `🎯 *Tu cotización*\n\n📦 *${product.name}*\n👥 ${people} persona${people !== 1 ? "s" : ""}\n💰 Total: *$${total.toLocaleString("es-CO")} COP*`,
-      `Para confirmar tu reserva, realiza el pago a:\n\n${bankInfo}\n\n✅ Cuando hayas pagado, envíanos el comprobante por este chat y confirmamos tu reserva.`,
-    ]);
+
+    if (payMethod === "product_link" && product.slug) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL
+        ?? process.env.RAILWAY_STATIC_URL
+        ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+      const productUrl = `${appUrl}/tienda/${slug}/${product.slug}`;
+      await sendMany(db, sock, jid, phone, conversationId, [
+        `🎯 *Tu cotización*\n\n📦 *${product.name}*\n👥 ${people} persona${people !== 1 ? "s" : ""}\n💰 Total: *$${total.toLocaleString("es-CO")} COP*`,
+        `Para completar tu reserva y pagar, ingresa al siguiente link:\n\n🔗 ${productUrl}\n\nAhí podrás confirmar tu pedido y subir tu comprobante de pago.`,
+      ]);
+    } else {
+      const banks = db.prepare("SELECT * FROM bank_accounts WHERE active=1").all() as { bank_name: string; account_type: string; account_number: string; account_holder: string | null }[];
+      const bankInfo = banks.length > 0
+        ? banks.map(b =>
+            `🏦 *${b.bank_name}*\n  ${b.account_type === "corriente" ? "Cta. Corriente" : "Cta. Ahorros"}: ${b.account_number}${b.account_holder ? `\n  A nombre de: ${b.account_holder}` : ""}`
+          ).join("\n\n")
+        : "_Configura tus datos bancarios en Ajustes → Cuentas bancarias_";
+      await sendMany(db, sock, jid, phone, conversationId, [
+        `🎯 *Tu cotización*\n\n📦 *${product.name}*\n👥 ${people} persona${people !== 1 ? "s" : ""}\n💰 Total: *$${total.toLocaleString("es-CO")} COP*`,
+        `Para confirmar tu reserva, realiza el pago a:\n\n${bankInfo}\n\n✅ Cuando hayas pagado, envíanos el comprobante por este chat y confirmamos tu reserva.`,
+      ]);
+    }
     return;
   }
 

@@ -13,6 +13,13 @@ interface AutoConfig {
   enabled: number; tone: string; frequency: string; posting_hour: number;
   publish_facebook: number; publish_instagram: number; auto_approve: number;
 }
+interface DiagnoseResult {
+  has_page_id: boolean; has_page_token: boolean; has_ig_id: boolean;
+  current_ig_id: string | null; page_name: string | null;
+  page_token_valid: boolean; ig_linked: boolean;
+  ig_id_from_page: string | null; ig_id_matches: boolean;
+  fb_permissions: string[]; errors: string[];
+}
 
 const STATUS_COLOR: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-700",
@@ -47,6 +54,10 @@ export default function AutopilotModule() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
+  const [selectedImageId, setSelectedImageId] = useState<number | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [fixing, setFixing] = useState(false);
+  const [diagnose, setDiagnose] = useState<DiagnoseResult | null>(null);
   const [generatedPost, setGeneratedPost] = useState<{ caption: string; hashtags: string; imageId: number | null } | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -72,6 +83,25 @@ export default function AutopilotModule() {
     else if (tab === "published") loadPosts("published");
     else if (tab === "images") loadImages();
   }, [tab]);
+
+  async function runDiagnose() {
+    setDiagnosing(true); setDiagnose(null);
+    const d = await fetch("/api/autopilot/diagnose").then(r => r.json()) as DiagnoseResult;
+    setDiagnose(d);
+    setDiagnosing(false);
+  }
+
+  async function fixIgId() {
+    setFixing(true);
+    const d = await fetch("/api/autopilot/diagnose", { method: "POST" }).then(r => r.json()) as { ok: boolean; ig_account_id?: string; error?: string };
+    setFixing(false);
+    if (d.ok) {
+      showMsg(true, `✅ ID de Instagram actualizado: ${d.ig_account_id}`);
+      runDiagnose();
+    } else {
+      showMsg(false, `❌ ${d.error}`);
+    }
+  }
 
   async function saveConfig() {
     setSaving(true);
@@ -111,9 +141,9 @@ export default function AutopilotModule() {
     await fetch("/api/autopilot/images/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: newOrder.map(i => i.id) }) });
   }
 
-  async function generate() {
+  async function generate(forceImageId?: number) {
     setGenerating(true); setGeneratedPost(null);
-    const imageId = images[0]?.id ?? null;
+    const imageId = forceImageId ?? selectedImageId ?? images[0]?.id ?? null;
     const res = await fetch("/api/autopilot/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageId, customPrompt: customPrompt.trim() || undefined }),
@@ -185,7 +215,7 @@ export default function AutopilotModule() {
               {msg.text}
             </span>
           )}
-          <button onClick={generate} disabled={generating}
+          <button onClick={() => { generate(); setTab("queue"); }} disabled={generating}
             className="text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
             style={{ background: "#0077b6" }}>
             {generating ? "Generando..." : "✨ Generar post"}
@@ -234,6 +264,21 @@ export default function AutopilotModule() {
               </label>
             )}
 
+            {selectedImageId && (
+              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5">
+                <img src={`/api/uploads/autopilot/${images.find(i => i.id === selectedImageId)?.filename}`}
+                  className="w-10 h-10 object-cover rounded-lg" />
+                <p className="text-sm text-blue-700 font-medium flex-1">Imagen seleccionada para el próximo post</p>
+                <button onClick={() => setSelectedImageId(null)} className="text-blue-400 hover:text-blue-600 text-xs">✕ Deseleccionar</button>
+                <button onClick={() => { generate(selectedImageId); setTab("queue"); }}
+                  disabled={generating}
+                  className="text-white text-xs px-3 py-1.5 rounded-lg font-medium disabled:opacity-50"
+                  style={{ background: "#0077b6" }}>
+                  {generating ? "Generando..." : "✨ Generar ahora"}
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {images.map((img, idx) => (
                 <div key={img.id}
@@ -242,7 +287,7 @@ export default function AutopilotModule() {
                   onDragOver={e => onDragOver(e, img.id)}
                   onDrop={e => onDrop(e, img.id)}
                   onDragEnd={() => { setDragging(null); setDragOver(null); }}
-                  className={`relative group border-2 rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all ${dragOver === img.id ? "border-blue-400 scale-105" : "border-gray-200"} ${dragging === img.id ? "opacity-50" : ""}`}>
+                  className={`relative group border-2 rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all ${selectedImageId === img.id ? "border-blue-500 ring-2 ring-blue-300" : dragOver === img.id ? "border-blue-400 scale-105" : "border-gray-200"} ${dragging === img.id ? "opacity-50" : ""}`}>
                   <img src={`/api/uploads/autopilot/${img.filename}`} className="w-full h-36 object-cover" />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
@@ -252,8 +297,13 @@ export default function AutopilotModule() {
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-sm leading-none">
                     ×
                   </button>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-                    <p className="text-white text-xs truncate">{img.original_name ?? img.filename}</p>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 flex items-end justify-between gap-1">
+                    <p className="text-white text-xs truncate flex-1">{img.original_name ?? img.filename}</p>
+                    <button
+                      onClick={() => { setSelectedImageId(img.id); }}
+                      className="shrink-0 bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      ✨ Usar
+                    </button>
                   </div>
                 </div>
               ))}
@@ -271,7 +321,7 @@ export default function AutopilotModule() {
                 <input value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
                   placeholder="Opcional: indica el tema o especificación del post..."
                   className="flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-                <button onClick={generate} disabled={generating}
+                <button onClick={() => generate()} disabled={generating}
                   className="text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 whitespace-nowrap"
                   style={{ background: "#0077b6" }}>
                   {generating ? "..." : "Generar"}
@@ -441,6 +491,87 @@ export default function AutopilotModule() {
                 style={{ background: "#0077b6" }}>
                 {saving ? "Guardando..." : "Guardar configuración"}
               </button>
+            </div>
+
+            {/* ── Diagnóstico de conexión ── */}
+            <div className="border-t pt-6">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-800 text-sm">🔍 Diagnóstico de conexión</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Verifica que Facebook e Instagram estén correctamente conectados</p>
+                </div>
+                <button onClick={runDiagnose} disabled={diagnosing}
+                  className="text-sm text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 disabled:opacity-50">
+                  {diagnosing ? "Verificando..." : "Verificar conexión"}
+                </button>
+              </div>
+
+              {diagnose && (
+                <div className="space-y-2">
+                  {/* Status rows */}
+                  {[
+                    { label: "Page ID configurado", ok: diagnose.has_page_id },
+                    { label: "Token de página configurado", ok: diagnose.has_page_token },
+                    { label: `Token válido${diagnose.page_name ? ` — ${diagnose.page_name}` : ""}`, ok: diagnose.page_token_valid },
+                    { label: "Instagram Business vinculado a la página", ok: diagnose.ig_linked },
+                    { label: `ID de Instagram guardado${diagnose.current_ig_id ? ` (${diagnose.current_ig_id})` : ""}`, ok: diagnose.has_ig_id },
+                    { label: `ID de Instagram correcto${diagnose.ig_id_from_page && !diagnose.ig_id_matches ? ` (correcto: ${diagnose.ig_id_from_page})` : ""}`, ok: diagnose.ig_id_matches },
+                  ].map((row, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span className={row.ok ? "text-emerald-500" : "text-red-400"}>{row.ok ? "✓" : "✗"}</span>
+                      <span className={row.ok ? "text-gray-700" : "text-gray-500"}>{row.label}</span>
+                    </div>
+                  ))}
+
+                  {/* Permissions */}
+                  {diagnose.fb_permissions.length > 0 && (
+                    <div className="bg-gray-50 rounded-lg p-3 mt-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Permisos del token:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {diagnose.fb_permissions.map(p => (
+                          <span key={p} className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                            ["pages_manage_posts","pages_read_engagement","instagram_basic","instagram_content_publish"].includes(p)
+                              ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-600"
+                          }`}>{p}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auto-fix button */}
+                  {diagnose.ig_linked && !diagnose.ig_id_matches && diagnose.ig_id_from_page && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-2">
+                      <p className="text-sm font-medium text-amber-800">El ID de Instagram está desactualizado</p>
+                      <p className="text-xs text-amber-600 mt-0.5 mb-2">
+                        La página tiene vinculado el ID <strong>{diagnose.ig_id_from_page}</strong> pero en la base de datos está guardado <strong>{diagnose.current_ig_id ?? "vacío"}</strong>.
+                      </p>
+                      <button onClick={fixIgId} disabled={fixing}
+                        className="text-sm text-white bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-lg disabled:opacity-50">
+                        {fixing ? "Actualizando..." : "🔧 Corregir automáticamente"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Errors */}
+                  {diagnose.errors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 mt-2 space-y-1.5">
+                      {diagnose.errors.map((e, i) => (
+                        <p key={i} className="text-xs text-red-700">{e}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* All good */}
+                  {diagnose.errors.length === 0 && diagnose.ig_id_matches && diagnose.page_token_valid && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-2">
+                      <p className="text-sm text-emerald-700 font-medium">✅ Todo en orden — Facebook e Instagram están correctamente conectados.</p>
+                      {!diagnose.fb_permissions.includes("pages_manage_posts") && (
+                        <p className="text-xs text-amber-600 mt-1">⚠️ El token no tiene el permiso <code>pages_manage_posts</code>. Si la app de Meta todavía no fue aprobada, solo funcionará con usuarios de prueba en Meta for Developers.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -499,6 +499,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE contacts ADD COLUMN email_collected_at INTEGER",
     // Audio transcription: extensión paga por empresa (activa desde master)
     "ALTER TABLE company_config ADD COLUMN audio_transcription_enabled INTEGER NOT NULL DEFAULT 0",
+    // Producto slug único para links públicos
+    "ALTER TABLE products ADD COLUMN slug TEXT",
+    // Método de pago predeterminado: bank_transfer | product_link | wompi | mercadopago
+    "ALTER TABLE company_config ADD COLUMN payment_method_default TEXT NOT NULL DEFAULT 'bank_transfer'",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)

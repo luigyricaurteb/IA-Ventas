@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { playNotification } from "@/lib/notification-sound";
 
 interface JulietaAlert {
   id: number; conversation_id: number; question: string;
@@ -16,13 +17,20 @@ export default function JulietaAlertsPanel({ onAlertCountChange }: JulietaAlerts
   const [expanded, setExpanded] = useState<number | null>(null);
   const [answers, setAnswers] = useState<Record<number, { answer: string; topic: string; sendToClient: boolean; save: boolean }>>({});
   const [submitting, setSubmitting] = useState<number | null>(null);
+  const prevCountRef = useRef<number>(0);
 
   async function fetch_() {
     const res = await fetch("/api/julieta/alerts");
     if (res.ok) {
       const d = await res.json();
-      setAlerts(d.alerts ?? []);
-      onAlertCountChange?.(d.count ?? 0);
+      const newAlerts = d.alerts ?? [];
+      const newCount = d.count ?? 0;
+      if (prevCountRef.current > 0 && newCount > prevCountRef.current) {
+        playNotification("bell");
+      }
+      prevCountRef.current = newCount;
+      setAlerts(newAlerts);
+      onAlertCountChange?.(newCount);
     }
   }
 
