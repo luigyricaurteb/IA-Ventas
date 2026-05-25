@@ -503,6 +503,8 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE products ADD COLUMN slug TEXT",
     // Método de pago predeterminado: bank_transfer | product_link | wompi | mercadopago
     "ALTER TABLE company_config ADD COLUMN payment_method_default TEXT NOT NULL DEFAULT 'bank_transfer'",
+    // Guardar filename directamente en el post para que persista aunque se elimine la imagen del banco
+    "ALTER TABLE autopilot_posts ADD COLUMN image_filename TEXT",
   ]) { try { db.exec(sql); } catch {} }
 
   // Tabla de configuración multi-canal (WhatsApp + Facebook + Instagram)

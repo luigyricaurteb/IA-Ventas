@@ -154,15 +154,27 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   db.prepare(`
     UPDATE autopilot_posts SET
-      status=?, published_at=?, fb_post_id=?, ig_post_id=?, error_msg=?
+      status=?, published_at=?, fb_post_id=?, ig_post_id=?, error_msg=?,
+      image_filename=COALESCE(image_filename, ?)
     WHERE id=?
   `).run(
     success ? "published" : "failed",
     success ? now : null,
     fbPostId, igPostId,
     errors.length ? errors.join(" | ") : null,
+    post.image_filename ?? null,
     Number(id)
   );
+
+  // Si publicó correctamente, eliminar la imagen del banco para que no se repita
+  if (success && post.image_filename) {
+    db.prepare("UPDATE autopilot_images SET active=0 WHERE filename=?").run(post.image_filename);
+    // Reordenar las imágenes restantes
+    const remaining = db.prepare("SELECT id FROM autopilot_images WHERE active=1 ORDER BY order_index ASC, id ASC").all() as { id: number }[];
+    remaining.forEach((img, idx) => {
+      db.prepare("UPDATE autopilot_images SET order_index=? WHERE id=?").run(idx + 1, img.id);
+    });
+  }
 
   if (success) return NextResponse.json({ ok: true, fbPostId, igPostId });
   return NextResponse.json({ ok: false, errors }, { status: 422 });

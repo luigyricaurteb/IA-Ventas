@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const args = status ? [status] : [];
 
   const posts = db.prepare(`
-    SELECT p.*, i.filename as image_filename, i.original_name as image_name
+    SELECT p.*, COALESCE(p.image_filename, i.filename) as image_filename, i.original_name as image_name
     FROM autopilot_posts p
     LEFT JOIN autopilot_images i ON p.image_id = i.id
     ${where}
