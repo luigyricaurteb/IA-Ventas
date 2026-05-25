@@ -537,6 +537,10 @@ function initCompanySchema(db: Database.Database): void {
     "ALTER TABLE whatsapp_config ADD COLUMN fb_page_name TEXT",
     "ALTER TABLE whatsapp_config ADD COLUMN ig_account_id TEXT",
     "ALTER TABLE whatsapp_config ADD COLUMN ig_username TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_app_id TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_app_secret TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_user_token TEXT",
+    "ALTER TABLE whatsapp_config ADD COLUMN fb_token_expires_at INTEGER",
   ]) { try { db.exec(sql); } catch {} }
 
   // Skill de ventas de Julieta — se inserta la primera vez, respeta cambios manuales posteriores

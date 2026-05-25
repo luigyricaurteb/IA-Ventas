@@ -15,6 +15,17 @@ interface WaConfig {
   has_fb_token: boolean;
 }
 
+interface FbTokenStatus {
+  fb_app_id: string;
+  has_app_secret: boolean;
+  has_page_token: boolean;
+  page_name: string | null;
+  expires_at: string | null;
+  days_left: number | null;
+  is_permanent: boolean;
+  token_status: "no_token" | "permanent" | "expiring_soon" | "active";
+}
+
 type ChannelTab = "whatsapp" | "facebook" | "instagram";
 
 export default function WhatsAppConfigPanel() {
@@ -26,9 +37,16 @@ export default function WhatsAppConfigPanel() {
   const [waToken, setWaToken]   = useState("");
   const [phoneId, setPhoneId]   = useState("");
 
-  // Facebook
+  // Facebook básico
   const [fbPageId, setFbPageId]     = useState("");
   const [fbPageToken, setFbPageToken] = useState("");
+
+  // Token permanente
+  const [fbTokenStatus, setFbTokenStatus] = useState<FbTokenStatus | null>(null);
+  const [fbAppId, setFbAppId]         = useState("");
+  const [fbAppSecret, setFbAppSecret] = useState("");
+  const [fbUserToken, setFbUserToken] = useState("");
+  const [exchanging, setExchanging]   = useState(false);
 
   // Instagram (se configura junto a Facebook)
   const [igAccountId, setIgAccountId] = useState("");
@@ -49,8 +67,46 @@ export default function WhatsAppConfigPanel() {
       setIgUsername(d.ig_username ?? "");
       setLoading(false);
     });
+    fetch("/api/settings/fb-token").then(r => r.json()).then((d: FbTokenStatus) => {
+      setFbTokenStatus(d);
+      setFbAppId(d.fb_app_id ?? "");
+    });
     setWebhookUrl(`${window.location.origin}/api/whatsapp/webhook`);
   }, []);
+
+  async function handleExchangeToken() {
+    if (!fbUserToken) { setResult({ ok: false, msg: "Pega el User Token de Graph API Explorer" }); return; }
+    setExchanging(true); setResult(null);
+    const body: Record<string, string> = { action: "exchange", fb_user_token: fbUserToken };
+    if (fbAppId)     body.fb_app_id     = fbAppId;
+    if (fbAppSecret) body.fb_app_secret = fbAppSecret;
+    if (fbPageId)    body.fb_page_id    = fbPageId;
+    const res = await fetch("/api/settings/fb-token", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const d = await res.json() as { ok: boolean; page_name?: string; page_id?: string; is_permanent?: boolean; pages_found?: {id:string;name:string}[]; error?: string };
+    if (d.ok) {
+      setResult({ ok: true, msg: `✅ Token ${d.is_permanent ? "permanente" : "de 60 días"} guardado para: ${d.page_name} (${d.page_id})` });
+      setFbUserToken(""); setFbAppSecret("");
+      fetch("/api/settings/whatsapp").then(r => r.json()).then((c: WaConfig) => setCfg(c));
+      fetch("/api/settings/fb-token").then(r => r.json()).then((s: FbTokenStatus) => setFbTokenStatus(s));
+    } else {
+      setResult({ ok: false, msg: `❌ ${d.error}` });
+    }
+    setExchanging(false);
+  }
+
+  async function handleSaveAppCredentials() {
+    if (!fbAppId || !fbAppSecret) { setResult({ ok: false, msg: "App ID y App Secret son requeridos" }); return; }
+    setSaving(true); setResult(null);
+    const res = await fetch("/api/settings/fb-token", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save_app", fb_app_id: fbAppId, fb_app_secret: fbAppSecret }),
+    });
+    const d = await res.json() as { ok: boolean; error?: string };
+    setResult(d.ok ? { ok: true, msg: "✅ Credenciales de app guardadas" } : { ok: false, msg: `❌ ${d.error}` });
+    setSaving(false);
+  }
 
   async function handleVerifyWa() {
     if (!waToken || !phoneId) { setResult({ ok: false, msg: "Completa el Token y Phone Number ID" }); return; }
@@ -226,58 +282,100 @@ export default function WhatsAppConfigPanel() {
 
       {/* ── FACEBOOK ── */}
       {activeTab === "facebook" && (
-        <div className="bg-white border rounded-xl p-5 space-y-4">
-          <h3 className="font-semibold text-gray-800">📘 Facebook Messenger</h3>
+        <div className="space-y-4">
 
-          {/* Estado actual guardado */}
-          {cfg?.has_fb_token && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-blue-800">✅ Facebook conectado</span>
-                <button onClick={() => handleDisconnect("facebook")} className="text-xs text-red-400 hover:text-red-600">Desconectar</button>
-              </div>
-              {cfg.fb_page_name && <p className="text-xs text-blue-700">Página: <strong>{cfg.fb_page_name}</strong></p>}
-              {cfg.fb_page_id   && <p className="text-xs text-blue-700">Page ID: <code className="bg-white px-1 rounded">{cfg.fb_page_id}</code></p>}
-              <p className="text-xs text-blue-600">Token: <code className="bg-white px-1 rounded">••••••••{cfg.wa_access_token_preview ? "" : " (guardado)"}</code></p>
+          {/* Estado del token */}
+          {fbTokenStatus && (
+            <div className={`rounded-xl p-4 border text-sm space-y-1 ${
+              fbTokenStatus.token_status === "permanent" ? "bg-emerald-50 border-emerald-200" :
+              fbTokenStatus.token_status === "expiring_soon" ? "bg-amber-50 border-amber-300" :
+              fbTokenStatus.token_status === "active" ? "bg-blue-50 border-blue-200" :
+              "bg-gray-50 border-gray-200"
+            }`}>
+              {fbTokenStatus.token_status === "permanent" && <p className="font-semibold text-emerald-700">✅ Token permanente activo — nunca expira</p>}
+              {fbTokenStatus.token_status === "active" && <p className="font-semibold text-blue-700">🟢 Token activo — expira en {fbTokenStatus.days_left} días</p>}
+              {fbTokenStatus.token_status === "expiring_soon" && <p className="font-semibold text-amber-700">⚠️ Token expira pronto — {fbTokenStatus.days_left} días restantes</p>}
+              {fbTokenStatus.token_status === "no_token" && <p className="font-semibold text-gray-600">❌ Sin token configurado</p>}
+              {fbTokenStatus.page_name && <p className="text-xs text-gray-600">Página: <strong>{fbTokenStatus.page_name}</strong></p>}
+              {fbTokenStatus.expires_at && <p className="text-xs text-gray-500">Expira: {new Date(fbTokenStatus.expires_at).toLocaleDateString("es-CO")}</p>}
             </div>
           )}
 
-          {/* Instrucciones colapsables */}
+          {/* ── SECCIÓN 1: Token Permanente (recomendado) ── */}
+          <div className="bg-white border rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">🔑 Token Permanente (Recomendado)</h3>
+              <p className="text-xs text-gray-500 mt-1">Genera un token que nunca expira. Requiere App ID y App Secret de tu Meta App.</p>
+            </div>
+
+            <details className="text-xs" open={!fbTokenStatus?.has_app_secret}>
+              <summary className="cursor-pointer text-indigo-700 font-semibold bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                Paso 1 — Credenciales de la App Meta
+              </summary>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-b-lg px-3 pb-3 space-y-3 mt-1">
+                <p className="text-indigo-700 text-xs mt-2">Ve a <strong>developers.facebook.com → Tu App → Configuración → Básica</strong></p>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">App ID</label>
+                  <input type="text" placeholder="Ej: 123456789012345" value={fbAppId} onChange={e => setFbAppId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">App Secret</label>
+                  <input type="password" placeholder="Clave secreta de la app" value={fbAppSecret} onChange={e => setFbAppSecret(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                </div>
+                <button onClick={handleSaveAppCredentials} disabled={saving || !fbAppId || !fbAppSecret}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-xs disabled:opacity-50">
+                  {saving ? "Guardando..." : "Guardar credenciales de app"}
+                </button>
+              </div>
+            </details>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-gray-700">Paso 2 — Pega tu User Token</p>
+              <p className="text-xs text-gray-500">Ve a <strong>developers.facebook.com/tools/explorer</strong> → Genera un token de usuario con los permisos requeridos → Pégalo aquí.</p>
+              <input type="password" placeholder="EAAGm... (User Access Token de Graph API Explorer)"
+                value={fbUserToken} onChange={e => setFbUserToken(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <button onClick={handleExchangeToken} disabled={exchanging || !fbUserToken || !fbTokenStatus?.has_app_secret}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                {exchanging ? "Generando token permanente..." : "🔁 Convertir a Token Permanente"}
+              </button>
+              {!fbTokenStatus?.has_app_secret && (
+                <p className="text-xs text-amber-600">⚠️ Guarda primero el App ID y App Secret (Paso 1)</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 2: Token Manual (opción rápida) ── */}
           <details className="text-xs">
-            <summary className="cursor-pointer text-amber-700 font-semibold bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              {cfg?.has_fb_token ? "¿Cómo actualizar las credenciales?" : "📋 Pasos para obtener el token"}
+            <summary className="cursor-pointer text-gray-600 font-semibold bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Opción alternativa — Pegar Page Token directamente (expira)
             </summary>
-            <div className="bg-amber-50 border border-amber-200 rounded-b-lg px-3 pb-3 space-y-1 text-amber-800">
-              <p className="mt-2">1. Tu app de Meta → Agregar producto → <strong>Messenger</strong></p>
-              <p>2. Conecta tu Página de Facebook</p>
-              <p>3. Ve a <strong>Graph API Explorer</strong> → llama <code>me/accounts</code></p>
-              <p>4. Copia el <code>access_token</code> y el <code>id</code> de tu página</p>
-              <p>5. Configura webhook → suscríbete a <strong>messages</strong></p>
+            <div className="bg-white border border-gray-200 rounded-b-xl p-4 space-y-3 mt-1">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Page Access Token</label>
+                <input type="password" placeholder={cfg?.has_fb_token ? "Dejar vacío para mantener el actual" : "EAAGm..."}
+                  value={fbPageToken} onChange={e => setFbPageToken(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID</label>
+                <input type="text" placeholder="Ej: 1017175161475090" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </div>
+              <button onClick={handleSaveFb} disabled={saving || (!fbPageToken && !cfg?.has_fb_token)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm disabled:opacity-50">
+                {saving ? "Guardando..." : "Guardar token manual"}
+              </button>
             </div>
           </details>
-
-          {/* Formulario */}
-          <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">
-              Page Access Token {!cfg?.has_fb_token && <span className="text-red-500">*</span>}
-            </label>
-            <input type="password"
-              placeholder={cfg?.has_fb_token ? "Dejar vacío para mantener el actual" : "EAAGm..."}
-              value={fbPageToken} onChange={e => setFbPageToken(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Page ID</label>
-            <input type="text" placeholder="Ej: 1017175161475090" value={fbPageId} onChange={e => setFbPageId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-            <p className="text-xs text-gray-400 mt-1">Desde me/accounts → campo "id" de la página</p>
-          </div>
 
           {result && activeTab === "facebook" && (
             <div className={`rounded-lg p-3 text-sm ${result.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{result.msg}</div>
           )}
 
-          {/* Botón de suscripción al webhook — necesario para recibir mensajes */}
+          {/* Webhook */}
           {cfg?.has_fb_token && (
             <button
               onClick={async () => {
@@ -297,10 +395,11 @@ export default function WhatsAppConfigPanel() {
             </button>
           )}
 
-          <button onClick={handleSaveFb} disabled={saving || (!fbPageToken && !cfg?.has_fb_token)}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-50">
-            {saving ? "Guardando..." : cfg?.has_fb_token ? "Actualizar Facebook" : "Guardar Facebook"}
-          </button>
+          {cfg?.has_fb_token && (
+            <button onClick={() => handleDisconnect("facebook")} className="w-full text-xs text-red-400 hover:text-red-600 py-2">
+              Desconectar Facebook
+            </button>
+          )}
         </div>
       )}
 
