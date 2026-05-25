@@ -104,7 +104,12 @@ export default function WhatsAppConfigPanel() {
       body: JSON.stringify({ action: "save_app", fb_app_id: fbAppId, fb_app_secret: fbAppSecret }),
     });
     const d = await res.json() as { ok: boolean; error?: string };
-    setResult(d.ok ? { ok: true, msg: "✅ Credenciales de app guardadas" } : { ok: false, msg: `❌ ${d.error}` });
+    if (d.ok) {
+      setFbAppSecret(""); // limpiar campo por seguridad
+      // Recargar estado para habilitar el Paso 2
+      fetch("/api/settings/fb-token").then(r => r.json()).then((s: FbTokenStatus) => setFbTokenStatus(s));
+    }
+    setResult(d.ok ? { ok: true, msg: "✅ Credenciales guardadas — ahora pega el User Token en el Paso 2" } : { ok: false, msg: `❌ ${d.error}` });
     setSaving(false);
   }
 
