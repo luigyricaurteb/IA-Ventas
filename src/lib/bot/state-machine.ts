@@ -231,15 +231,26 @@ export async function processBotMessage(
     // Toggle: misma keyword entra Y sale del modo admin
     if (keywordSent) {
       // Borrar el mensaje de la clave del historial visible
-      db.prepare("DELETE FROM messages WHERE conversation_id=? AND content=? AND role='user' ORDER BY created_at DESC LIMIT 1").run(conversationId, text);
+      try { db.prepare("DELETE FROM messages WHERE conversation_id=? AND content=? AND role='user'").run(conversationId, text); } catch {}
+
+      const savedData = (() => { try { return bs?.data ? JSON.parse(bs.data as string) : {}; } catch { return {}; } })();
 
       if (!isInAdmin) {
-        setState(db, conversationId, "ADMIN" as BotState);
+        // Guardar estado previo para restaurarlo al salir del modo admin
+        setState(db, conversationId, "ADMIN" as BotState, {
+          prevState: bs?.state ?? "ACTIVE",
+          prevData: savedData,
+          prevProductId: bs?.selected_product_id ?? null,
+        });
         await adminSend(sock, jid, phone,
           `🔧 *Modo Admin activado*\n\nHola. Puedes preguntarme cualquier cosa sobre el negocio en lenguaje natural.`
         );
       } else {
-        setState(db, conversationId, "ACTIVE");
+        // Restaurar estado previo al salir del modo admin
+        const prevState = (savedData.prevState as BotState) ?? "ACTIVE";
+        const prevData = (savedData.prevData as Record<string, unknown>) ?? {};
+        const prevProductId = (savedData.prevProductId as number | null) ?? null;
+        setState(db, conversationId, prevState, prevData, prevProductId);
         await adminSend(sock, jid, phone,
           `✅ *Modo Admin desactivado*\n\nVolviendo al modo normal.`
         );

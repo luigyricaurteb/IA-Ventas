@@ -494,7 +494,7 @@ Responde SOLO con el JSON, sin texto adicional.` }
 
     // Historial completo para la IA (lee toda la conversación)
     const history = db.prepare(
-      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 30"
+      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 40"
     ).all(conv.id) as { role: string; content: string }[];
 
     await processBotMessage(sock, conv.id, phone, sendJid, text, history, slug, pushName);

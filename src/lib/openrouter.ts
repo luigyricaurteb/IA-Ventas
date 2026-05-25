@@ -183,7 +183,7 @@ export async function generateStructuredReply(
   systemPrompt += `\n\nIMPORTANTE: Responde en máximo 3 líneas. Si el usuario muestra interés en comprar, guíalo suavemente hacia elegir un producto del catálogo.`;
   void aiName;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.slice(-10).map(m => ({
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = history.slice(-20).map(m => ({
     role: m.role === "user" ? "user" : "assistant",
     content: m.content,
   }));

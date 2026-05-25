@@ -143,7 +143,7 @@ export async function handleMetaMessage(
 
     // Historial para la IA
     const history = db.prepare(
-      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 30"
+      "SELECT role, content FROM messages WHERE conversation_id=? AND role IN ('user','assistant') ORDER BY created_at ASC LIMIT 40"
     ).all(conv.id) as { role: string; content: string }[];
 
     // Adaptador de envío: processBotMessage espera una función de envío compatible con Baileys sock.
