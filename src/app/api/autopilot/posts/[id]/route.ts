@@ -54,7 +54,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   } | null;
 
   const message = [post.caption, post.hashtags].filter(Boolean).join("\n\n");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+    ?? `https://aivoxgroup.com`;
   const imageUrl = post.image_filename ? `${appUrl}/api/uploads/autopilot/${post.image_filename}` : null;
 
   let fbPostId: string | null = null;

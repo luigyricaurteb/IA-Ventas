@@ -75,7 +75,7 @@ async function publishPost(db: import("better-sqlite3").Database, slug: string) 
 
   const { caption, hashtags } = await generateCaption(db, cfg?.tone ?? "profesional");
   const message = [caption, hashtags].filter(Boolean).join("\n\n");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `https://aivoxgroup.com`);
   const imageUrl = `${appUrl}/api/uploads/autopilot/${nextImage.filename}`;
 
   let fbPostId: string | null = null;

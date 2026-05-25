@@ -119,8 +119,8 @@ async function sendProductImages(
     const metaDb = (sock as unknown as { _db: Database.Database })._db ?? db;
     const metaPhone = (sock as unknown as { _phone: string })._phone ?? phone.replace(/\D/g, "");
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
-      ?? process.env.RAILWAY_STATIC_URL
-      ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+      ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+      ?? `https://aivoxgroup.com`;
 
     for (let i = 0; i < images.length; i++) {
       const imageUrl = `${appUrl}/api/uploads/products/${images[i].filename}`;
@@ -627,8 +627,8 @@ export async function processBotMessage(
 
     if (payMethod === "product_link" && product.slug) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL
-        ?? process.env.RAILWAY_STATIC_URL
-        ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+        ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+        ?? `https://aivoxgroup.com`;
       const productUrl = `${appUrl}/tienda/${slug}/${product.slug}`;
       await sendMany(db, sock, jid, phone, conversationId, [
         `🎯 *Tu cotización*\n\n📦 *${product.name}*\n👥 ${people} persona${people !== 1 ? "s" : ""}\n💰 Total: *$${total.toLocaleString("es-CO")} COP*`,

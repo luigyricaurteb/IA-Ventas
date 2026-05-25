@@ -169,8 +169,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
     // Build public PDF link using reservation code
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-      ?? process.env.RAILWAY_PUBLIC_DOMAIN
-      ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+      ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+      ?? `https://aivoxgroup.com`;
     const pdfLink = reservationCode ? `${baseUrl}/api/pdf/public?code=${reservationCode}` : null;
 
     if (isFullyPaid) {

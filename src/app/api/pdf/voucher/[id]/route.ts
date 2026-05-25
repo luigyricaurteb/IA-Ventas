@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   ).get(resId) as { full_name: string | null; email: string | null; phone: string | null } | null;
 
   // QR apunta al recibo público (cliente puede escanearlo para ver su recibo)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `https://aivoxgroup.com`);
   const receiptUrl = `${baseUrl}/api/pdf/public?code=${code}`;
   const qrDataUrl = await QRCode.toDataURL(receiptUrl, { width: 120, margin: 1 });
   const qrBuffer  = Buffer.from(qrDataUrl.split(",")[1], "base64");

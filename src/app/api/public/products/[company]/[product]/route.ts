@@ -40,8 +40,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   }[];
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    ?? process.env.RAILWAY_STATIC_URL
-    ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+    ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+    ?? `https://aivoxgroup.com`;
 
   return NextResponse.json({
     company: { name: cfg?.name ?? company.name, slug: company.slug, logo_filename: company.logo_filename },

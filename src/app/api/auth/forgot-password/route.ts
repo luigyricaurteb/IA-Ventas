@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = Math.floor(Date.now() / 1000) + 3600; // 1 hora
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://disciplined-rejoicing-production-a444.up.railway.app`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `https://aivoxgroup.com`);
 
   // ── Master user ─────────────────────────────────────────────────────────
   if (!company || company === "__master__") {
