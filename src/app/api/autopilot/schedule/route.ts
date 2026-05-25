@@ -9,6 +9,10 @@ import { getUserFromToken } from "@/lib/auth";
 import { getCompanyDb } from "@/lib/master/db-company";
 import masterDb, { listCompanies } from "@/lib/master/db-master";
 import OpenAI from "openai";
+import fs from "node:fs";
+import path from "node:path";
+
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY ?? "",
@@ -78,43 +82,72 @@ async function publishPost(db: import("better-sqlite3").Database, slug: string) 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `https://aivoxgroup.com`);
   const imageUrl = `${appUrl}/api/uploads/autopilot/${nextImage.filename}`;
 
+  // Leer imagen en binario (más confiable que URL para Facebook)
+  const imageFilePath = path.join(DATA_DIR, "uploads", "autopilot", path.basename(nextImage.filename));
+  const imageExists = fs.existsSync(imageFilePath);
+  const ext = path.extname(nextImage.filename).slice(1).toLowerCase();
+  const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
+  const mime = mimeMap[ext] ?? "image/jpeg";
+
   let fbPostId: string | null = null;
   let igPostId: string | null = null;
   const errors: string[] = [];
 
-  // Facebook
+  // Facebook — subida binaria directa
   if ((cfg?.publish_facebook ?? 1) && waCfg?.fb_page_id && waCfg?.fb_page_token) {
     try {
-      const r = await fetch(`${BASE}/${waCfg.fb_page_id}/photos`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: imageUrl, message, access_token: waCfg.fb_page_token }),
-        signal: AbortSignal.timeout(30000),
-      });
-      const d = await r.json() as { id?: string; error?: { message: string } };
-      if (d.id) fbPostId = d.id; else errors.push(`FB: ${d.error?.message ?? "error"}`);
+      if (imageExists) {
+        const imageBuffer = fs.readFileSync(imageFilePath);
+        const fd = new FormData();
+        fd.append("source", new Blob([imageBuffer], { type: mime }), `image.${ext}`);
+        fd.append("message", message);
+        fd.append("access_token", waCfg.fb_page_token);
+        const r = await fetch(`${BASE}/${waCfg.fb_page_id}/photos`, {
+          method: "POST", body: fd, signal: AbortSignal.timeout(60000),
+        });
+        const d = await r.json() as { id?: string; post_id?: string; error?: { message: string } };
+        console.log(`[autopilot:${slug}] FB response:`, JSON.stringify(d));
+        if (d.id || d.post_id) fbPostId = d.post_id ?? d.id ?? null;
+        else errors.push(`FB: ${d.error?.message ?? "error"}`);
+      } else {
+        // Sin imagen — post de texto
+        const r = await fetch(`${BASE}/${waCfg.fb_page_id}/feed`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, access_token: waCfg.fb_page_token }),
+          signal: AbortSignal.timeout(30000),
+        });
+        const d = await r.json() as { id?: string; error?: { message: string } };
+        if (d.id) fbPostId = d.id; else errors.push(`FB: ${d.error?.message ?? "error"}`);
+      }
     } catch (e) { errors.push(`FB: ${(e as Error).message}`); }
   }
 
-  // Instagram
+  // Instagram — requiere URL pública
   if ((cfg?.publish_instagram ?? 1) && waCfg?.ig_account_id && waCfg?.fb_page_token) {
-    try {
-      const cr = await fetch(`${BASE}/${waCfg.ig_account_id}/media`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_url: imageUrl, caption: message, access_token: waCfg.fb_page_token }),
-        signal: AbortSignal.timeout(30000),
-      });
-      const cd = await cr.json() as { id?: string; error?: { message: string } };
-      if (cd.id) {
-        await new Promise(r => setTimeout(r, 3000));
-        const pr = await fetch(`${BASE}/${waCfg.ig_account_id}/media_publish`, {
+    if (!imageExists) {
+      errors.push("IG: Se requiere imagen para publicar en Instagram");
+    } else {
+      try {
+        const cr = await fetch(`${BASE}/${waCfg.ig_account_id}/media`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ creation_id: cd.id, access_token: waCfg.fb_page_token }),
+          body: JSON.stringify({ image_url: imageUrl, caption: message, access_token: waCfg.fb_page_token }),
           signal: AbortSignal.timeout(30000),
         });
-        const pd = await pr.json() as { id?: string; error?: { message: string } };
-        if (pd.id) igPostId = pd.id; else errors.push(`IG: ${pd.error?.message ?? "error"}`);
-      } else errors.push(`IG: ${cd.error?.message ?? "error"}`);
-    } catch (e) { errors.push(`IG: ${(e as Error).message}`); }
+        const cd = await cr.json() as { id?: string; error?: { message: string } };
+        console.log(`[autopilot:${slug}] IG container:`, JSON.stringify(cd));
+        if (cd.id) {
+          await new Promise(r => setTimeout(r, 4000));
+          const pr = await fetch(`${BASE}/${waCfg.ig_account_id}/media_publish`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creation_id: cd.id, access_token: waCfg.fb_page_token }),
+            signal: AbortSignal.timeout(30000),
+          });
+          const pd = await pr.json() as { id?: string; error?: { message: string } };
+          console.log(`[autopilot:${slug}] IG publish:`, JSON.stringify(pd));
+          if (pd.id) igPostId = pd.id; else errors.push(`IG: ${pd.error?.message ?? "error"}`);
+        } else errors.push(`IG: ${cd.error?.message ?? "error"}`);
+      } catch (e) { errors.push(`IG: ${(e as Error).message}`); }
+    }
   }
 
   const success = !!(fbPostId || igPostId);
