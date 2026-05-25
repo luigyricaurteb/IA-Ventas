@@ -177,8 +177,12 @@ export default function AutopilotModule() {
     setPublishing(id);
     const res = await fetch(`/api/autopilot/posts/${id}`, { method: "POST" });
     const d = await res.json() as { ok: boolean; errors?: string[] };
-    if (d.ok) showMsg(true, "✅ Publicado en redes sociales");
-    else showMsg(false, `❌ ${d.errors?.join(", ") ?? "Error al publicar"}`);
+    if (d.ok) {
+      showMsg(true, "✅ Publicado en redes sociales");
+      loadImages(); // refrescar banco para quitar la imagen publicada
+    } else {
+      showMsg(false, `❌ ${d.errors?.join(", ") ?? "Error al publicar"}`);
+    }
     setPublishing(null);
     loadPosts(tab === "published" ? "published" : "draft");
   }

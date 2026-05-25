@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
 
-const BUILD = "v3.2 · " + new Date("2026-05-25").toLocaleDateString("es-CO", { day:"2-digit", month:"short", year:"numeric" });
+const BUILD = "v3.3 · " + new Date("2026-05-25").toLocaleDateString("es-CO", { day:"2-digit", month:"short", year:"numeric" });
 
 interface CompanyOption { slug: string; name: string; status: string; logo_filename?: string | null }
 
